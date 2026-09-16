@@ -207,7 +207,7 @@ The source list uses `word-break: break-all` and `title` attributes for full-val
 | # | Check | Command | Status |
 |---|-------|---------|--------|
 | 1 | Typecheck | `tsc --noEmit` | ✅ 0 errors |
-| 2 | Tests | `vitest run` | ✅ 1471 passed, 18 skipped (81 files) |
+| 2 | Tests | `vitest run` | ✅ 1492 passed, 18 skipped (83 files) |
 | 3 | ESLint | `eslint .` | ✅ 0 errors |
 | 4 | Prettier | `prettier --check .` | ✅ All files formatted |
 | 5 | Build | `next build` | ✅ Compiled successfully |
@@ -216,8 +216,8 @@ The source list uses `word-break: break-all` and `title` attributes for full-val
 
 ### Test count change:
 - Step 38 baseline: 1452 passed, 18 skipped
-- Step 39 final: 1471 passed, 18 skipped
-- Increase: **19 new tests** (13 pure + 6 component)
+- Step 39 final: 1492 passed, 18 skipped
+- Increase: **40 new tests** (13 detection-coverage pure + 13 detection-explainability pure + 8 DetectionCoverage component + 6 DetectionItem component)
 
 ## Regression Requirements (preserved)
 

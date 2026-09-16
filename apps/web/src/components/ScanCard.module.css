@@ -1315,3 +1315,64 @@
   letter-spacing: 0.05rem;
   color: #6b7280;
 }
+
+/* ─── Step 40: Detection Coverage ──────────────────────────────────── */
+
+.detectionCoverage {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #f9fafb;
+}
+
+.detectionCoverage h2 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+  color: #374151;
+}
+
+.coverageMeta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 1rem;
+  margin-bottom: 0.4rem;
+}
+
+.coverageMeta dt {
+  font-size: 0.7rem;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.025rem;
+}
+
+.coverageMeta dd {
+  font-size: 0.85rem;
+  margin: 0;
+  color: #111827;
+  font-weight: 600;
+}
+
+.coverageEmpty {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.evidenceTypeListCompact {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+}
+
+.evidenceTypeItemCompact {
+  font-size: 0.75rem;
+  color: #374151;
+  background: #f3f4f6;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.2rem;
+}

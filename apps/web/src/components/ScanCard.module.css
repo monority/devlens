@@ -1086,3 +1086,12 @@
 .techList {
   margin-top: 0.75rem;
 }
+
+/* ─── Step 33: Detection Explanation ──────────────────────────────── */
+
+.detectionExplanation {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin: 0.25rem 0 0.5rem 0;
+  line-height: 1.4;
+}

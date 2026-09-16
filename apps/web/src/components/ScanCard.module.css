@@ -1095,3 +1095,61 @@
   margin: 0.25rem 0 0.5rem 0;
   line-height: 1.4;
 }
+
+/* ─── Step 34: Technology Composition ─────────────────────────────── */
+
+.technologyComposition {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.technologyComposition h3 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025rem;
+  color: #6b7280;
+  margin: 0 0 0.5rem 0;
+}
+
+.compositionCategory {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+}
+
+.compositionCategory:last-child {
+  margin-bottom: 0;
+}
+
+.compositionCategoryLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.25rem;
+}
+
+.compositionTechList {
+  list-style: none;
+  padding: 0 0 0 1rem;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5rem;
+}
+
+.compositionTechItem {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.compositionTechName {
+  font-size: 0.85rem;
+  color: #111827;
+}
+
+.compositionTechCategory {
+  font-size: 0.78rem;
+  color: #9ca3af;
+}

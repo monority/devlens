@@ -112,6 +112,42 @@ export function ScanInsights({ result }: ScanInsightsProps): React.ReactElement 
           </ul>
         </div>
       )}
+
+      {/* Technology composition (grouped by category, deduplicated by ID) */}
+      {insights.technologyComposition.length > 0 && (
+        <div className={styles.technologyComposition}>
+          <h3>Technology composition</h3>
+          {insights.technologyComposition.map(({ category, technologies }) => (
+            <div key={category} className={styles.compositionCategory}>
+              <span className={styles.compositionCategoryLabel}>
+                {category} · {technologies.length}
+              </span>
+              <ul className={styles.compositionTechList}>
+                {technologies.map(({ id, name }) => {
+                  const known = isKnownTechnology(id);
+                  return (
+                    <li key={id} className={styles.compositionTechItem}>
+                      {known ? (
+                        <Link
+                          href={`/technologies/${encodeURIComponent(id)}`}
+                          className={styles.compositionTechName}
+                        >
+                          {name}
+                        </Link>
+                      ) : (
+                        <span className={styles.compositionTechName}>{name}</span>
+                      )}
+                      <span className={styles.compositionTechCategory}>
+                        {known ? category : 'Unknown'}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

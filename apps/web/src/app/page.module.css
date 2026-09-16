@@ -1,0 +1,35 @@
+.main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2rem;
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.subtitle {
+  color: #6b7280;
+  font-size: 1rem;
+}
+
+.techCatalogLink {
+  margin-top: 1rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #2563eb;
+  text-decoration: none;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid #2563eb;
+  border-radius: 0.35rem;
+  transition: background-color 0.15s ease;
+}
+
+.techCatalogLink:hover {
+  background-color: rgba(37, 99, 235, 0.08);
+}

@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+.pnpm/
+.pnpm-store/
+
+# Build outputs
+.next/
+dist/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env*.local
+
+# Test results
+playwright-report/
+test-results/
+coverage/
+
+# ESLint
+.eslintcache
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*

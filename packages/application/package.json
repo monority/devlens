@@ -1,0 +1,23 @@
+{
+  "name": "@devlens/application",
+  "version": "0.1.0",
+  "description": "DevLens — application layer: scan lifecycle orchestration",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@devlens/core": "workspace:*",
+    "@devlens/crawler": "workspace:*",
+    "@devlens/detectors": "workspace:*"
+  },
+  "type": "module"
+}

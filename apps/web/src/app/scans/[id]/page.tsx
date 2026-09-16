@@ -61,8 +61,17 @@ export async function generateMetadata({
   }
 }
 
-export default async function ScanDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ScanDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ q?: string; category?: string }>;
+}) {
   const { id } = await params;
+  const sp = await searchParams;
+  const query = sp?.q ?? '';
+  const category = sp?.category ?? '';
 
   try {
     const result = await fetchScanById(id);
@@ -104,7 +113,12 @@ export default async function ScanDetailPage({ params }: { params: Promise<{ id:
           <CopyReportLink scanId={result.scan.id} />
           <ExportScanButton result={result} />
         </div>
-        <ScanLifecycle scanId={id} initialResult={result} />
+        <ScanLifecycle
+          scanId={id}
+          initialResult={result}
+          initialQuery={query}
+          initialCategory={category}
+        />
       </main>
     );
   } catch {

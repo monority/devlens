@@ -39,13 +39,22 @@ export interface ScanLifecycleProps {
   scanId: string;
   /** The initial scan result from the server (for hydration compatibility). */
   initialResult: ScanDetailResponse;
+  /** Initial query filter from URL (for detection filtering). */
+  initialQuery?: string;
+  /** Initial category filter from URL (for detection filtering). */
+  initialCategory?: string;
 }
 
 /**
  * Renders the scan detail and polls for lifecycle updates when the scan
  * is in a non-terminal state.
  */
-export function ScanLifecycle({ scanId, initialResult }: ScanLifecycleProps): React.ReactElement {
+export function ScanLifecycle({
+  scanId,
+  initialResult,
+  initialQuery,
+  initialCategory,
+}: ScanLifecycleProps): React.ReactElement {
   const [result, setResult] = useState<ScanDetailResponse>(initialResult);
   const [notFound, setNotFound] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
@@ -100,7 +109,11 @@ export function ScanLifecycle({ scanId, initialResult }: ScanLifecycleProps): Re
   return (
     <>
       {refreshError && <p className={styles.refreshError}>{refreshError}</p>}
-      <ScanDetailView result={result} />
+      <ScanDetailView
+        result={result}
+        initialQuery={initialQuery ?? ''}
+        initialCategory={initialCategory ?? ''}
+      />
     </>
   );
 }

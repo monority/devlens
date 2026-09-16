@@ -35,6 +35,7 @@ import { ScanOverview } from './ScanOverview';
 import { ScanInsights } from './ScanInsights';
 import { DetectionList } from './DetectionList';
 import { DetectionFilterView } from './DetectionFilterView';
+import { ScanDetectionResults } from './ScanDetectionResults';
 import styles from './ScanCard.module.css';
 
 // ─── Scan status badge helpers ────────────────────────────────────────
@@ -250,14 +251,17 @@ export function ScanningState({ scan }: { scan: ScanDetailResponse['scan'] }): R
  * Renders the full detail view of a single scan result.
  *
  * Delegates to sub-components for each section:
- *   - ScanSummary  (target, status, timeline)
- *   - Snapshot     (HTTP + HTML observations)
- *   - ScanningState (pending/running UI)
- *   - DetectionList (completed detections, or EmptyDetections for zero)
+ *   - ScanOverview   (scan metadata + metrics, completed scans only)
+ *   - ScanInsights   (technology insights, completed scans only)
+ *   - Snapshot       (HTTP + HTML observations)
+ *   - ScanningState  (pending/running UI)
+ *   - ScanDetectionResults / DetectionFilterView (completed detections,
+ *     sorted deterministically by confidence DESC, name ASC)
+ *   - DetectionList  (failed scans — preserves existing behavior)
  *
  * Lifecycle states (pending/running/failed) are preserved exactly as
  * implemented in Step 24. Only the completed-results presentation is
- * redesigned in Step 25.
+ * enhanced in Step 38.
  */
 export interface ScanDetailViewProps {
   result: ScanDetailResponse;
@@ -307,6 +311,8 @@ export function ScanDetailView({
             initialQuery={initialQuery}
             initialCategory={initialCategory ?? ''}
           />
+        ) : scan.status === 'completed' ? (
+          <ScanDetectionResults detections={detections} />
         ) : (
           <DetectionList detections={detections} />
         )}

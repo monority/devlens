@@ -31,7 +31,7 @@ import {
   getDetectionCategories,
 } from '../lib/detection-filter';
 import { DetectionFilters } from './DetectionFilters';
-import { DetectionList } from './DetectionList';
+import { ScanDetectionResults } from './ScanDetectionResults';
 import type { DetectionResponse } from '../lib/types.js';
 import type { DetectionFilters as DetectionFiltersState } from '../lib/detection-filter.js';
 
@@ -103,7 +103,7 @@ export function DetectionFilterView({
           setCategory('');
         }}
       />
-      <DetectionList detections={filtered} />
+      <ScanDetectionResults detections={filtered} />
     </>
   );
 }

@@ -1,0 +1,21 @@
+{
+  "name": "devlens-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DevLens — Node.js worker for background jobs",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc --build",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@devlens/application": "workspace:*",
+    "@devlens/core": "workspace:*",
+    "@devlens/crawler": "workspace:*",
+    "@devlens/database": "workspace:*",
+    "@devlens/detectors": "workspace:*"
+  },
+  "type": "module"
+}

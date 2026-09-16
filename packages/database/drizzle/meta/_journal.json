@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1787926461423,
+      "tag": "0000_opposite_doctor_spectrum",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787927000000,
+      "tag": "0001_add_detections_to_snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787927001000,
+      "tag": "0002_add_meta_tags_to_snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787927600000,
+      "tag": "0003_add_scripts_to_snapshots",
+      "breakpoints": true
+    }
+  ]
+}

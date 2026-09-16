@@ -1,0 +1,65 @@
+.main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.detailHeader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 1.5rem;
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem 0;
+}
+
+.subtitle {
+  color: #6b7280;
+  font-size: 1rem;
+  margin: 0 0 0.5rem 0;
+}
+
+.backLink {
+  font-size: 0.875rem;
+  color: #2563eb;
+  text-decoration: none;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid #2563eb;
+  border-radius: 0.3rem;
+  transition: background-color 0.15s ease;
+}
+
+.backLink:hover {
+  background-color: rgba(37, 99, 235, 0.08);
+}
+
+.scanId {
+  background: #f3f4f6;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.25rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.compareLink {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #059669;
+  text-decoration: none;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid #059669;
+  border-radius: 0.3rem;
+  transition: background-color 0.15s ease;
+}
+
+.compareLink:hover {
+  background-color: rgba(5, 150, 105, 0.08);
+}

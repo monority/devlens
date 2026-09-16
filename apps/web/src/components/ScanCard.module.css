@@ -1,0 +1,1088 @@
+/* Scan card styles */
+.card {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  background: #ffffff;
+  transition: box-shadow 0.15s ease;
+}
+
+.card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.cardBody {
+  margin-bottom: 0.5rem;
+}
+
+.target {
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin: 0 0 0.25rem 0;
+  word-break: break-all;
+}
+
+.hostname {
+  color: #6b7280;
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.cardFooter {
+  font-size: 0.8rem;
+}
+
+.cardFooter a {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.cardFooter a:hover {
+  text-decoration: underline;
+}
+
+/* Status badges */
+.statusBadge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025rem;
+}
+
+.statusCompleted {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.statusFailed {
+  background: #fee2e2;
+  color: #991b2b;
+}
+
+.statusRunning {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.statusPending {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+/* List layout */
+.list {
+  margin-top: 1rem;
+}
+
+.list h2 {
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+/* Empty state */
+.empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #6b7280;
+}
+
+.empty p {
+  margin: 0.25rem 0;
+}
+
+/* Error state */
+.error {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #6b7280;
+}
+
+.error h2 {
+  font-size: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Not found */
+.notFound {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #6b7280;
+}
+
+.notFound h2 {
+  font-size: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.notFound code {
+  background: #f3f4f6;
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.notFound a {
+  color: #2563eb;
+  text-decoration: none;
+  display: inline-block;
+  margin-top: 1rem;
+}
+
+.notFound a:hover {
+  text-decoration: underline;
+}
+
+/* Detail view */
+.detail {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.detailHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.detailHeader h1 {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+.detailMeta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem 1rem;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.detailMeta dt {
+  font-size: 0.8rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.025rem;
+}
+
+.detailMeta dd {
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.detailMeta code {
+  background: #f3f4f6;
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.detail h2 {
+  font-size: 1.1rem;
+  margin-bottom: 0.75rem;
+}
+
+.detail section {
+  margin-bottom: 1.5rem;
+}
+
+.detectionList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.detection {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+
+.techName {
+  font-weight: 600;
+  display: block;
+  font-size: 1rem;
+}
+
+.confidence {
+  font-size: 0.8rem;
+  color: #2563eb;
+  display: block;
+}
+
+.category {
+  font-size: 0.75rem;
+  color: #6b7280;
+  display: block;
+}
+
+.evidenceList {
+  list-style: none;
+  padding: 0.5rem 0 0 0;
+  margin: 0.5rem 0 0 0;
+  border-top: 1px solid #f3f4f6;
+  font-size: 0.8rem;
+}
+
+.evidenceList li {
+  padding: 0.25rem 0;
+  border-bottom: 1px solid #f9fafb;
+}
+
+.evidenceItem strong {
+  color: #374151;
+  margin-right: 0.3rem;
+}
+
+.evidenceItem code {
+  background: #f3f4f6;
+  padding: 0.1rem 0.25rem;
+  border-radius: 0.2rem;
+  font-size: 0.8rem;
+}
+
+/* Snapshot section */
+.snapshot p {
+  margin: 0.25rem 0;
+}
+
+/* Scanning state (pending/running) */
+.scanning {
+  padding: 1.5rem;
+  background: #f9fafb;
+  border: 1px dashed #d1d5db;
+  border-radius: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.scanning h2 {
+  margin-top: 0;
+  color: #2563eb;
+}
+
+.scanning p {
+  margin: 0.25rem 0;
+  color: #4b5563;
+}
+
+.scanning time {
+  font-weight: 500;
+  color: #111827;
+}
+
+/* ─── Step 25: Report presentation classes ────────────────────────── */
+
+/* ScansHistory with "New scan" link */
+.listHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.listHeader h2 {
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.newScanLink {
+  font-size: 0.85rem;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.newScanLink:hover {
+  text-decoration: underline;
+}
+
+/* Empty state with link */
+.empty a {
+  color: #2563eb;
+  text-decoration: none;
+  display: inline-block;
+  margin-top: 0.5rem;
+}
+
+.empty a:hover {
+  text-decoration: underline;
+}
+
+/* Scan summary (detail view header) */
+.summary {
+  margin-bottom: 1.5rem;
+}
+
+.summaryHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.summaryHeader h1 {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+.summaryMeta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem 1rem;
+}
+
+.summaryMeta dt {
+  font-size: 0.8rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.025rem;
+}
+
+.summaryMeta dd {
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.wordBreak {
+  word-break: break-all;
+}
+
+/* Snapshot section */
+.snapshot {
+  margin-bottom: 1.5rem;
+}
+
+.snapshot h2 {
+  font-size: 1.1rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Detections */
+.detections {
+  margin-bottom: 1.5rem;
+}
+
+.detectionsHeading {
+  font-size: 1.1rem;
+  margin-bottom: 0.75rem;
+}
+
+.detections h2 {
+  font-size: 1.1rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Detection list (ordered) */
+.detectionList {
+  list-style: decimal;
+  padding: 0 0 0 1.5rem;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.detectionItem {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+
+.detectionHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: baseline;
+  margin-bottom: 0.5rem;
+}
+
+.techName {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #111827;
+}
+
+.category {
+  font-size: 0.8rem;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.25rem;
+}
+
+.score {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.detectionMeta {
+  margin-bottom: 0.5rem;
+}
+
+.evidenceCount {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+/* Evidence tree (collapsible details) */
+.evidenceTree {
+  margin-top: 0.5rem;
+}
+
+.evidenceSummary {
+  font-size: 0.8rem;
+  color: #4b5563;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  padding: 0.25rem 0;
+}
+
+.evidenceSummary::before {
+  content: '▸ ';
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+
+.evidenceTree[open] .evidenceSummary::before,
+.evidenceTree[open] summary::before {
+  transform: rotate(90deg);
+}
+
+/* Evidence list */
+.evidenceList {
+  list-style: none;
+  padding: 0.25rem 0 0 1rem;
+  margin: 0.25rem 0 0 0;
+  font-size: 0.8rem;
+}
+
+.evidenceList li {
+  padding: 0.25rem 0;
+  border-bottom: 1px solid #f9fafb;
+}
+
+.evidenceItem {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.5rem;
+  align-items: baseline;
+}
+
+.evidenceType {
+  color: #6b7280;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.025rem;
+}
+
+.evidenceFields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.5rem;
+  align-items: baseline;
+}
+
+.evidenceValue {
+  color: #374151;
+}
+
+.evidenceCode {
+  background: #f3f4f6;
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.2rem;
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+.evidenceUrl {
+  color: #2563eb;
+  word-break: break-all;
+}
+
+/* Empty detections state */
+.emptyDetections {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #6b7280;
+  border: 1px dashed #d1d5db;
+  border-radius: 0.5rem;
+}
+
+.emptyDetections h2 {
+  margin-top: 0;
+  color: #111827;
+}
+
+.emptyDetections p {
+  margin: 0.25rem 0;
+}
+
+/* ─── Step 26: Comparison report styles ────────────────────────────── */
+
+.comparison {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.comparisonHeader h1 {
+  font-size: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.comparisonSides {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .comparisonSides {
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+  }
+}
+
+.comparisonSide h2 {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+  color: #6b7280;
+}
+
+.comparisonSide:first-child h2::before {
+  content: '← ';
+}
+
+.comparisonSide:last-child h2::before {
+  content: '→ ';
+}
+
+.comparisonError {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #6b7280;
+}
+
+.comparisonErrorLink {
+  color: #2563eb;
+  text-decoration: none;
+  display: inline-block;
+  margin-top: 1rem;
+}
+
+.comparisonErrorLink:hover {
+  text-decoration: underline;
+}
+
+.targetWarning {
+  background: #fffbeb;
+  border: 1px solid #f59e0b;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.targetWarning h2 {
+  margin-top: 0;
+  color: #92400e;
+}
+
+.targetList {
+  margin: 0.5rem 0 0 0;
+}
+
+.failedNotice {
+  background: #fef2f2;
+  border: 1px solid #ef4444;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.failedNotice h2 {
+  margin-top: 0;
+  color: #991b1b;
+}
+
+.techChanges h2 {
+  font-size: 1.1rem;
+  margin-bottom: 0.75rem;
+}
+
+.techChanges h3 {
+  font-size: 0.95rem;
+  margin: 1rem 0 0.5rem 0;
+  color: #374151;
+}
+
+.changeList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.changeItem {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.75rem;
+  align-items: center;
+  padding: 0.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+}
+
+.changeBadge {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025rem;
+}
+
+.addedBadge {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.removedBadge {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.unchangedBadge {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.scoreTable,
+.evidenceTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+  font-size: 0.85rem;
+}
+
+.scoreTable th,
+.scoreTable td,
+.evidenceTable th,
+.evidenceTable td {
+  text-align: left;
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.scoreTable th,
+.evidenceTable th {
+  font-size: 0.75rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.025rem;
+}
+
+.scoreChange {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.scoreChange[aria-label='increased'] {
+  color: #166534;
+}
+
+.scoreChange[aria-label='decreased'] {
+  color: #991b1b;
+}
+
+.evidenceUrl {
+  color: #2563eb;
+  word-break: break-all;
+}
+
+.noChanges {
+  padding: 1.5rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+}
+
+.noChanges p {
+  margin: 0;
+  color: #4b5563;
+}
+
+.noEvidenceChanges {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin: 0.25rem 0;
+}
+
+@media (max-width: 768px) {
+  .comparisonSides {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── Step 27: Scan filter UI ───────────────────────────────────────── */
+
+.scanFilters {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+}
+
+.filterControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.filterLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.025rem;
+}
+
+.searchInput {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.3rem;
+  font-size: 0.9rem;
+  min-width: 200px;
+}
+
+.searchInput:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
+.statusSelect {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.3rem;
+  font-size: 0.9rem;
+  background: white;
+  cursor: pointer;
+}
+
+.statusSelect:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
+.resetButton {
+  align-self: flex-end;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid #6b7280;
+  border-radius: 0.3rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+  background: white;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.resetButton:hover {
+  background-color: rgba(55, 65, 81, 0.08);
+}
+
+.resultCount {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin: 0.5rem 0 0 0;
+}
+
+.filterEmpty {
+  text-align: center;
+  padding: 1.5rem 1rem;
+  color: #6b7280;
+}
+
+.filterEmpty p {
+  margin: 0.25rem 0;
+}
+
+.emptyLink {
+  color: #2563eb;
+  text-decoration: none;
+  display: inline-block;
+  margin-top: 0.5rem;
+}
+
+.emptyLink:hover {
+  text-decoration: underline;
+}
+
+/* ─── Step 28: Copy report link ─────────────────────────────────────── */
+
+.copyReportLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.copyReportLink button {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4b5563;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 0.3rem;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.copyReportLink button:hover {
+  background-color: rgba(55, 65, 81, 0.05);
+}
+
+.copyFeedback,
+.copyError {
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.copyFeedback {
+  color: #166534;
+}
+
+.copyError {
+  color: #991b2b;
+}
+
+/* ─── Step 28: Detection count in detail header ─────────────────────── */
+
+.detectionCount {
+  color: #6b7280;
+  font-size: 0.9rem;
+  font-weight: 400;
+  margin-left: 0.5rem;
+}
+
+/* ─── Step 28/29: Copy report link ──────────────────────────────────── */
+
+.copyReportLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.copyReportLink button {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4b5563;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 0.3rem;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.copyReportLink button:hover {
+  background-color: rgba(55, 65, 81, 0.05);
+}
+
+.copyFeedback,
+.copyError {
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.copyFeedback {
+  color: #166534;
+}
+
+.copyError {
+  color: #991b2b;
+}
+
+/* ─── Step 29: Export scan ──────────────────────────────────────────── */
+
+.exportScanLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.exportButton {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4b5563;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 0.3rem;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.exportButton:hover {
+  background-color: rgba(55, 65, 81, 0.05);
+}
+
+.exportFeedback {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #166534;
+}
+
+/* ─── Step 30: Technology catalog links ─────────────────────────────── */
+
+.techNameLink {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.techNameLink:hover {
+  text-decoration: underline;
+}
+
+/* ─── Step 32: Scan Insights ──────────────────────────────────────── */
+
+.scanInsights {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background: #f9fafb;
+}
+
+.scanInsights h2 {
+  font-size: 1.1rem;
+  margin: 0 0 0.75rem 0;
+}
+
+.techCount {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 1rem 0;
+  color: #111827;
+}
+
+.categoryComposition h3,
+.evidenceCoverage h3,
+.techList h3 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025rem;
+  color: #6b7280;
+  margin: 0 0 0.4rem 0;
+}
+
+.categoryList,
+.evidenceTypeList,
+.techListItems {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.75rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.categoryItem,
+.evidenceTypeItem,
+.techListItem {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.categoryName,
+.techCategory,
+.evidenceTypeName {
+  font-size: 0.85rem;
+  color: #374151;
+}
+
+.categoryCount,
+.evidenceTypeCount {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.techInsightLink {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.techInsightLink:hover {
+  text-decoration: underline;
+}
+
+.evidenceMeta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 1rem;
+  margin-bottom: 0.4rem;
+}
+
+.evidenceMeta dt {
+  font-size: 0.75rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.025rem;
+}
+
+.evidenceMeta dd {
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.techList {
+  margin-top: 0.75rem;
+}

@@ -1,0 +1,25 @@
+{
+  "name": "devlens-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DevLens — Next.js web application",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@devlens/application": "workspace:*",
+    "@devlens/core": "workspace:*",
+    "@devlens/crawler": "workspace:*",
+    "@devlens/database": "workspace:*",
+    "@devlens/detectors": "workspace:*",
+    "next": "^15.5.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "drizzle-orm": "^0.45.2",
+    "vitest": "^4.1.11"
+  }
+}

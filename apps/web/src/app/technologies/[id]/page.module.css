@@ -1,0 +1,80 @@
+.main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 1.5rem;
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem 0;
+}
+
+.subtitle {
+  color: #6b7280;
+  font-size: 1rem;
+  margin: 0 0 0.75rem 0;
+}
+
+.techId {
+  background: #f3f4f6;
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.25rem;
+  font-size: 0.9rem;
+}
+
+/* Detail metadata */
+.detail {
+  width: 100%;
+  margin-bottom: 2rem;
+}
+
+.detailMeta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem 1rem;
+}
+
+.detailMeta dt {
+  font-size: 0.8rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.025rem;
+}
+
+.detailMeta dd {
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+/* Footer */
+.footer {
+  margin-top: 1.5rem;
+  width: 100%;
+}
+
+.backLink {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #2563eb;
+  text-decoration: none;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid #2563eb;
+  border-radius: 0.3rem;
+  transition: background-color 0.15s ease;
+}
+
+.backLink:hover {
+  background-color: rgba(37, 99, 235, 0.08);
+}

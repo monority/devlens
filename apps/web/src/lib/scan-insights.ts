@@ -17,7 +17,7 @@
  *   - evidence types: count DESC, type ASC
  */
 
-import type { ScanDetailResponse, DetectionResponse } from '../lib/types.js';
+import type { ScanDetailResponse, DetectionResponse, EvidenceResponse } from '../lib/types.js';
 import { evidenceTypeLabel } from '../lib/evidence-presenter';
 import { isKnownTechnology } from '../lib/technology-catalog';
 
@@ -41,6 +41,20 @@ export interface TechnologyCategoryComposition {
   readonly category: string;
   /** Unique technologies within this category, sorted deterministically. */
   readonly technologies: TechnologyCompositionItem[];
+}
+
+/**
+ * A single row in the technology evidence matrix.
+ */
+export interface TechnologyEvidenceMatrixItem {
+  /** The technology ID (stable identity). */
+  readonly id: string;
+  /** The technology display name (from the first occurrence). */
+  readonly name: string;
+  /** Unique evidence type labels, sorted alphabetically ASC. */
+  readonly evidenceTypes: string[];
+  /** Count of deduplicated evidence entries for this technology. */
+  readonly evidenceCount: number;
 }
 
 /**
@@ -79,6 +93,8 @@ export interface ScanInsights {
   evidenceTypes: EvidenceTypeCount[];
   /** Technology composition grouped by category (count DESC, category ASC). */
   technologyComposition: TechnologyCategoryComposition[];
+  /** Technology evidence matrix (name ASC, id ASC). */
+  technologyEvidenceMatrix: TechnologyEvidenceMatrixItem[];
 }
 
 // ─── Internal helpers ────────────────────────────────────────────────
@@ -215,6 +231,129 @@ export function getTechnologyComposition(
 }
 
 /**
+ * Produces a deterministic canonical identity string for an evidence item.
+ *
+ * Used for deduplication when merging evidence across duplicate detection
+ * records. Each evidence type uses its type-specific primary identifier:
+ * - html → selector
+ * - http_header → name
+ * - script_url → url
+ * - script_content → snippet
+ * - meta_tag → name
+ * - javascript_global → globalName
+ * - resource → url
+ * - link → url
+ * - unknown → full JSON serialization
+ *
+ * This is a presentation-only helper — it does not alter evidence or
+ * participate in detector logic.
+ */
+function evidenceIdentity(item: EvidenceResponse): string {
+  switch (item.type) {
+    case 'html':
+      return `html:${item.selector}`;
+    case 'http_header':
+      return `http_header:${item.name}`;
+    case 'script_url':
+      return `script_url:${item.url}`;
+    case 'script_content':
+      return `script_content:${item.snippet}`;
+    case 'meta_tag':
+      return `meta_tag:${item.name}`;
+    case 'javascript_global':
+      return `javascript_global:${item.globalName}`;
+    case 'resource':
+      return `resource:${item.url}`;
+    case 'link':
+      return `link:${item.url}`;
+    default: {
+      // Fallback for unknown/future evidence types — serialize the full item
+      const unknown = item as { type: string; [key: string]: unknown };
+      return `${unknown.type}:${JSON.stringify(unknown)}`;
+    }
+  }
+}
+
+/**
+ * Deduplicates evidence entries using the canonical evidence identity.
+ *
+ * Preserves the order of first occurrence. Does not mutate the input array.
+ */
+function deduplicateEvidence(evidence: EvidenceResponse[]): EvidenceResponse[] {
+  const seen = new Set<string>();
+  const result: EvidenceResponse[] = [];
+  for (const item of evidence) {
+    const id = evidenceIdentity(item);
+    if (!seen.has(id)) {
+      seen.add(id);
+      result.push(item);
+    }
+  }
+  return result;
+}
+
+/**
+ * Builds a technology evidence matrix from detection results.
+ *
+ * For each unique technology ID across all detections:
+ *   - Preserves the technology ID and its display name (first occurrence)
+ *   - Merges evidence from all detections of the same technology
+ *   - Deduplicates evidence entries using the canonical identity
+ *   - Derives unique evidence type labels (alphabetically sorted ASC)
+ *   - Counts the actual deduplicated evidence entries
+ *
+ * Duplicate detection records for the same technology ID collapse into
+ * a single matrix row — evidence is merged and deduplicated.
+ *
+ * Unknown technology IDs are preserved as-is (no catalog lookup).
+ * Unknown evidence types use the "Evidence" fallback label.
+ *
+ * Does not recalculate confidence. Does not mutate the input.
+ *
+ * @param detections Array of detection responses
+ * @returns Technology evidence matrix items, sorted by name ASC then id ASC
+ */
+export function getTechnologyEvidenceMatrix(
+  detections: DetectionResponse[],
+): TechnologyEvidenceMatrixItem[] {
+  // Group evidence by technology ID, deduplicating
+  const techMap: Map<string, { name: string; evidence: EvidenceResponse[] }> = new Map();
+
+  for (const detection of detections) {
+    const tech = detection.technology;
+    if (!techMap.has(tech.id)) {
+      techMap.set(tech.id, { name: tech.name, evidence: [] });
+    }
+    // Merge evidence from this detection
+    techMap.get(tech.id)!.evidence.push(...detection.evidence);
+  }
+
+  // Build matrix items
+  const items: TechnologyEvidenceMatrixItem[] = [];
+  for (const [id, { name, evidence }] of techMap) {
+    const uniqueEvidence = deduplicateEvidence(evidence);
+    const evidenceTypes = [...new Set(uniqueEvidence.map((e) => evidenceTypeLabel(e.type)))].sort();
+
+    items.push({
+      id,
+      name,
+      evidenceTypes,
+      evidenceCount: uniqueEvidence.length,
+    });
+  }
+
+  // Sort by name ASC, then id ASC
+  items.sort((a, b) => {
+    if (a.name !== b.name) {
+      return a.name < b.name ? -1 : 1;
+    }
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+
+  return items;
+}
+
+/**
  * Aggregates technology usage insights from a scan result.
  *
  * Derives:
@@ -224,6 +363,7 @@ export function getTechnologyComposition(
  * - `categories` — per-category detection counts (count DESC, category ASC)
  * - `evidenceTypes` — per-evidence-type item counts (count DESC, type ASC)
  * - `technologyComposition` — grouped technology composition by category
+ * - `technologyEvidenceMatrix` — per-technology evidence types and counts
  *
  * All values are derived exclusively from the already-loaded scan result.
  * Does not mutate the input.
@@ -253,6 +393,7 @@ export function getScanInsights(scan: ScanDetailResponse): ScanInsights {
   }));
 
   const technologyComposition = getTechnologyComposition(detections);
+  const technologyEvidenceMatrix = getTechnologyEvidenceMatrix(detections);
 
   return {
     technologyCount,
@@ -261,5 +402,6 @@ export function getScanInsights(scan: ScanDetailResponse): ScanInsights {
     categories,
     evidenceTypes,
     technologyComposition,
+    technologyEvidenceMatrix,
   };
 }

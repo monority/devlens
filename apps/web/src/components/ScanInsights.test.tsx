@@ -338,3 +338,110 @@ describe('ScanInsights — Technology composition', () => {
     expect(html).not.toContain('Compatible technologies');
   });
 });
+
+// ─── Step 35: Technology evidence matrix component tests ─────────────
+
+describe('ScanInsights — Technology evidence matrix', () => {
+  it('matrix renders for a completed scan with detections', () => {
+    const result = makeCompletedScanDetail([
+      makeDetection('react', 'React', 'framework'),
+      makeDetection('wordpress', 'WordPress', 'cms'),
+    ]);
+    const html = renderToString(React.createElement(ScanInsights, { result }));
+
+    expect(html).toContain('Technology evidence');
+  });
+
+  it('renders technology names with correct catalog links', () => {
+    const result = makeCompletedScanDetail([
+      makeDetection('react', 'React', 'framework'),
+      makeDetection('nginx', 'nginx', 'server'),
+    ]);
+    const html = renderToString(React.createElement(ScanInsights, { result }));
+
+    expect(html).toContain('href="/technologies/react"');
+    expect(html).toContain('href="/technologies/nginx"');
+  });
+
+  it('renders unknown technologies as plain text (no link)', () => {
+    const result = makeCompletedScanDetail([
+      makeDetection('unknown-tech', 'Unknown Technology', 'custom'),
+    ]);
+    const html = renderToString(React.createElement(ScanInsights, { result }));
+
+    expect(html).not.toContain('/technologies/unknown-tech');
+    expect(html).toContain('Unknown Technology');
+  });
+
+  it('renders evidence type labels correctly', () => {
+    const result = makeCompletedScanDetail([makeDetection('react', 'React', 'framework', 3)]);
+    const html = renderToString(React.createElement(ScanInsights, { result }));
+    const cleaned = clean(html);
+
+    // makeDetection with 3 evidence items creates: http_header, meta_tag, script_url
+    expect(cleaned).toContain('HTTP Header');
+    expect(cleaned).toContain('Meta Tag');
+    expect(cleaned).toContain('Script URL');
+  });
+
+  it('renders evidence count (sources) correctly', () => {
+    const result = makeCompletedScanDetail([makeDetection('react', 'React', 'framework', 2)]);
+    const html = renderToString(React.createElement(ScanInsights, { result }));
+    const cleaned = clean(html);
+
+    expect(cleaned).toContain('2 sources');
+  });
+
+  it('renders multiple technologies in the matrix', () => {
+    const result = makeCompletedScanDetail([
+      makeDetection('react', 'React', 'framework'),
+      makeDetection('wordpress', 'WordPress', 'cms'),
+      makeDetection('nginx', 'nginx', 'server'),
+    ]);
+    const html = renderToString(React.createElement(ScanInsights, { result }));
+
+    expect(html).toContain('React');
+    expect(html).toContain('WordPress');
+    expect(html).toContain('nginx');
+  });
+
+  it('does not render matrix for empty completed scan', () => {
+    const result = makeCompletedScanDetail([]);
+    const html = renderToString(React.createElement(ScanInsights, { result }));
+    const cleaned = clean(html);
+
+    expect(cleaned).not.toContain('Technology evidence');
+  });
+
+  it('does not render matrix for a failed scan', () => {
+    const result = makeFailedScanDetail();
+    const html = renderToString(React.createElement(ScanInsights, { result }));
+
+    expect(html).toBe('');
+  });
+
+  it('does not render matrix for a pending scan', () => {
+    const result = makePendingScanDetail();
+    const html = renderToString(React.createElement(ScanInsights, { result }));
+
+    expect(html).toBe('');
+  });
+
+  it('preserves existing composition, explanation, and evidence UI', () => {
+    const result = makeCompletedScanDetail([
+      makeDetection('react', 'React', 'framework', 2),
+      makeDetection('wordpress', 'WordPress', 'cms', 1),
+    ]);
+    const html = renderToString(React.createElement(ScanInsights, { result }));
+    const cleaned = clean(html);
+
+    // All existing sections must still be present
+    expect(cleaned).toContain('Technology Insights');
+    expect(cleaned).toContain('2 technologies detected');
+    expect(cleaned).toContain('Categories');
+    expect(cleaned).toContain('Evidence coverage');
+    expect(cleaned).toContain('Detected technologies');
+    expect(cleaned).toContain('Technology composition');
+    expect(cleaned).toContain('Technology evidence');
+  });
+});

@@ -14,12 +14,19 @@ import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { ScansHistory, ScanCard, ScansError, ScanNotFound, ScanDetailView } from './ScanViews.js';
-import type { ScanSummary, ScanDetailResponse } from '../lib/types.js';
+import type { ScanSummary, ScanDetailResponse, DetectionResponse } from '../lib/types.js';
 
 // Mock next/link to render a plain <a> tag (no router context needed)
 vi.mock('next/link', () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) =>
     React.createElement('a', { href }, children),
+}));
+
+// Mock next/navigation so DetectionFilterView (rendered for completed scans
+// with initialQuery provided) can call useRouter/useSearchParams in renderToString
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: vi.fn() }),
+  useSearchParams: () => ({ get: () => null }),
 }));
 
 // ─── Test fixtures ───────────────────────────────────────────────────
@@ -105,6 +112,19 @@ function makeScanDetail(overrides: Partial<ScanDetailResponse> = {}): ScanDetail
       },
     ],
     ...overrides,
+  };
+}
+
+function makeDetection(
+  id: string,
+  name: string,
+  category: string,
+  confidence = 80,
+): DetectionResponse {
+  return {
+    technology: { id, name, category },
+    confidence,
+    evidence: [{ type: 'http_header', name: 'Server', value: 'nginx' }],
   };
 }
 
@@ -477,5 +497,161 @@ describe('ScanDetailView', () => {
     expect(html).toContain('The scan completed successfully');
     expect(html).toContain('No supported technologies were detected');
     expect(html).toContain('Detections (0)');
+  });
+});
+
+// ─── Step 36: Detection filtering integration ────────────────────────
+
+describe('ScanDetailView — Detection filtering (Step 36)', () => {
+  it('renders filter controls when initialQuery is provided', () => {
+    const result = makeScanDetail({
+      detections: [makeDetection('react', 'React', 'frontend', 95)],
+    });
+    const html = renderToString(
+      React.createElement(ScanDetailView, { result, initialQuery: '', initialCategory: '' }),
+    );
+
+    expect(html).toContain('Search technologies');
+    expect(html).toContain('Category');
+  });
+
+  it('renders filtered detection list with result count', () => {
+    const detections: DetectionResponse[] = [
+      makeDetection('react', 'React', 'frontend', 95),
+      makeDetection('vue', 'Vue', 'frontend', 80),
+    ];
+    const result = { ...makeScanDetail(), detections };
+    const html = renderToString(
+      React.createElement(ScanDetailView, { result, initialQuery: 'react', initialCategory: '' }),
+    );
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('1 of 2');
+    expect(cleaned).toContain('Detections (1)');
+  });
+
+  it('preserves existing insights and evidence UI when filters are active', () => {
+    const result = makeScanDetail({
+      detections: [
+        makeDetection('react', 'React', 'frontend', 95),
+        makeDetection('vue', 'Vue', 'frontend', 80),
+      ],
+    });
+    const html = renderToString(
+      React.createElement(ScanDetailView, { result, initialQuery: 'react', initialCategory: '' }),
+    );
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // All existing sections must still be present
+    expect(cleaned).toContain('Technology Insights');
+    expect(cleaned).toContain('Technology composition');
+    expect(cleaned).toContain('Technology evidence');
+    expect(cleaned).toContain('Search technologies');
+  });
+
+  it('shows "No detections match these filters." when filter yields zero results', () => {
+    const result = makeScanDetail({
+      detections: [makeDetection('react', 'React', 'frontend', 95)],
+    });
+    const html = renderToString(
+      React.createElement(ScanDetailView, {
+        result,
+        initialQuery: 'nonexistent',
+        initialCategory: '',
+      }),
+    );
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('No detections match these filters.');
+  });
+
+  it('does not render filter controls for a failed scan', () => {
+    const failedScan: ScanDetailResponse = {
+      scan: makeFailedScan(),
+      snapshot: null,
+      detections: [],
+    };
+    const html = renderToString(
+      React.createElement(ScanDetailView, {
+        result: failedScan,
+        initialQuery: '',
+        initialCategory: '',
+      }),
+    );
+
+    expect(html).not.toContain('Search technologies');
+  });
+
+  it('does not render filter controls for a pending scan', () => {
+    const pendingScan: ScanDetailResponse = {
+      scan: makePendingScan(),
+      snapshot: null,
+      detections: [],
+    };
+    const html = renderToString(
+      React.createElement(ScanDetailView, {
+        result: pendingScan,
+        initialQuery: '',
+        initialCategory: '',
+      }),
+    );
+
+    expect(html).not.toContain('Search technologies');
+  });
+
+  it('does not render filter controls for a running scan', () => {
+    const runningScan: ScanDetailResponse = {
+      scan: makeRunningScan(),
+      snapshot: null,
+      detections: [],
+    };
+    const html = renderToString(
+      React.createElement(ScanDetailView, {
+        result: runningScan,
+        initialQuery: '',
+        initialCategory: '',
+      }),
+    );
+
+    expect(html).not.toContain('Search technologies');
+  });
+
+  it('technology links remain intact in filtered view', () => {
+    const result = makeScanDetail({
+      detections: [makeDetection('nginx', 'nginx', 'server', 80)],
+    });
+    const html = renderToString(
+      React.createElement(ScanDetailView, { result, initialQuery: '', initialCategory: '' }),
+    );
+
+    expect(html).toContain('href="/technologies/nginx"');
+  });
+
+  it('preserves detection order (no reordering by filter)', () => {
+    const detections: DetectionResponse[] = [
+      makeDetection('react', 'React', 'frontend', 95),
+      makeDetection('vue', 'Vue', 'frontend', 80),
+    ];
+    const result = { ...makeScanDetail(), detections };
+    const html = renderToString(
+      React.createElement(ScanDetailView, { result, initialQuery: '', initialCategory: '' }),
+    );
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // React should appear before Vue in the HTML
+    expect(cleaned.indexOf('React')).toBeLessThan(cleaned.indexOf('Vue'));
+  });
+
+  it('renders all category options in the select', () => {
+    const result = makeScanDetail({
+      detections: [makeDetection('react', 'React', 'frontend', 95)],
+    });
+    const html = renderToString(
+      React.createElement(ScanDetailView, { result, initialQuery: '', initialCategory: '' }),
+    );
+
+    // Categories from the catalog should be present
+    expect(html).toContain('framework');
+    expect(html).toContain('All');
   });
 });

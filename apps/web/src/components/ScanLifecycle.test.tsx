@@ -38,6 +38,13 @@ vi.mock('../lib/api.js', () => ({
   fetchScans: vi.fn(),
 }));
 
+// Mock next/navigation so DetectionFilterView (rendered for completed scans)
+// can render in renderToString without a router context.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: vi.fn() }),
+  useSearchParams: () => ({ get: () => null }),
+}));
+
 // ─── Test fixtures ───────────────────────────────────────────────────
 
 function makeResult(

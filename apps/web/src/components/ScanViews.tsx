@@ -32,6 +32,7 @@ import type { ScanSummary, ScanDetailResponse, SnapshotResponse } from '../lib/t
 import { ScanSummary as ScanSummarySection } from './ScanSummary';
 import { ScanInsights } from './ScanInsights';
 import { DetectionList } from './DetectionList';
+import { DetectionFilterView } from './DetectionFilterView';
 import styles from './ScanCard.module.css';
 
 // ─── Scan status badge helpers ────────────────────────────────────────
@@ -256,7 +257,19 @@ export function ScanningState({ scan }: { scan: ScanDetailResponse['scan'] }): R
  * implemented in Step 24. Only the completed-results presentation is
  * redesigned in Step 25.
  */
-export function ScanDetailView({ result }: { result: ScanDetailResponse }): React.ReactElement {
+export interface ScanDetailViewProps {
+  result: ScanDetailResponse;
+  /** Initial search query from URL (for client-side detection filtering) */
+  initialQuery?: string;
+  /** Initial category filter from URL (for client-side detection filtering) */
+  initialCategory?: string;
+}
+
+export function ScanDetailView({
+  result,
+  initialQuery,
+  initialCategory,
+}: ScanDetailViewProps): React.ReactElement {
   const { scan, snapshot, detections } = result;
 
   return (
@@ -281,6 +294,13 @@ export function ScanDetailView({ result }: { result: ScanDetailResponse }): Reac
             <h2>Detections (pending)</h2>
             <p>Detection results will appear after the scan completes.</p>
           </>
+        ) : scan.status === 'completed' && initialQuery !== undefined ? (
+          <DetectionFilterView
+            detections={detections}
+            scanId={scan.id}
+            initialQuery={initialQuery}
+            initialCategory={initialCategory ?? ''}
+          />
         ) : (
           <DetectionList detections={detections} />
         )}

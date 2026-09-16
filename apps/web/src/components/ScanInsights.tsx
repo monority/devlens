@@ -148,6 +148,46 @@ export function ScanInsights({ result }: ScanInsightsProps): React.ReactElement 
           ))}
         </div>
       )}
+
+      {/* Technology evidence matrix (per-tech evidence types and counts) */}
+      {insights.technologyEvidenceMatrix.length > 0 && (
+        <div className={styles.technologyEvidenceMatrix}>
+          <h3>Technology evidence</h3>
+          {insights.technologyEvidenceMatrix.map(({ id, name, evidenceTypes, evidenceCount }) => {
+            const known = isKnownTechnology(id);
+            return (
+              <div key={id} className={styles.matrixRow}>
+                <span className={styles.matrixTech}>
+                  {known ? (
+                    <Link
+                      href={`/technologies/${encodeURIComponent(id)}`}
+                      className={styles.compositionTechName}
+                    >
+                      {name}
+                    </Link>
+                  ) : (
+                    <span>{name}</span>
+                  )}
+                </span>
+                <span className={styles.matrixEvidence}>
+                  <span className={styles.matrixEvidenceTypes}>
+                    {evidenceTypes.length > 0
+                      ? evidenceTypes.map((et) => (
+                          <span key={et} className={styles.evidenceTypeName}>
+                            {et}
+                          </span>
+                        ))
+                      : 'No evidence'}
+                  </span>
+                </span>
+                <span className={styles.matrixSourceCount}>
+                  {evidenceCount} source{evidenceCount === 1 ? '' : 's'}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }

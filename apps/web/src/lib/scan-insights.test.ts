@@ -15,6 +15,7 @@ import {
   getEvidenceTypeCounts,
   getCategoryCounts,
   getTechnologyComposition,
+  getTechnologyEvidenceMatrix,
 } from './scan-insights';
 import type { ScanDetailResponse, DetectionResponse, EvidenceResponse } from './types';
 
@@ -564,5 +565,263 @@ describe('getTechnologyComposition', () => {
     getTechnologyComposition(detections);
 
     expect(detections.length).toBe(originalLength);
+  });
+});
+
+// ─── Technology evidence matrix tests ────────────────────────────────
+
+describe('getTechnologyEvidenceMatrix', () => {
+  it('produces a matrix row for one technology with one evidence item', () => {
+    const detections = [
+      makeDetection({
+        technology: makeTechnology({ id: 'react', name: 'React', category: 'framework' }),
+        evidence: [makeEvidence('script_url', { url: 'https://example.com/app.js' })],
+      }),
+    ];
+
+    const matrix = getTechnologyEvidenceMatrix(detections);
+
+    expect(matrix).toEqual([
+      {
+        id: 'react',
+        name: 'React',
+        evidenceTypes: ['Script URL'],
+        evidenceCount: 1,
+      },
+    ]);
+  });
+
+  it('produces unique evidence types for one technology with multiple evidence types', () => {
+    const detections = [
+      makeDetection({
+        technology: makeTechnology({ id: 'react', name: 'React', category: 'framework' }),
+        evidence: [
+          makeEvidence('http_header', { name: 'Server', value: 'nginx' }),
+          makeEvidence('meta_tag', { name: 'generator', content: 'React' }),
+          makeEvidence('script_url', { url: 'https://example.com/app.js' }),
+        ],
+      }),
+    ];
+
+    const matrix = getTechnologyEvidenceMatrix(detections);
+
+    expect(matrix[0]!.evidenceTypes).toEqual(['HTTP Header', 'Meta Tag', 'Script URL']);
+    expect(matrix[0]!.evidenceCount).toBe(3);
+  });
+
+  it('groups multiple technologies across categories', () => {
+    const detections = [
+      makeDetection({
+        technology: makeTechnology({ id: 'react', name: 'React', category: 'framework' }),
+        evidence: [makeEvidence('script_url', { url: 'https://example.com/app.js' })],
+      }),
+      makeDetection({
+        technology: makeTechnology({ id: 'wordpress', name: 'WordPress', category: 'cms' }),
+        evidence: [makeEvidence('meta_tag', { name: 'generator', content: 'WordPress' })],
+      }),
+    ];
+
+    const matrix = getTechnologyEvidenceMatrix(detections);
+
+    expect(matrix).toHaveLength(2);
+    expect(matrix.map((m) => m.name)).toEqual(['React', 'WordPress']);
+  });
+
+  it('collapses duplicate technology IDs into one row', () => {
+    const detections = [
+      makeDetection({
+        technology: makeTechnology({ id: 'react', name: 'React', category: 'framework' }),
+        evidence: [makeEvidence('script_url', { url: 'https://example.com/app.js' })],
+      }),
+      makeDetection({
+        technology: makeTechnology({ id: 'react', name: 'React', category: 'framework' }),
+        evidence: [makeEvidence('http_header', { name: 'Server', value: 'nginx' })],
+      }),
+    ];
+
+    const matrix = getTechnologyEvidenceMatrix(detections);
+
+    expect(matrix).toHaveLength(1);
+    expect(matrix[0]).toEqual({
+      id: 'react',
+      name: 'React',
+      evidenceTypes: ['HTTP Header', 'Script URL'],
+      evidenceCount: 2,
+    });
+  });
+
+  it('preserves first occurrence name for duplicate technology IDs', () => {
+    const detections = [
+      makeDetection({
+        technology: makeTechnology({ id: 'react', name: 'React', category: 'framework' }),
+        evidence: [makeEvidence('script_url', { url: 'https://example.com/app.js' })],
+      }),
+      // Same ID, different name — first occurrence wins
+      makeDetection({
+        technology: makeTechnology({ id: 'react', name: 'React.js', category: 'framework' }),
+        evidence: [],
+      }),
+    ];
+
+    const matrix = getTechnologyEvidenceMatrix(detections);
+
+    expect(matrix[0]!.name).toBe('React');
+  });
+
+  it('merges evidence from duplicate detection records', () => {
+    const detections = [
+      makeDetection({
+        technology: makeTechnology({ id: 'react', name: 'React', category: 'framework' }),
+        evidence: [
+          makeEvidence('script_url', { url: 'https://example.com/app.js' }),
+          makeEvidence('http_header', { name: 'Server', value: 'nginx' }),
+        ],
+      }),
+      makeDetection({
+        technology: makeTechnology({ id: 'react', name: 'React', category: 'framework' }),
+        evidence: [
+          makeEvidence('meta_tag', { name: 'generator', content: 'React' }),
+          makeEvidence('script_url', { url: 'https://example.com/app.js' }), // duplicate
+        ],
+      }),
+    ];
+
+    const matrix = getTechnologyEvidenceMatrix(detections);
+
+    // 3 evidence items + 1 duplicate script_url → 3 unique entries
+    expect(matrix[0]!.evidenceCount).toBe(3);
+    expect(matrix[0]!.evidenceTypes).toEqual(['HTTP Header', 'Meta Tag', 'Script URL']);
+  });
+
+  it('deduplicates identical evidence entries within merged evidence', () => {
+    const detections = [
+      makeDetection({
+        technology: makeTechnology({ id: 'nginx', name: 'nginx', category: 'server' }),
+        evidence: [
+          makeEvidence('http_header', { name: 'Server', value: 'nginx' }),
+          makeEvidence('http_header', { name: 'Server', value: 'nginx' }), // exact duplicate
+        ],
+      }),
+    ];
+
+    const matrix = getTechnologyEvidenceMatrix(detections);
+
+    expect(matrix[0]!.evidenceCount).toBe(1);
+    expect(matrix[0]!.evidenceTypes).toEqual(['HTTP Header']);
+  });
+
+  it('handles no evidence (zero evidence items)', () => {
+    const detections = [
+      makeDetection({
+        technology: makeTechnology({ id: 'react', name: 'React', category: 'framework' }),
+        evidence: [],
+      }),
+    ];
+
+    const matrix = getTechnologyEvidenceMatrix(detections);
+
+    expect(matrix[0]!.evidenceTypes).toEqual([]);
+    expect(matrix[0]!.evidenceCount).toBe(0);
+  });
+
+  it('preserves unknown technology IDs', () => {
+    const detections = [
+      makeDetection({
+        technology: makeTechnology({
+          id: 'custom-tool',
+          name: 'Custom Tool',
+          category: 'something-not-in-catalog',
+        }),
+        evidence: [makeEvidence('html', { selector: '#app', snippet: 'test' })],
+      }),
+    ];
+
+    const matrix = getTechnologyEvidenceMatrix(detections);
+
+    expect(matrix).toHaveLength(1);
+    expect(matrix[0]!.id).toBe('custom-tool');
+    expect(matrix[0]!.name).toBe('Custom Tool');
+    expect(matrix[0]!.evidenceTypes).toEqual(['HTML Element']);
+    expect(matrix[0]!.evidenceCount).toBe(1);
+  });
+
+  it('handles unknown evidence types safely', () => {
+    const detections = [
+      makeDetection({
+        technology: makeTechnology({ id: 'react', name: 'React', category: 'framework' }),
+        evidence: [
+          makeEvidence('http_header', { name: 'Server', value: 'nginx' }),
+          // Unknown evidence type
+          makeEvidence('future_type' as EvidenceResponse['type'], { data: 'unknown' }),
+        ],
+      }),
+    ];
+
+    const matrix = getTechnologyEvidenceMatrix(detections);
+
+    // Should not crash, unknown type uses "Evidence" fallback
+    expect(matrix[0]!.evidenceCount).toBe(2);
+    expect(matrix[0]!.evidenceTypes).toContain('Evidence');
+    expect(matrix[0]!.evidenceTypes).toContain('HTTP Header');
+  });
+
+  it('sorts technologies by name ASC then id ASC', () => {
+    const detections = [
+      makeDetection({
+        technology: makeTechnology({ id: 'zzz', name: 'Zebra', category: 'framework' }),
+      }),
+      makeDetection({
+        technology: makeTechnology({ id: 'aaa', name: 'Alpha', category: 'framework' }),
+      }),
+      makeDetection({
+        technology: makeTechnology({ id: 'bbb', name: 'Alpha', category: 'framework' }),
+      }),
+    ];
+
+    const matrix = getTechnologyEvidenceMatrix(detections);
+
+    // Sorted by name: Alpha, Zebra; within Alpha, by id: aaa, bbb
+    expect(matrix.map((m) => [m.id, m.name])).toEqual([
+      ['aaa', 'Alpha'],
+      ['bbb', 'Alpha'],
+      ['zzz', 'Zebra'],
+    ]);
+  });
+
+  it('produces deterministic output across calls (no mutation)', () => {
+    const detections = [
+      makeDetection({
+        technology: makeTechnology({ id: 'react', name: 'React', category: 'framework' }),
+        evidence: [
+          makeEvidence('script_url', { url: 'https://example.com/app.js' }),
+          makeEvidence('http_header', { name: 'Server', value: 'nginx' }),
+        ],
+      }),
+      makeDetection({
+        technology: makeTechnology({ id: 'wordpress', name: 'WordPress', category: 'cms' }),
+        evidence: [makeEvidence('meta_tag', { name: 'generator', content: 'WordPress' })],
+      }),
+    ];
+
+    const first = getTechnologyEvidenceMatrix(detections);
+    const second = getTechnologyEvidenceMatrix(detections);
+
+    expect(first).toEqual(second);
+  });
+
+  it('does not mutate the input detections array', () => {
+    const detections = [
+      makeDetection({
+        technology: makeTechnology({ id: 'react', name: 'React', category: 'framework' }),
+        evidence: [makeEvidence('script_url', { url: 'https://example.com/app.js' })],
+      }),
+    ];
+    const originalLength = detections.length;
+    const originalEvidenceLength = detections[0]!.evidence.length;
+
+    getTechnologyEvidenceMatrix(detections);
+
+    expect(detections.length).toBe(originalLength);
+    expect(detections[0]!.evidence.length).toBe(originalEvidenceLength);
   });
 });

@@ -655,3 +655,83 @@ describe('ScanDetailView — Detection filtering (Step 36)', () => {
     expect(html).toContain('All');
   });
 });
+
+// ─── Step 37: Scan Overview integration ──────────────────────────────
+
+describe('ScanDetailView — Scan Overview (Step 37)', () => {
+  it('renders overview metrics for completed scans', () => {
+    const result = makeScanDetail({
+      detections: [
+        makeDetection('react', 'React', 'frontend', 95),
+        makeDetection('nginx', 'nginx', 'server', 80),
+      ],
+    });
+    const html = renderToString(React.createElement(ScanDetailView, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('Technologies');
+    expect(cleaned).toContain('Evidence');
+    expect(cleaned).toContain('Highest confidence');
+    expect(cleaned).toContain('95%');
+  });
+
+  it('does not render overview for non-completed scans', () => {
+    const pendingScan: ScanDetailResponse = {
+      scan: makePendingScan(),
+      snapshot: null,
+      detections: [],
+    };
+    const html = renderToString(React.createElement(ScanDetailView, { result: pendingScan }));
+
+    expect(html).not.toContain('Highest confidence');
+  });
+
+  it('shows zero-detection state in overview', () => {
+    const result = makeScanDetail({ detections: [] });
+    const html = renderToString(React.createElement(ScanDetailView, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('Technologies');
+    expect(cleaned).toContain('Highest confidence');
+  });
+
+  it('overview metrics are stable when filters are active', () => {
+    const detections: DetectionResponse[] = [
+      makeDetection('react', 'React', 'frontend', 95),
+      makeDetection('vue', 'Vue', 'frontend', 80),
+    ];
+    const result: ScanDetailResponse = { ...makeScanDetail(), detections };
+
+    // Without filters
+    const htmlNoFilter = renderToString(React.createElement(ScanDetailView, { result }));
+    const cleanedNoFilter = htmlNoFilter.replace(/<!-- -->/g, '');
+
+    // With filters
+    const htmlWithFilter = renderToString(
+      React.createElement(ScanDetailView, { result, initialQuery: 'react', initialCategory: '' }),
+    );
+    const cleanedWithFilter = htmlWithFilter.replace(/<!-- -->/g, '');
+
+    // Technology count (2 unique) and highest confidence (95) must be the same
+    expect(cleanedNoFilter).toContain('2');
+    expect(cleanedWithFilter).toContain('2');
+    expect(cleanedNoFilter).toContain('95%');
+    expect(cleanedWithFilter).toContain('95%');
+  });
+
+  it('overview and detection list both render for completed scans', () => {
+    const result = makeScanDetail({
+      detections: [makeDetection('react', 'React', 'frontend', 95)],
+    });
+    const html = renderToString(
+      React.createElement(ScanDetailView, { result, initialQuery: '', initialCategory: '' }),
+    );
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // Overview metrics present
+    expect(cleaned).toContain('Technologies');
+    // Detection list also present
+    expect(cleaned).toContain('Detections');
+    expect(cleaned).toContain('React');
+  });
+});

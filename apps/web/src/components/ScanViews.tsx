@@ -28,8 +28,10 @@
 
 import Link from 'next/link';
 import { isScanning } from '../lib/scan-utils';
+import { getScanOverview } from '../lib/scan-overview';
 import type { ScanSummary, ScanDetailResponse, SnapshotResponse } from '../lib/types.js';
 import { ScanSummary as ScanSummarySection } from './ScanSummary';
+import { ScanOverview } from './ScanOverview';
 import { ScanInsights } from './ScanInsights';
 import { DetectionList } from './DetectionList';
 import { DetectionFilterView } from './DetectionFilterView';
@@ -274,8 +276,12 @@ export function ScanDetailView({
 
   return (
     <article className={styles.detail}>
-      {/* ── Scan metadata ── */}
-      <ScanSummarySection scan={scan} />
+      {/* ── Scan overview / summary ── */}
+      {scan.status === 'completed' ? (
+        <ScanOverview overview={getScanOverview(result)} />
+      ) : (
+        <ScanSummarySection scan={scan} />
+      )}
 
       {/* ── Technology insights (completed scans only) ── */}
       <ScanInsights result={result} />

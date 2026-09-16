@@ -205,3 +205,93 @@ describe('DetectionItem — Step 33 explanation', () => {
     expect(html).toContain('Link');
   });
 });
+
+describe('DetectionItem — Step 39 explainability', () => {
+  const makeDetection = (overrides: Partial<DetectionResponse> = {}): DetectionResponse => ({
+    technology: { id: 'react', name: 'React', category: 'frontend' },
+    confidence: 95,
+    evidence: [{ type: 'script_url', url: 'https://cdn.example.com/react.js' }],
+    ...overrides,
+  });
+
+  it('renders evidence source descriptions', () => {
+    const detection = makeDetection({
+      evidence: [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+        { type: 'script_url', url: 'https://cdn.example.com/react.js' },
+      ],
+    });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    // React renderToString escapes single quotes as &#x27; in text content
+    const decoded = html.replace(/&#x27;/g, "'");
+
+    // Source descriptions derived from evidence fields
+    expect(decoded).toContain("HTTP header 'Server'");
+    expect(decoded).toContain("Script from 'https://cdn.example.com/react.js'");
+  });
+
+  it('renders evidence source type labels', () => {
+    const detection = makeDetection({
+      evidence: [{ type: 'html', selector: '#app', snippet: '<div>' }],
+    });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const decoded = html.replace(/&#x27;/g, "'");
+
+    expect(html).toContain('HTML Element');
+    expect(decoded).toContain("HTML element at '#app'");
+  });
+
+  it('wraps long evidence values with title attribute for full value', () => {
+    const longValue = 'x'.repeat(500);
+    const detection = makeDetection({
+      evidence: [{ type: 'http_header', name: longValue, value: 'nginx' }],
+    });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+
+    // Full value should be available in the title attribute
+    expect(html).toContain(`title="${longValue}: nginx"`);
+  });
+
+  it('renders evidence source list for all evidence types', () => {
+    const detection = makeDetection({
+      evidence: [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+        { type: 'meta_tag', name: 'generator', content: 'Hugo' },
+        { type: 'script_url', url: 'https://cdn.example.com/app.js' },
+        { type: 'script_content', snippet: 'window.foo' },
+        { type: 'html', selector: '#app', snippet: '<div>' },
+        { type: 'javascript_global', globalName: 'React' },
+        { type: 'resource', url: 'https://cdn.example.com/logo.png' },
+        { type: 'link', url: 'https://cdn.example.com/style.css' },
+      ],
+    });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const decoded = html.replace(/&#x27;/g, "'");
+
+    expect(decoded).toContain("HTTP header 'Server'");
+    expect(decoded).toContain("Meta tag 'generator'");
+    expect(decoded).toContain("Script from 'https://cdn.example.com/app.js'");
+    expect(html).toContain('JavaScript snippet');
+    expect(decoded).toContain("HTML element at '#app'");
+    expect(decoded).toContain("JavaScript global 'React'");
+    expect(decoded).toContain("Resource at 'https://cdn.example.com/logo.png'");
+    expect(decoded).toContain("Link to 'https://cdn.example.com/style.css'");
+  });
+
+  it('preserves confidence in explainability rendering', () => {
+    const detection = makeDetection({ confidence: 87 });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+
+    expect(html).toContain('87');
+    expect(html).toContain('Confidence');
+  });
+
+  it('handles zero evidence (no source list, no crash)', () => {
+    const detection = makeDetection({ evidence: [] });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+
+    // Should not contain evidence source items
+    expect(html).not.toContain("HTTP header '");
+    expect(html).toContain('No evidence details are available.');
+  });
+});

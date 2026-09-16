@@ -5,15 +5,19 @@
  *
  *   TechnologyName  ·  Category  ·  Confidence: N%
  *   └── Explanation (evidence coverage summary)
+ *   └── Evidence source list (concise origin descriptions)
  *   └── Evidence (collapsible tree)
  *
  * Uses the confidence/score exactly as returned by the API — no
  * subjective labels, no re-sorting, no recalculation.
+ *
+ * Evidence source descriptions are derived from existing evidence fields
+ * (via `getDetectionExplainability`) — no new data is invented.
  */
 
 import type { DetectionResponse } from '../lib/types.js';
 import { isKnownTechnology } from '../lib/technology-catalog';
-import { getDetectionExplanation } from '../lib/detection-explanation';
+import { getDetectionExplainability } from '../lib/detection-explainability';
 import { EvidenceList } from './EvidenceList';
 import Link from 'next/link';
 import styles from './ScanCard.module.css';
@@ -39,8 +43,8 @@ export function DetectionItem({ detection, index }: DetectionItemProps): React.R
     <span>{technology.name}</span>
   );
 
-  // Derive a neutral explanation from the detection's actual evidence.
-  const explanation = getDetectionExplanation(detection);
+  // Derive a structured explanation from the detection's actual evidence.
+  const explainability = getDetectionExplainability(detection);
 
   return (
     <li className={styles.detectionItem} key={`${technology.id}-${index}`}>
@@ -51,7 +55,7 @@ export function DetectionItem({ detection, index }: DetectionItemProps): React.R
       </header>
 
       {/* Explanation: neutral summary of evidence coverage */}
-      <p className={styles.detectionExplanation}>{explanation.summary}</p>
+      <p className={styles.detectionExplanation}>{explainability.summary}</p>
 
       {evidence.length > 0 && (
         <footer className={styles.detectionMeta}>
@@ -59,6 +63,22 @@ export function DetectionItem({ detection, index }: DetectionItemProps): React.R
             {evidence.length} evidence {evidence.length === 1 ? 'item' : 'items'}
           </span>
         </footer>
+      )}
+
+      {/* Evidence source list: concise per-evidence origin descriptions */}
+      {explainability.evidenceSources.length > 0 && (
+        <ul className={styles.evidenceSourceList}>
+          {explainability.evidenceSources.map((source, sourceIndex) => (
+            <li
+              key={`evidence-source-${sourceIndex}`}
+              className={styles.evidenceSourceItem}
+              title={source.value}
+            >
+              <span className={styles.evidenceSourceType}>{source.type}</span>
+              <span className={styles.evidenceSourceDesc}>{source.source}</span>
+            </li>
+          ))}
+        </ul>
       )}
 
       <EvidenceList evidence={evidence} />

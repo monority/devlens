@@ -33,6 +33,7 @@ import type { ScanSummary, ScanDetailResponse, SnapshotResponse } from '../lib/t
 import { ScanSummary as ScanSummarySection } from './ScanSummary';
 import { ScanOverview } from './ScanOverview';
 import { ScanInsights } from './ScanInsights';
+import { DetectionCoverage } from './DetectionCoverage';
 import { DetectionList } from './DetectionList';
 import { DetectionFilterView } from './DetectionFilterView';
 import { ScanDetectionResults } from './ScanDetectionResults';
@@ -288,7 +289,10 @@ export function ScanDetailView({
       )}
 
       {/* ── Technology insights (completed scans only) ── */}
-      <ScanInsights result={result} />
+      {scan.status === 'completed' && <ScanInsights result={result} />}
+
+      {/* ── Detection coverage (completed scans only) ── */}
+      {scan.status === 'completed' && <DetectionCoverage detections={detections} />}
 
       {/* ── Snapshot / scanning state ── */}
       {isScanning(scan.status) ? (

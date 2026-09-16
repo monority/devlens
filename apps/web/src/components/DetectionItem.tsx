@@ -4,6 +4,7 @@
  * Layout:
  *
  *   TechnologyName  ·  Category  ·  Confidence: N%
+ *   └── Explanation (evidence coverage summary)
  *   └── Evidence (collapsible tree)
  *
  * Uses the confidence/score exactly as returned by the API — no
@@ -12,6 +13,7 @@
 
 import type { DetectionResponse } from '../lib/types.js';
 import { isKnownTechnology } from '../lib/technology-catalog';
+import { getDetectionExplanation } from '../lib/detection-explanation';
 import { EvidenceList } from './EvidenceList';
 import Link from 'next/link';
 import styles from './ScanCard.module.css';
@@ -37,6 +39,9 @@ export function DetectionItem({ detection, index }: DetectionItemProps): React.R
     <span>{technology.name}</span>
   );
 
+  // Derive a neutral explanation from the detection's actual evidence.
+  const explanation = getDetectionExplanation(detection);
+
   return (
     <li className={styles.detectionItem} key={`${technology.id}-${index}`}>
       <header className={styles.detectionHeader}>
@@ -44,6 +49,9 @@ export function DetectionItem({ detection, index }: DetectionItemProps): React.R
         <span className={styles.category}>{technology.category}</span>
         <span className={styles.score}>Confidence: {confidence}%</span>
       </header>
+
+      {/* Explanation: neutral summary of evidence coverage */}
+      <p className={styles.detectionExplanation}>{explanation.summary}</p>
 
       {evidence.length > 0 && (
         <footer className={styles.detectionMeta}>

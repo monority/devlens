@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
-import { DetectionItem } from './DetectionItem.js';
+import { DetectionItem } from './DetectionItem';
 import type { DetectionResponse } from '../lib/types.js';
 
 describe('DetectionItem', () => {
@@ -92,5 +92,116 @@ describe('DetectionItem', () => {
     expect(html).not.toContain('excellent');
     // But the raw confidence should still appear.
     expect(html).toContain('30');
+  });
+});
+
+describe('DetectionItem — Step 33 explanation', () => {
+  const makeDetection = (overrides: Partial<DetectionResponse> = {}): DetectionResponse => ({
+    technology: { id: 'react', name: 'React', category: 'frontend' },
+    confidence: 95,
+    evidence: [{ type: 'script_url', url: 'https://cdn.example.com/react.js' }],
+    ...overrides,
+  });
+
+  it('renders the evidence explanation summary', () => {
+    const detection = makeDetection({
+      evidence: [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+        { type: 'meta_tag', name: 'generator', content: 'WordPress' },
+      ],
+    });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+
+    expect(html).toContain('Detected from');
+    expect(html).toContain('evidence');
+  });
+
+  it('preserves exact confidence value in the explanation', () => {
+    const detection = makeDetection({ confidence: 87 });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+
+    // Confidence should still appear as-is
+    expect(html).toContain('87');
+  });
+
+  it('renders evidence-source summary with type labels', () => {
+    const detection = makeDetection({
+      evidence: [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+        { type: 'meta_tag', name: 'generator', content: 'WordPress' },
+        { type: 'script_url', url: 'https://cdn.example.com/app.js' },
+      ],
+    });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+
+    expect(html).toContain('HTTP Header');
+    expect(html).toContain('Meta Tag');
+    expect(html).toContain('Script URL');
+  });
+
+  it('renders "No evidence details are available." for zero evidence', () => {
+    const detection = makeDetection({ evidence: [] });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+
+    expect(html).toContain('No evidence details are available.');
+  });
+
+  it('preserves known technology link to catalog', () => {
+    const detection = makeDetection({
+      technology: { id: 'nginx', name: 'nginx', category: 'server' },
+    });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+
+    // Known technology should link to /technologies/nginx
+    expect(html).toContain('href="/technologies/nginx"');
+    expect(html).toContain('nginx');
+  });
+
+  it('renders unknown technology name as plain text (no link)', () => {
+    const detection = makeDetection({
+      technology: { id: 'unknown-tech', name: 'Unknown Tech', category: 'unknown' },
+    });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+
+    // Should NOT link to /technologies/unknown-tech
+    expect(html).not.toContain('/technologies/unknown-tech');
+    // But the name should still be visible
+    expect(html).toContain('Unknown Tech');
+  });
+
+  it('existing evidence disclosure still works (collapsible tree)', () => {
+    const detection = makeDetection({
+      evidence: [{ type: 'script_url', url: 'https://cdn.example.com/react.js' }],
+    });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // Evidence disclosure should still be present
+    expect(cleaned).toContain('Evidence (1)');
+  });
+
+  it('renders all eight evidence types without crashing', () => {
+    const detection = makeDetection({
+      evidence: [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+        { type: 'meta_tag', name: 'generator', content: 'WordPress' },
+        { type: 'script_url', url: 'https://cdn.example.com/app.js' },
+        { type: 'script_content', snippet: 'window.foo' },
+        { type: 'html', selector: '#app', snippet: '<div>' },
+        { type: 'javascript_global', globalName: 'React' },
+        { type: 'resource', url: 'https://cdn.example.com/logo.png' },
+        { type: 'link', url: 'https://cdn.example.com/style.css' },
+      ],
+    });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+
+    expect(html).toContain('HTTP Header');
+    expect(html).toContain('Meta Tag');
+    expect(html).toContain('Script URL');
+    expect(html).toContain('Script Content');
+    expect(html).toContain('HTML Element');
+    expect(html).toContain('JavaScript Global');
+    expect(html).toContain('Resource URL');
+    expect(html).toContain('Link');
   });
 });

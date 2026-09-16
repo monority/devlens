@@ -24,6 +24,26 @@ import { isKnownTechnology } from '../lib/technology-catalog';
 // ─── Types ───────────────────────────────────────────────────────────
 
 /**
+ * A single technology in the composition view.
+ */
+export interface TechnologyCompositionItem {
+  /** The technology ID (stable identity for deduplication). */
+  readonly id: string;
+  /** The technology display name. */
+  readonly name: string;
+}
+
+/**
+ * Technologies grouped under a single category.
+ */
+export interface TechnologyCategoryComposition {
+  /** Category name (e.g. "cms", "framework"), or "Unknown" for uncataloged IDs. */
+  readonly category: string;
+  /** Unique technologies within this category, sorted deterministically. */
+  readonly technologies: TechnologyCompositionItem[];
+}
+
+/**
  * A category with its detection count.
  */
 export interface CategoryCount {
@@ -57,6 +77,8 @@ export interface ScanInsights {
   categories: CategoryCount[];
   /** Evidence type counts, sorted by count DESC then type ASC. */
   evidenceTypes: EvidenceTypeCount[];
+  /** Technology composition grouped by category (count DESC, category ASC). */
+  technologyComposition: TechnologyCategoryComposition[];
 }
 
 // ─── Internal helpers ────────────────────────────────────────────────
@@ -120,6 +142,79 @@ export function getCategoryCounts(detections: DetectionResponse[]): CategoryCoun
 }
 
 /**
+ * Groups detected technologies by category, deduplicating by technology ID.
+ *
+ * For each detection:
+ *   1. Resolve its catalog metadata (via `isKnownTechnology`).
+ *   2. Determine its category — catalog category if known, "Unknown" otherwise.
+ *   3. Group the technology under that category.
+ *
+ * Duplicate technology IDs (same tech appearing in multiple detections)
+ * collapse to a single entry in the composition — the first occurrence's
+ * name is preserved.
+ *
+ * Categories are ordered by:
+ *   - technology count DESC
+ *   - category ASC
+ *
+ * Technologies within a category are ordered by:
+ *   - technology name ASC
+ *   - technology id ASC (deterministic tie-breaker)
+ *
+ * Unknown technology IDs are placed in an `"Unknown"` presentation category
+ * and preserve their original name from the detection.
+ *
+ * Does not mutate the input. This is a pure, deterministic function.
+ *
+ * @param detections Array of detection responses
+ * @returns Category compositions, sorted deterministically
+ */
+export function getTechnologyComposition(
+  detections: DetectionResponse[],
+): TechnologyCategoryComposition[] {
+  // Group technologies by category, deduplicating by ID
+  // Use a Map so the first occurrence of a duplicate ID is preserved
+  const categoryMap: Map<string, Map<string, TechnologyCompositionItem>> = new Map();
+
+  for (const detection of detections) {
+    const tech = detection.technology;
+    const category = isKnownTechnology(tech.id) ? tech.category : 'Unknown';
+
+    if (!categoryMap.has(category)) {
+      categoryMap.set(category, new Map());
+    }
+
+    const techMap = categoryMap.get(category)!;
+    if (!techMap.has(tech.id)) {
+      techMap.set(tech.id, { id: tech.id, name: tech.name });
+    }
+  }
+
+  // Convert to array
+  const compositions: TechnologyCategoryComposition[] = [];
+  for (const [category, techMap] of categoryMap) {
+    // Sort technologies within the category by name ASC, then id ASC
+    const technologies = [...techMap.values()].sort((a, b) => {
+      if (a.name !== b.name) {
+        return a.name < b.name ? -1 : 1;
+      }
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+    });
+    compositions.push({ category, technologies });
+  }
+
+  // Sort categories by: technology count DESC, category ASC
+  compositions.sort((a, b) => {
+    if (b.technologies.length !== a.technologies.length) {
+      return b.technologies.length - a.technologies.length;
+    }
+    return a.category < b.category ? -1 : a.category > b.category ? 1 : 0;
+  });
+
+  return compositions;
+}
+
+/**
  * Aggregates technology usage insights from a scan result.
  *
  * Derives:
@@ -128,6 +223,7 @@ export function getCategoryCounts(detections: DetectionResponse[]): CategoryCoun
  * - `categoryCount` — number of distinct categories (including "Unknown")
  * - `categories` — per-category detection counts (count DESC, category ASC)
  * - `evidenceTypes` — per-evidence-type item counts (count DESC, type ASC)
+ * - `technologyComposition` — grouped technology composition by category
  *
  * All values are derived exclusively from the already-loaded scan result.
  * Does not mutate the input.
@@ -156,11 +252,14 @@ export function getScanInsights(scan: ScanDetailResponse): ScanInsights {
     count,
   }));
 
+  const technologyComposition = getTechnologyComposition(detections);
+
   return {
     technologyCount,
     evidenceCount,
     categoryCount,
     categories,
     evidenceTypes,
+    technologyComposition,
   };
 }

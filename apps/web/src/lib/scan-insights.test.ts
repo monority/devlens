@@ -10,7 +10,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { getScanInsights, getEvidenceTypeCounts, getCategoryCounts } from './scan-insights';
+import {
+  getScanInsights,
+  getEvidenceTypeCounts,
+  getCategoryCounts,
+  getTechnologyComposition,
+} from './scan-insights';
 import type { ScanDetailResponse, DetectionResponse, EvidenceResponse } from './types';
 
 // ─── Fixture builders ────────────────────────────────────────────────
@@ -375,5 +380,189 @@ describe('getCategoryCounts', () => {
       { category: 'Unknown', count: 1 },
       { category: 'framework', count: 1 },
     ]);
+  });
+});
+
+// ─── Technology composition tests ────────────────────────────────────
+
+describe('getTechnologyComposition', () => {
+  it('groups multiple technologies across multiple categories', () => {
+    const detections = [
+      makeDetection({
+        technology: makeTechnology({ id: 'react', name: 'React', category: 'framework' }),
+      }),
+      makeDetection({
+        technology: makeTechnology({ id: 'wordpress', name: 'WordPress', category: 'cms' }),
+      }),
+      makeDetection({
+        technology: makeTechnology({ id: 'nginx', name: 'nginx', category: 'server' }),
+      }),
+    ];
+
+    const composition = getTechnologyComposition(detections);
+
+    // Three categories, each with 1 technology — sorted alphabetically
+    expect(composition).toEqual([
+      { category: 'cms', technologies: [{ id: 'wordpress', name: 'WordPress' }] },
+      { category: 'framework', technologies: [{ id: 'react', name: 'React' }] },
+      { category: 'server', technologies: [{ id: 'nginx', name: 'nginx' }] },
+    ]);
+  });
+
+  it('groups multiple technologies in one category', () => {
+    const detections = [
+      makeDetection({
+        technology: makeTechnology({ id: 'wordpress', name: 'WordPress', category: 'cms' }),
+      }),
+      makeDetection({
+        technology: makeTechnology({ id: 'drupal', name: 'Drupal', category: 'cms' }),
+      }),
+    ];
+
+    const composition = getTechnologyComposition(detections);
+
+    expect(composition).toHaveLength(1);
+    expect(composition[0]!.category).toBe('cms');
+    expect(composition[0]!.technologies).toEqual([
+      { id: 'drupal', name: 'Drupal' },
+      { id: 'wordpress', name: 'WordPress' },
+    ]);
+  });
+
+  it('deduplicates technologies with the same ID', () => {
+    const detections = [
+      makeDetection({
+        technology: makeTechnology({ id: 'react', name: 'React', category: 'framework' }),
+      }),
+      makeDetection({
+        technology: makeTechnology({ id: 'react', name: 'React', category: 'framework' }),
+      }),
+    ];
+
+    const composition = getTechnologyComposition(detections);
+
+    expect(composition).toHaveLength(1);
+    expect(composition[0]!.technologies).toHaveLength(1);
+    expect(composition[0]!.technologies[0]).toEqual({ id: 'react', name: 'React' });
+  });
+
+  it('preserves the first occurrence name for duplicate IDs', () => {
+    const detections = [
+      makeDetection({
+        technology: makeTechnology({ id: 'react', name: 'React', category: 'framework' }),
+      }),
+      // Same ID, different name — first occurrence wins
+      makeDetection({
+        technology: makeTechnology({ id: 'react', name: 'React DOM', category: 'framework' }),
+      }),
+    ];
+
+    const composition = getTechnologyComposition(detections);
+
+    expect(composition[0]!.technologies[0]).toEqual({ id: 'react', name: 'React' });
+  });
+
+  it('places unknown technology IDs in the "Unknown" category', () => {
+    const detections = [
+      makeDetection({
+        technology: makeTechnology({ id: 'unknown-tech', name: 'Custom Tool', category: 'custom' }),
+      }),
+      makeDetection({
+        technology: makeTechnology({ id: 'react', name: 'React', category: 'framework' }),
+      }),
+    ];
+
+    const composition = getTechnologyComposition(detections);
+
+    const unknownCategory = composition.find((c) => c.category === 'Unknown');
+    expect(unknownCategory).toBeDefined();
+    expect(unknownCategory!.technologies).toEqual([{ id: 'unknown-tech', name: 'Custom Tool' }]);
+  });
+
+  it('preserves unknown technology name from detection', () => {
+    const detections = [
+      makeDetection({
+        technology: makeTechnology({
+          id: 'mystery-tool',
+          name: 'Mystery Tool',
+          category: 'something-not-in-catalog',
+        }),
+      }),
+    ];
+
+    const composition = getTechnologyComposition(detections);
+
+    expect(composition).toEqual([
+      {
+        category: 'Unknown',
+        technologies: [{ id: 'mystery-tool', name: 'Mystery Tool' }],
+      },
+    ]);
+  });
+
+  it('handles empty detections', () => {
+    const composition = getTechnologyComposition([]);
+    expect(composition).toEqual([]);
+  });
+
+  it('sorts categories by count DESC then category ASC', () => {
+    const detections = [
+      makeDetection({ technology: makeTechnology({ id: 'react', category: 'framework' }) }),
+      makeDetection({ technology: makeTechnology({ id: 'angular', category: 'framework' }) }),
+      makeDetection({ technology: makeTechnology({ id: 'vue', category: 'framework' }) }),
+      makeDetection({ technology: makeTechnology({ id: 'wordpress', category: 'cms' }) }),
+      makeDetection({ technology: makeTechnology({ id: 'drupal', category: 'cms' }) }),
+      makeDetection({ technology: makeTechnology({ id: 'nginx', category: 'server' }) }),
+    ];
+
+    const composition = getTechnologyComposition(detections);
+
+    // framework: 3, cms: 2, server: 1
+    expect(composition.map((c) => c.category)).toEqual(['framework', 'cms', 'server']);
+  });
+
+  it('sorts technologies within a category by name ASC then id ASC', () => {
+    const detections = [
+      // Same name, different IDs — id ASC tiebreaker
+      makeDetection({
+        technology: makeTechnology({ id: 'aaa', name: 'Same Name', category: 'framework' }),
+      }),
+      makeDetection({
+        technology: makeTechnology({ id: 'zzz', name: 'Same Name', category: 'framework' }),
+      }),
+    ];
+
+    const composition = getTechnologyComposition(detections);
+
+    expect(composition[0]!.technologies.map((t) => t.id)).toEqual(['aaa', 'zzz']);
+  });
+
+  it('produces identical output across calls (no mutation, deterministic)', () => {
+    const detections = [
+      makeDetection({
+        technology: makeTechnology({ id: 'react', name: 'React', category: 'framework' }),
+      }),
+      makeDetection({
+        technology: makeTechnology({ id: 'wordpress', name: 'WordPress', category: 'cms' }),
+      }),
+    ];
+
+    const first = getTechnologyComposition(detections);
+    const second = getTechnologyComposition(detections);
+
+    expect(first).toEqual(second);
+  });
+
+  it('does not mutate the input detections array', () => {
+    const detections = [
+      makeDetection({
+        technology: makeTechnology({ id: 'react', name: 'React', category: 'framework' }),
+      }),
+    ];
+    const originalLength = detections.length;
+
+    getTechnologyComposition(detections);
+
+    expect(detections.length).toBe(originalLength);
   });
 });

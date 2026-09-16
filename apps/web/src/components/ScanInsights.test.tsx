@@ -247,3 +247,94 @@ describe('ScanInsights', () => {
     expect(html).toContain('Unknown');
   });
 });
+
+// ─── Step 34: Technology composition component tests ─────────────────
+
+describe('ScanInsights — Technology composition', () => {
+  it('renders the composition section for a completed scan with multiple categories', () => {
+    const result = makeCompletedScanDetail([
+      makeDetection('react', 'React', 'framework'),
+      makeDetection('wordpress', 'WordPress', 'cms'),
+      makeDetection('nginx', 'nginx', 'server'),
+    ]);
+    const html = renderToString(React.createElement(ScanInsights, { result }));
+
+    expect(html).toContain('Technology composition');
+    expect(html).toContain('cms');
+    expect(html).toContain('framework');
+    expect(html).toContain('server');
+  });
+
+  it('groups technologies by category in the composition', () => {
+    const result = makeCompletedScanDetail([
+      makeDetection('wordpress', 'WordPress', 'cms'),
+      makeDetection('drupal', 'Drupal', 'cms'),
+      makeDetection('react', 'React', 'framework'),
+    ]);
+    const html = renderToString(React.createElement(ScanInsights, { result }));
+
+    expect(html).toContain('WordPress');
+    expect(html).toContain('Drupal');
+    expect(html).toContain('React');
+  });
+
+  it('renders known technology names as catalog links', () => {
+    const result = makeCompletedScanDetail([
+      makeDetection('react', 'React', 'framework'),
+      makeDetection('nginx', 'nginx', 'server'),
+    ]);
+    const html = renderToString(React.createElement(ScanInsights, { result }));
+
+    expect(html).toContain('href="/technologies/react"');
+    expect(html).toContain('href="/technologies/nginx"');
+  });
+
+  it('renders unknown technology names as plain text (no link)', () => {
+    const result = makeCompletedScanDetail([
+      makeDetection('unknown-tech', 'Unknown Technology', 'custom'),
+    ]);
+    const html = renderToString(React.createElement(ScanInsights, { result }));
+
+    // Unknown tech should NOT have a catalog link
+    expect(html).not.toContain('/technologies/unknown-tech');
+    // But the name should still be visible
+    expect(html).toContain('Unknown Technology');
+  });
+
+  it('does not render composition for an empty detection scan', () => {
+    const result = makeCompletedScanDetail([]);
+    const html = renderToString(React.createElement(ScanInsights, { result }));
+    const cleaned = clean(html);
+
+    expect(cleaned).not.toContain('Technology composition');
+  });
+
+  it('does not render composition for a failed scan', () => {
+    const result = makeFailedScanDetail();
+    const html = renderToString(React.createElement(ScanInsights, { result }));
+
+    expect(html).toBe('');
+  });
+
+  it('does not render composition for a pending scan', () => {
+    const result = makePendingScanDetail();
+    const html = renderToString(React.createElement(ScanInsights, { result }));
+
+    expect(html).toBe('');
+  });
+
+  it('renders composition with descriptive wording', () => {
+    const result = makeCompletedScanDetail([
+      makeDetection('react', 'React', 'framework'),
+      makeDetection('wordpress', 'WordPress', 'cms'),
+    ]);
+    const html = renderToString(React.createElement(ScanInsights, { result }));
+
+    // Wording should be purely descriptive — no relationship terms
+    expect(html).toContain('Technology composition');
+    expect(html).not.toContain('Technology stack');
+    expect(html).not.toContain('Dependencies');
+    expect(html).not.toContain('Built with');
+    expect(html).not.toContain('Compatible technologies');
+  });
+});

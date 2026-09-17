@@ -16,9 +16,12 @@ import {
   evidenceIsUrl,
   evidenceUrl,
 } from '../lib/evidence-presenter';
-import type { EvidenceResponse } from '../lib/types.js';
+import { getDetectionExplainability } from '../lib/detection-explainability';
+import { isKnownTechnology } from '../lib/technology-catalog';
+import type { DetectionResponse, EvidenceResponse } from '../lib/types.js';
 import { ScanOverview } from './ScanOverview';
 import { getScanOverview } from '../lib/scan-overview';
+import { EvidenceList } from './EvidenceList';
 import Link from 'next/link';
 import styles from './ScanCard.module.css';
 
@@ -182,6 +185,19 @@ function ComparisonSummary({ result }: { result: ComparisonResult }): React.Reac
 
 // ─── Technology changes ──────────────────────────────────────────────
 
+/**
+ * Looks up the full `DetectionResponse` for a technology by its canonical
+ * `technology.id` from the scan's detections array.
+ *
+ * Pure helper — no comparison semantics, no mutation.
+ */
+function findDetectionById(
+  detections: DetectionResponse[],
+  techId: string,
+): DetectionResponse | null {
+  return detections.find((d) => d.technology.id === techId) ?? null;
+}
+
 function TechnologyChanges({ result }: { result: ComparisonResult }): React.ReactElement {
   if (!result.hasChanges) {
     return (
@@ -201,7 +217,11 @@ function TechnologyChanges({ result }: { result: ComparisonResult }): React.Reac
           <h3>Added ({result.added.length})</h3>
           <ul className={styles.changeList}>
             {result.added.map((d) => (
-              <TechnologyComparisonItem key={d.id} detection={d} />
+              <TechnologyComparisonItem
+                key={d.id}
+                detection={d}
+                fullDetection={findDetectionById(result.right!.detections, d.id)}
+              />
             ))}
           </ul>
         </>
@@ -212,7 +232,11 @@ function TechnologyChanges({ result }: { result: ComparisonResult }): React.Reac
           <h3>Removed ({result.removed.length})</h3>
           <ul className={styles.changeList}>
             {result.removed.map((d) => (
-              <TechnologyComparisonItem key={d.id} detection={d} />
+              <TechnologyComparisonItem
+                key={d.id}
+                detection={d}
+                fullDetection={findDetectionById(result.left!.detections, d.id)}
+              />
             ))}
           </ul>
         </>
@@ -266,8 +290,14 @@ function TechnologyChanges({ result }: { result: ComparisonResult }): React.Reac
 
 function TechnologyComparisonItem({
   detection,
+  fullDetection,
 }: {
   detection: TechnologyComparison;
+  /** Full detection from the source scan, looked up by technology.id.
+   *  Present for added/removed technologies; null when the detection
+   *  is missing from the source scan or for unchanged techs (which
+   *  keep their existing evidence-change rendering). */
+  fullDetection?: DetectionResponse | null;
 }): React.ReactElement {
   const badgeClass =
     detection.status === 'added'
@@ -276,17 +306,54 @@ function TechnologyComparisonItem({
         ? styles.removedBadge
         : styles.unchangedBadge;
 
+  // Technology name: link to catalog detail page if the tech is known.
+  const techName =
+    fullDetection && isKnownTechnology(detection.id) ? (
+      <Link
+        href={`/technologies/${encodeURIComponent(detection.id)}`}
+        className={styles.techNameLink}
+      >
+        {detection.name}
+      </Link>
+    ) : (
+      <span className={styles.techName}>{detection.name}</span>
+    );
+
+  // Derive a structured explanation (summary + deduplicated evidence)
+  // from the full detection — reused from the existing explainability pipeline.
+  const explainability = fullDetection ? getDetectionExplainability(fullDetection) : null;
+
   return (
     <li className={styles.changeItem}>
       <span className={`${styles.changeBadge} ${badgeClass}`}>{detection.status}</span>
-      <span className={styles.techName}>{detection.name}</span>
+      {techName}
       <span className={styles.category}>{detection.category}</span>
-      {detection.scoreChanged && (
+
+      {/* Confidence for added/removed technologies (from the source scan) */}
+      {detection.status === 'added' && detection.rightConfidence !== null && (
+        <span className={styles.score}>Confidence: {detection.rightConfidence}%</span>
+      )}
+      {detection.status === 'removed' && detection.leftConfidence !== null && (
+        <span className={styles.score}>Confidence: {detection.leftConfidence}%</span>
+      )}
+
+      {/* Existing: score delta for unchanged technologies with changed confidence */}
+      {detection.status === 'unchanged' && detection.scoreChanged && (
         <span className={styles.scoreChange}>
           {detection.leftConfidence} → {detection.rightConfidence}
           {(detection.scoreDelta ?? 0) > 0 ? ' ↑' : ' ↓'}
         </span>
       )}
+
+      {/* NEW: Explainability summary + supporting evidence for added/removed */}
+      {fullDetection && explainability && explainability.evidenceCount > 0 && (
+        <div className={styles.changeEvidence}>
+          <p className={styles.detectionExplanation}>{explainability.summary}</p>
+          <EvidenceList evidence={explainability.evidence} />
+        </div>
+      )}
+
+      {/* Existing: evidence changes for unchanged technologies */}
       {detection.evidenceChanges.some((e) => e.status !== 'unchanged') && (
         <EvidenceChangeList changes={detection.evidenceChanges} />
       )}

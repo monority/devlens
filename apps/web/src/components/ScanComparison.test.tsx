@@ -437,3 +437,243 @@ describe('ScanComparison — navigation', () => {
     expect(html).toContain('/scans');
   });
 });
+
+// ─── Step 48: Technology change explainability ────────────────────────
+
+describe('ScanComparison — added/removed technology explainability', () => {
+  it('added technology renders confidence', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+      makeDetection('vue', 'Vue', 'frontend', 80),
+    ]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('Added (1)');
+    expect(cleaned).toContain('Vue');
+    expect(cleaned).toContain('Confidence: 80%');
+  });
+
+  it('added technology renders supporting evidence', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+      makeDetection('vue', 'Vue', 'frontend', 80, [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+      ]),
+    ]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('HTTP Header');
+    expect(cleaned).toContain('Server: nginx');
+    expect(cleaned).toContain('Evidence (1)');
+  });
+
+  it('removed technology renders confidence', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('angular', 'Angular', 'framework', 70),
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('Removed (1)');
+    expect(cleaned).toContain('Angular');
+    expect(cleaned).toContain('Confidence: 70%');
+  });
+
+  it('removed technology renders supporting evidence', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('angular', 'Angular', 'framework', 70, [
+        { type: 'meta_tag', name: 'generator', content: 'Angular CLI' },
+      ]),
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+
+    expect(html).toContain('Meta Tag');
+    expect(html).toContain('Angular CLI');
+    expect(html).toContain('Detected from');
+  });
+
+  it('added technology renders explainability summary', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+      makeDetection('vue', 'Vue', 'frontend', 80, [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+        { type: 'meta_tag', name: 'generator', content: 'Vue' },
+      ]),
+    ]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+
+    expect(html).toContain('Detected from');
+    expect(html).toContain('HTTP Header');
+    expect(html).toContain('Meta Tag');
+  });
+
+  it('known technology in added list links to technology detail route', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+      makeDetection('vue', 'Vue', 'frontend', 80, [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+      ]),
+    ]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // isKnownTechnology('vue') returns true, so Vue should be linked
+    expect(cleaned).toContain('/technologies/vue');
+    expect(cleaned).toContain('Vue');
+  });
+
+  it('unknown technology in added list does not link', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+      makeDetection('unknown-tech', 'Unknown Tech', 'frontend', 80, [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+      ]),
+    ]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('Unknown Tech');
+    expect(cleaned).not.toContain('/technologies/unknown-tech');
+  });
+
+  it('handles technology without evidence gracefully', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+      makeDetection('vue', 'Vue', 'frontend', 80),
+    ]);
+    const result = compareScans(left, right);
+
+    // Should not throw and should still show the technical
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('Vue');
+    expect(cleaned).toContain('Confidence: 80%');
+    // No evidence → no "Evidence (" collapsible summary should appear
+    expect(cleaned).not.toContain('Evidence (');
+  });
+
+  it('handles missing detection in source scan safely', () => {
+    // Start with a right scan that naturally produces an added technology
+    // (Phantom is in right, not in left).
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+      makeDetection('phantom-tech', 'Phantom', 'unknown', 50, [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+      ]),
+    ]);
+    const result = compareScans(left, right);
+
+    // Now simulate the detection being missing from the source scan's
+    // detections array (e.g. it was filtered or not yet loaded). The
+    // TechnologyComparisonItem should still render safely without crashing
+    // — just name + category + confidence, no evidence.
+    result.right!.detections = result.right!.detections.filter(
+      (d) => d.technology.id !== 'phantom-tech',
+    );
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // Renders with name + category + confidence, no crash
+    expect(cleaned).toContain('Phantom');
+    expect(cleaned).toContain('unknown');
+    expect(cleaned).toContain('Confidence: 50%');
+    // No evidence rendered since the detection is missing
+    expect(cleaned).not.toContain('Detected from');
+  });
+
+  it('unchanged technology with score changes does not re-render evidence from full detection', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('react', 'React', 'frontend', 90, [
+        { type: 'http_header', name: 'Server', value: 'apache' },
+      ]),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95, [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+      ]),
+    ]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // Score change table still present (not regressed)
+    expect(cleaned).toContain('Score / confidence changes (1)');
+    expect(html).toContain('90');
+    expect(html).toContain('95');
+  });
+
+  it('both added and removed technologies render with their respective evidence', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('angular', 'Angular', 'framework', 70, [
+        { type: 'meta_tag', name: 'generator', content: 'Angular CLI' },
+      ]),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95, [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+      ]),
+    ]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // Added (React in right, not in left)
+    expect(cleaned).toContain('Added (1)');
+    expect(cleaned).toContain('Confidence: 95%');
+    expect(cleaned).toContain('Detected from');
+
+    // Removed (Angular in left, not in right)
+    expect(cleaned).toContain('Removed (1)');
+    expect(cleaned).toContain('Confidence: 70%');
+    expect(cleaned).toContain('Angular CLI');
+  });
+});

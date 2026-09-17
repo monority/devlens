@@ -775,6 +775,11 @@
   margin: 0.25rem 0;
 }
 
+/* Step 48: Evidence within comparison change items */
+.changeEvidence {
+  flex: 1 1 100%;
+}
+
 /* ─── Comparison summary ───────────────────────────────────────────── */
 
 .comparisonSummary {

@@ -8,6 +8,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { compareScans, evidenceKey } from '../lib/comparison.js';
+import { getEvidenceIdentity } from '../lib/evidence-identity.js';
 import type { ScanDetailResponse, DetectionResponse } from '../lib/types.js';
 
 // ─── Test fixtures ───────────────────────────────────────────────────
@@ -304,18 +305,49 @@ describe('compareScans — determinism', () => {
   });
 });
 
-// ─── evidenceKey ─────────────────────────────────────────────────────
+// ─── evidenceKey backward compatibility ──────────────────────────────
+//
+// evidenceKey is re-exported from comparison.ts as an alias of
+// getEvidenceIdentity. The canonical tests for getEvidenceIdentity live
+// in evidence-identity.test.ts. Here we verify compareScans still
+// deduplicates evidence correctly using the canonical identity.
 
-describe('evidenceKey', () => {
-  it('produces different keys for different http_header names', () => {
-    expect(evidenceKey({ type: 'http_header', name: 'Server', value: 'nginx' })).not.toBe(
-      evidenceKey({ type: 'http_header', name: 'X-Powered-By', value: 'React' }),
-    );
+describe('evidenceKey backward compatibility (compareScans integration)', () => {
+  it('comparison.ts re-exports canonical getEvidenceIdentity as evidenceKey', () => {
+    // The re-exported evidenceKey must be the exact same function reference
+    // as the canonical getEvidenceIdentity.
+    expect(evidenceKey).toBe(getEvidenceIdentity);
   });
 
-  it('produces the same key for identical evidence', () => {
-    expect(evidenceKey({ type: 'http_header', name: 'Server', value: 'nginx' })).toBe(
-      evidenceKey({ type: 'http_header', name: 'Server', value: 'nginx' }),
-    );
+  it('compareScans deduplicates evidence by canonical identity', () => {
+    const detection: DetectionResponse = {
+      technology: { id: 'react', name: 'React', category: 'frontend' },
+      confidence: 95,
+      evidence: [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+        { type: 'http_header', name: 'Server', value: 'Apache' }, // same identity
+      ],
+    };
+    const scan: ScanDetailResponse = {
+      scan: {
+        id: 's1',
+        status: 'completed',
+        target: 'https://example.com',
+        hostname: 'example.com',
+        createdAt: '2025-01-01T00:00:00Z',
+        startedAt: '2025-01-01T00:00:00Z',
+        completedAt: '2025-01-01T00:01:00Z',
+        failedAt: null,
+        error: null,
+      },
+      snapshot: null,
+      detections: [detection],
+    };
+
+    const result = compareScans(scan, scan);
+    const unchangedTech = result.unchanged[0]!;
+
+    // Both evidence items have identity "http_header:Server" → deduplicated to 1
+    expect(unchangedTech.evidenceChanges).toHaveLength(1);
   });
 });

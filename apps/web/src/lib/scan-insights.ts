@@ -20,6 +20,7 @@
 import type { ScanDetailResponse, DetectionResponse, EvidenceResponse } from '../lib/types.js';
 import { evidenceTypeLabel } from '../lib/evidence-presenter';
 import { isKnownTechnology } from '../lib/technology-catalog';
+import { deduplicateEvidence } from '../lib/evidence-identity';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -228,68 +229,6 @@ export function getTechnologyComposition(
   });
 
   return compositions;
-}
-
-/**
- * Produces a deterministic canonical identity string for an evidence item.
- *
- * Used for deduplication when merging evidence across duplicate detection
- * records. Each evidence type uses its type-specific primary identifier:
- * - html → selector
- * - http_header → name
- * - script_url → url
- * - script_content → snippet
- * - meta_tag → name
- * - javascript_global → globalName
- * - resource → url
- * - link → url
- * - unknown → full JSON serialization
- *
- * This is a presentation-only helper — it does not alter evidence or
- * participate in detector logic.
- */
-function evidenceIdentity(item: EvidenceResponse): string {
-  switch (item.type) {
-    case 'html':
-      return `html:${item.selector}`;
-    case 'http_header':
-      return `http_header:${item.name}`;
-    case 'script_url':
-      return `script_url:${item.url}`;
-    case 'script_content':
-      return `script_content:${item.snippet}`;
-    case 'meta_tag':
-      return `meta_tag:${item.name}`;
-    case 'javascript_global':
-      return `javascript_global:${item.globalName}`;
-    case 'resource':
-      return `resource:${item.url}`;
-    case 'link':
-      return `link:${item.url}`;
-    default: {
-      // Fallback for unknown/future evidence types — serialize the full item
-      const unknown = item as { type: string; [key: string]: unknown };
-      return `${unknown.type}:${JSON.stringify(unknown)}`;
-    }
-  }
-}
-
-/**
- * Deduplicates evidence entries using the canonical evidence identity.
- *
- * Preserves the order of first occurrence. Does not mutate the input array.
- */
-function deduplicateEvidence(evidence: EvidenceResponse[]): EvidenceResponse[] {
-  const seen = new Set<string>();
-  const result: EvidenceResponse[] = [];
-  for (const item of evidence) {
-    const id = evidenceIdentity(item);
-    if (!seen.has(id)) {
-      seen.add(id);
-      result.push(item);
-    }
-  }
-  return result;
 }
 
 /**

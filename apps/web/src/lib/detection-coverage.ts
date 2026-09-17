@@ -33,6 +33,7 @@
 
 import type { DetectionResponse, EvidenceResponse } from '../lib/types.js';
 import { evidenceTypeLabel } from '../lib/evidence-presenter';
+import { deduplicateEvidence } from '../lib/evidence-identity';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -54,66 +55,7 @@ export interface DetectionCoverage {
 
 // ─── Internal helpers ───────────────────────────────────────────────
 
-/**
- * Produces a canonical identity string for an evidence item.
- *
- * This mirrors the identity semantics already established in
- * `scan-insights.ts` (`evidenceIdentity`) and replicated in
- * `scan-detection-results.ts` (`evidenceKey`). Each evidence type uses
- * its type-specific primary identifier:
- * - html               → selector
- * - http_header        → name
- * - script_url         → url
- * - script_content     → snippet
- * - meta_tag           → name
- * - javascript_global  → globalName
- * - resource           → url
- *   link               → url
- * - unknown            → full JSON serialization
- *
- * No second algorithm is introduced.
- */
-function evidenceKey(item: EvidenceResponse): string {
-  switch (item.type) {
-    case 'html':
-      return `html:${item.selector}`;
-    case 'http_header':
-      return `http_header:${item.name}`;
-    case 'script_url':
-      return `script_url:${item.url}`;
-    case 'script_content':
-      return `script_content:${item.snippet}`;
-    case 'meta_tag':
-      return `meta_tag:${item.name}`;
-    case 'javascript_global':
-      return `javascript_global:${item.globalName}`;
-    case 'resource':
-      return `resource:${item.url}`;
-    case 'link':
-      return `link:${item.url}`;
-    default: {
-      const unknown = item as { type: string; [key: string]: unknown };
-      return `${unknown.type}:${JSON.stringify(unknown)}`;
-    }
-  }
-}
-
-/**
- * Deduplicates evidence items using the canonical identity key.
- * Preserves order of first occurrence. Does not mutate input.
- */
-function deduplicateEvidence(evidence: readonly EvidenceResponse[]): EvidenceResponse[] {
-  const seen = new Set<string>();
-  const result: EvidenceResponse[] = [];
-  for (const item of evidence) {
-    const key = evidenceKey(item);
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(item);
-    }
-  }
-  return result;
-}
+// Uses canonical getEvidenceIdentity + deduplicateEvidence from evidence-identity.ts
 
 // ─── Pure coverage function ──────────────────────────────────────────
 

@@ -34,60 +34,9 @@
  *   - Immutable (does not mutate input; creates new arrays for evidence)
  */
 
-import type { DetectionResponse, EvidenceResponse } from '../lib/types.js';
+import type { DetectionResponse } from '../lib/types.js';
 import { evidenceTypeLabel } from '../lib/evidence-presenter';
-
-// ─── Internal helper: evidence identity ──────────────────────────────
-
-/**
- * Produces a canonical string for an evidence item, used for deduplication.
- *
- * This mirrors the identity semantics already established in the evidence
- * presenter layer (`scan-insights.ts` `evidenceIdentity`) — each evidence
- * type uses its type-specific primary identifier. No second algorithm is
- * introduced.
- */
-function evidenceKey(item: EvidenceResponse): string {
-  switch (item.type) {
-    case 'html':
-      return `html:${item.selector}`;
-    case 'http_header':
-      return `http_header:${item.name}`;
-    case 'script_url':
-      return `script_url:${item.url}`;
-    case 'script_content':
-      return `script_content:${item.snippet}`;
-    case 'meta_tag':
-      return `meta_tag:${item.name}`;
-    case 'javascript_global':
-      return `javascript_global:${item.globalName}`;
-    case 'resource':
-      return `resource:${item.url}`;
-    case 'link':
-      return `link:${item.url}`;
-    default: {
-      const unknown = item as { type: string; [key: string]: unknown };
-      return `${unknown.type}:${JSON.stringify(unknown)}`;
-    }
-  }
-}
-
-/**
- * Deduplicates evidence items using the canonical identity key.
- * Preserves the first occurrence. Does not mutate the input array.
- */
-function deduplicateEvidence(evidence: readonly EvidenceResponse[]): EvidenceResponse[] {
-  const seen = new Set<string>();
-  const result: EvidenceResponse[] = [];
-  for (const item of evidence) {
-    const key = evidenceKey(item);
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(item);
-    }
-  }
-  return result;
-}
+import { getEvidenceIdentity, deduplicateEvidence } from '../lib/evidence-identity';
 
 // ─── Pure detection results function ─────────────────────────────────
 
@@ -146,7 +95,11 @@ export function getScanDetectionResults(detections: DetectionResponse[]): Detect
       if (labelA !== labelB) {
         return labelA < labelB ? -1 : 1;
       }
-      return evidenceKey(a) < evidenceKey(b) ? -1 : evidenceKey(a) > evidenceKey(b) ? 1 : 0;
+      return getEvidenceIdentity(a) < getEvidenceIdentity(b)
+        ? -1
+        : getEvidenceIdentity(a) > getEvidenceIdentity(b)
+          ? 1
+          : 0;
     });
 
     results.push({

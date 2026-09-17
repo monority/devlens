@@ -28,7 +28,7 @@ export interface DetectionItemProps {
 }
 
 export function DetectionItem({ detection, index }: DetectionItemProps): React.ReactElement {
-  const { technology, confidence, evidence } = detection;
+  const { technology, confidence } = detection;
 
   // If the technology is in the catalog, link the name to its detail
   // page. Unknown IDs render as plain text (no broken link).
@@ -57,10 +57,11 @@ export function DetectionItem({ detection, index }: DetectionItemProps): React.R
       {/* Explanation: neutral summary of evidence coverage */}
       <p className={styles.detectionExplanation}>{explainability.summary}</p>
 
-      {evidence.length > 0 && (
+      {explainability.evidenceCount > 0 && (
         <footer className={styles.detectionMeta}>
           <span className={styles.evidenceCount}>
-            {evidence.length} evidence {evidence.length === 1 ? 'item' : 'items'}
+            {explainability.evidenceCount} evidence{' '}
+            {explainability.evidenceCount === 1 ? 'item' : 'items'}
           </span>
         </footer>
       )}
@@ -81,7 +82,7 @@ export function DetectionItem({ detection, index }: DetectionItemProps): React.R
         </ul>
       )}
 
-      <EvidenceList evidence={evidence} />
+      <EvidenceList evidence={explainability.evidence} />
     </li>
   );
 }

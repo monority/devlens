@@ -19,6 +19,11 @@
  */
 
 import type { ScanDetailResponse, DetectionResponse, EvidenceResponse } from './types.js';
+import { getEvidenceIdentity } from './evidence-identity';
+
+// Re-export as evidenceKey for backward compatibility with consumers that
+// import from comparison.ts.
+export const evidenceKey = getEvidenceIdentity;
 
 // ─── Public types ────────────────────────────────────────────────────
 
@@ -34,39 +39,6 @@ export interface ComparisonInput {
  * The status of an evidence item relative to the other scan.
  */
 export type EvidenceStatus = 'added' | 'removed' | 'unchanged';
-
-/**
- * A deterministic identity for an evidence item, used for comparison.
- *
- * This is NOT a domain-level identity — it is a presentation-level key
- * derived from the evidence type and its identifying fields. Two evidence
- * items with the same key are considered "the same evidence" for
- * comparison purposes.
- */
-export function evidenceKey(item: EvidenceResponse): string {
-  switch (item.type) {
-    case 'http_header':
-      return `http_header:${item.name}`;
-    case 'meta_tag':
-      return `meta_tag:${item.name}`;
-    case 'script_url':
-      return `script_url:${item.url}`;
-    case 'script_content':
-      return `script_content:${item.snippet}`;
-    case 'html':
-      return `html:${item.selector}`;
-    case 'javascript_global':
-      return `javascript_global:${item.globalName}`;
-    case 'resource':
-      return `resource:${item.url}`;
-    case 'link':
-      return `link:${item.url}`;
-    default:
-      // Fallback for unknown evidence types — use full JSON so it is
-      // deterministic but unique.
-      return `unknown:${JSON.stringify(item)}`;
-  }
-}
 
 /**
  * One evidence item in a comparison.

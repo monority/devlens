@@ -294,4 +294,42 @@ describe('DetectionItem — Step 39 explainability', () => {
     expect(html).not.toContain("HTTP header '");
     expect(html).toContain('No evidence details are available.');
   });
+
+  it('deduplicates evidence in the rendered output', () => {
+    const detection = makeDetection({
+      evidence: [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+        { type: 'http_header', name: 'Server', value: 'Apache' },
+      ],
+    });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // All three have identity http_header:Server → deduplicated to 1
+    expect(cleaned).toContain('1 evidence item');
+  });
+
+  it('renders evidence sources in deterministic order (type ASC → identity ASC)', () => {
+    const detection = makeDetection({
+      evidence: [
+        { type: 'script_url', url: 'https://cdn.example.com/z.js' },
+        { type: 'http_header', name: 'X-Powered-By', value: 'React' },
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+      ],
+    });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const decoded = html.replace(/&#x27;/g, "'");
+
+    // Order: HTTP Header (Server) → HTTP Header (X-Powered-By) → Script URL
+    const serverPos = decoded.indexOf("HTTP header 'Server'");
+    const poweredByPos = decoded.indexOf("HTTP header 'X-Powered-By'");
+    const scriptPos = decoded.indexOf('Script from');
+
+    expect(serverPos).toBeGreaterThan(-1);
+    expect(poweredByPos).toBeGreaterThan(-1);
+    expect(scriptPos).toBeGreaterThan(-1);
+    expect(serverPos).toBeLessThan(poweredByPos);
+    expect(poweredByPos).toBeLessThan(scriptPos);
+  });
 });

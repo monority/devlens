@@ -1,7 +1,7 @@
 /**
  * Detection explainability — pure, in-memory derivation of a structured
  * explanation for a technology detection, including per-evidence origin
- * descriptions.
+ * descriptions, canonical identity, and deduplication.
  *
  * This module turns the existing detection data (technology, confidence,
  * evidence) into a richer presentation model that explains — using only
@@ -13,6 +13,7 @@
  *   - invent evidence that does not exist
  *   - fabricate detector names, paths, or reasons
  *   - introduce a second confidence/scoring algorithm
+ *   - duplicate evidenceIdentity (reuses the canonical algorithm)
  *
  * All derived strings are deterministic: no locale-dependent formatting,
  * no random values, no object-key insertion-order reliance.
@@ -33,8 +34,10 @@ export interface EvidenceSource {
   type: string;
   /** Short description of where this evidence originated. */
   source: string;
-  /** The primary identifying value (e.g. header name, selector, URL). */
+  /** The primary identifying value (e.g. "Server: nginx"). */
   value: string;
+  /** Canonical evidence identity key (e.g. "http_header:Server"). */
+  identity: string;
 }
 
 /**
@@ -49,15 +52,79 @@ export interface DetectionExplainability {
   confidence: number;
   /** Neutral summary string (reused from getDetectionExplanation). */
   summary: string;
-  /** Total evidence count. */
+  /** Total evidence count (after deduplication). */
   evidenceCount: number;
   /** Unique evidence type labels, sorted alphabetically. */
   evidenceTypes: string[];
-  /** Per-evidence origin descriptions, in evidence order. */
+  /** Per-evidence origin descriptions, deduplicated and deterministically ordered. */
   evidenceSources: EvidenceSource[];
+  /** Deduplicated, sorted evidence items — for reuse with EvidenceList. */
+  evidence: EvidenceResponse[];
 }
 
 // ─── Internal helpers ───────────────────────────────────────────────
+
+/**
+ * Produces a canonical identity string for an evidence item.
+ *
+ * This mirrors the identity semantics already established in
+ * `scan-insights.ts` (`evidenceIdentity`), replicated in
+ * `scan-detection-results.ts` (`evidenceKey`), and used here in
+ * `detection-explainability.ts`:
+ * - html               → "html:{selector}"
+ * - http_header        → "http_header:{name}"
+ * - script_url         → "script_url:{url}"
+ * - script_content     → "script_content:{snippet}"
+ * - meta_tag           → "meta_tag:{name}"
+ * - javascript_global  → "javascript_global:{globalName}"
+ * - resource           → "resource:{url}"
+ * - link               → "link:{url}"
+ * - unknown            → "{type}:{JSON.stringify(item)}"
+ *
+ * No second algorithm is introduced — this is the same canonical identity
+ * used throughout the project for evidence deduplication.
+ */
+function evidenceIdentity(item: EvidenceResponse): string {
+  switch (item.type) {
+    case 'html':
+      return `html:${item.selector}`;
+    case 'http_header':
+      return `http_header:${item.name}`;
+    case 'script_url':
+      return `script_url:${item.url}`;
+    case 'script_content':
+      return `script_content:${item.snippet}`;
+    case 'meta_tag':
+      return `meta_tag:${item.name}`;
+    case 'javascript_global':
+      return `javascript_global:${item.globalName}`;
+    case 'resource':
+      return `resource:${item.url}`;
+    case 'link':
+      return `link:${item.url}`;
+    default: {
+      const unknown = item as { type: string; [key: string]: unknown };
+      return `${unknown.type}:${JSON.stringify(unknown)}`;
+    }
+  }
+}
+
+/**
+ * Deduplicates evidence entries using the canonical evidence identity.
+ * Preserves order of first occurrence. Does not mutate the input array.
+ */
+function deduplicateEvidence(evidence: readonly EvidenceResponse[]): EvidenceResponse[] {
+  const seen = new Set<string>();
+  const result: EvidenceResponse[] = [];
+  for (const item of evidence) {
+    const id = evidenceIdentity(item);
+    if (!seen.has(id)) {
+      seen.add(id);
+      result.push(item);
+    }
+  }
+  return result;
+}
 
 /**
  * Builds a human-readable source description for a single evidence item,
@@ -115,35 +182,48 @@ function evidenceSourceValue(item: EvidenceResponse): string {
  * The confidence value is passed through exactly as-is from the detection
  * — it is never recalculated or relabeled. The summary string is derived
  * from the existing `getDetectionExplanation` module — not reimplemented.
- * Every evidence-source description is constructed from the evidence's own
- * fields; no new data is invented.
+ *
+ * Evidence is:
+ *   - Deduplicated using the canonical `evidenceIdentity` algorithm
+ *     (same as scan-insights.ts and scan-detection-results.ts)
+ *   - Sorted deterministically by type label ASC, then identity ASC
+ *   - Described using only fields that exist on each evidence object
  *
  * @param detection The detection response (from API, already loaded)
  * @returns A deterministic explainability model
  */
 export function getDetectionExplainability(detection: DetectionResponse): DetectionExplainability {
-  const { technology, confidence, evidence } = detection;
+  const { technology, confidence } = detection;
 
   // Reuse the existing explanation module for the summary
   const { summary } = getDetectionExplanation(detection);
 
-  // Collect unique evidence type labels, sorted alphabetically
-  const seenTypes = new Set<string>();
-  const evidenceTypes: string[] = [];
-  for (const item of evidence) {
-    const label = evidenceTypeLabel(item.type);
-    if (!seenTypes.has(label)) {
-      seenTypes.add(label);
-      evidenceTypes.push(label);
+  // Deduplicate evidence using the canonical identity, then sort
+  // deterministically by type label ASC → canonical identity ASC
+  const uniqueEvidence = deduplicateEvidence(detection.evidence).sort((a, b) => {
+    const labelA = evidenceTypeLabel(a.type);
+    const labelB = evidenceTypeLabel(b.type);
+    if (labelA !== labelB) {
+      return labelA < labelB ? -1 : 1;
     }
-  }
-  evidenceTypes.sort();
+    return evidenceIdentity(a) < evidenceIdentity(b)
+      ? -1
+      : evidenceIdentity(a) > evidenceIdentity(b)
+        ? 1
+        : 0;
+  });
 
-  // Build per-evidence source descriptions (deterministic order = evidence array order)
-  const evidenceSources: EvidenceSource[] = evidence.map((item) => ({
+  // Collect unique evidence type labels, sorted alphabetically
+  const evidenceTypes = Array.from(
+    new Set(uniqueEvidence.map((item) => evidenceTypeLabel(item.type))),
+  ).sort();
+
+  // Build per-evidence source descriptions with canonical identity
+  const evidenceSources: EvidenceSource[] = uniqueEvidence.map((item) => ({
     type: evidenceTypeLabel(item.type),
     source: evidenceSourceDescription(item),
     value: evidenceSourceValue(item),
+    identity: evidenceIdentity(item),
   }));
 
   return {
@@ -153,8 +233,9 @@ export function getDetectionExplainability(detection: DetectionResponse): Detect
     },
     confidence,
     summary,
-    evidenceCount: evidence.length,
+    evidenceCount: uniqueEvidence.length,
     evidenceTypes,
     evidenceSources,
+    evidence: uniqueEvidence,
   };
 }

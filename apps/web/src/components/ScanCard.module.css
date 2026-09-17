@@ -775,6 +775,70 @@
   margin: 0.25rem 0;
 }
 
+/* ─── Comparison summary ───────────────────────────────────────────── */
+
+.comparisonSummary {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+}
+
+.comparisonSummary h2 {
+  font-size: 1rem;
+  margin: 0 0 0.75rem 0;
+  color: #374151;
+}
+
+.comparisonSummary dl {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem 1rem;
+}
+
+.comparisonSummary dt {
+  font-size: 0.8rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.025rem;
+}
+
+.comparisonSummary dd {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .comparisonSummary dl {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ─── Comparison back link ──────────────────────────────────────────── */
+
+.comparisonBackLink {
+  font-size: 0.85rem;
+  color: #6b7280;
+  text-decoration: none;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.3rem;
+  margin-bottom: 0.75rem;
+  display: inline-block;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.comparisonBackLink:hover {
+  color: #2563eb;
+  border-color: #2563eb;
+  text-decoration: underline;
+}
+
 @media (max-width: 768px) {
   .comparisonSides {
     grid-template-columns: 1fr;

@@ -6,12 +6,18 @@
  * `comparison.test.ts`; these tests focus on presentation.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { ScanComparison } from './ScanComparison.js';
 import { compareScans } from '../lib/comparison.js';
 import type { ScanDetailResponse, DetectionResponse } from '../lib/types.js';
+
+// Mock next/link so it renders a plain <a> tag (no router context needed)
+vi.mock('next/link', () => ({
+  default: ({ children, href }: { children: React.ReactNode; href: string }) =>
+    React.createElement('a', { href }, children),
+}));
 
 // ─── Test fixtures ───────────────────────────────────────────────────
 
@@ -203,5 +209,231 @@ describe('ScanComparison', () => {
     expect(html).toContain('Evidence changes');
     expect(html).toContain('Meta Tag');
     expect(html).toContain('added');
+  });
+});
+
+// ─── Heading tests ───────────────────────────────────────────────────
+
+describe('ScanComparison — heading hierarchy', () => {
+  it('comparison header uses H2 (not H1)', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+
+    // The old h1 in ComparisonHeader is now h2.
+    expect(html).toContain('<h2>Scan Comparison</h2>');
+    expect(html).not.toContain('<h1>Scan Comparison</h1>');
+  });
+
+  it('does not render a duplicate page-level H1 from the comparison component', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // The only h1s in the component should come from ScanOverview's
+    // section-level headings ("Scan #{id}"), not from the comparison
+    // header which was previously a duplicate page-level h1.
+    expect(cleaned).toContain('<h1>Scan #scan_left</h1>');
+    expect(cleaned).toContain('<h1>Scan #scan_right</h1>');
+  });
+});
+
+// ─── Scan overview tests ────────────────────────────────────────────
+
+describe('ScanComparison — scan overview in header', () => {
+  it('previous side renders overview metrics (technology count, evidence count, confidence)', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95, [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+      ]),
+      makeDetection('vue', 'Vue', 'frontend', 80),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+
+    // ScanOverview shows target, hostname, and metrics
+    expect(html).toContain('https://example.com/');
+    expect(html).toContain('example.com');
+    expect(html).toContain('Technologies');
+    expect(html).toContain('Evidence');
+    expect(html).toContain('Highest confidence');
+  });
+
+  it('current side shows its own detection count', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+      makeDetection('vue', 'Vue', 'frontend', 80),
+      makeDetection('svelte', 'Svelte', 'frontend', 70),
+    ]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+
+    // Both sides render overview metrics
+    expect(html).toContain('Technologies');
+    expect(html).toContain('Evidence');
+    expect(html).toContain('Highest confidence');
+  });
+
+  it('overview does not use raw scan ID as primary identity', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+
+    // The target URL is shown as a primary user-facing identity
+    expect(html).toContain('https://example.com/');
+    expect(html).toContain('example.com');
+  });
+});
+
+// ─── Comparison summary tests ─────────────────────────────────────────
+
+describe('ScanComparison — comparison summary', () => {
+  it('renders Added count', () => {
+    const left = makeScan('scan_left', 'completed', [makeDetection('vue', 'Vue', 'frontend', 80)]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('vue', 'Vue', 'frontend', 80),
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+
+    expect(html).toContain('Comparison summary');
+    expect(html).toContain('Added');
+    expect(html).toContain('Removed');
+    expect(html).toContain('Score changes');
+    expect(html).toContain('Evidence changes');
+    expect(html).toContain('Overall');
+    expect(html).toContain('Changes');
+  });
+
+  it('renders correct count for multiple additions and removals', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('vue', 'Vue', 'frontend', 80),
+      makeDetection('angular', 'Angular', 'framework', 70),
+      makeDetection('jquery', 'jQuery', 'frontend', 60),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('vue', 'Vue', 'frontend', 80),
+      makeDetection('react', 'React', 'frontend', 95),
+      makeDetection('svelte', 'Svelte', 'frontend', 70),
+    ]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+
+    // Added: React, Svelte (2). Removed: Angular, jQuery (2).
+    // Score changes: 0 (Vue is unchanged at 80).
+    expect(html).toContain('Added');
+    expect(html).toContain('Removed');
+    expect(html).toContain('Overall');
+    expect(html).toContain('Changes');
+  });
+
+  it('renders score changes count', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('react', 'React', 'frontend', 90),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+
+    expect(html).toContain('Score changes');
+    expect(html).toContain('Changes');
+  });
+
+  it('renders evidence changes count', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95, [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+      ]),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95, [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+        { type: 'meta_tag', name: 'generator', content: 'React 19' },
+      ]),
+    ]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+
+    expect(html).toContain('Evidence changes');
+  });
+
+  it('renders "No Changes" when all counts are zero', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+
+    expect(html).toContain('Comparison summary');
+    expect(html).toContain('No Changes');
+  });
+});
+
+// ─── Navigation tests ────────────────────────────────────────────────
+
+describe('ScanComparison — navigation', () => {
+  it('renders back-to-scan-history link on the successful comparison path', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+
+    expect(html).toContain('Back to scan history');
+    expect(html).toContain('/scans');
+    expect(html).toContain('← Back to scan history');
+  });
+
+  it('renders back-to-scan-history link on the error path (missing scan)', () => {
+    const left = null;
+    const right = makeScan('scan_right', 'completed', []);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+
+    expect(html).toContain('Back to scan history');
+    expect(html).toContain('/scans');
   });
 });

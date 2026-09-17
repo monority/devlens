@@ -17,7 +17,9 @@ import {
   evidenceUrl,
 } from '../lib/evidence-presenter';
 import type { EvidenceResponse } from '../lib/types.js';
-import { ScanSummary } from './ScanSummary';
+import { ScanOverview } from './ScanOverview';
+import { getScanOverview } from '../lib/scan-overview';
+import Link from 'next/link';
 import styles from './ScanCard.module.css';
 
 export interface ScanComparisonProps {
@@ -80,6 +82,9 @@ export function ScanComparison({ result }: ScanComparisonProps): React.ReactElem
         </section>
       )}
 
+      {/* ── Comparison summary ── */}
+      <ComparisonSummary result={result} />
+
       {/* ── Technology changes ── */}
       {!result.leftFailed && !result.rightFailed && <TechnologyChanges result={result} />}
     </article>
@@ -89,17 +94,23 @@ export function ScanComparison({ result }: ScanComparisonProps): React.ReactElem
 // ─── Comparison header ───────────────────────────────────────────────
 
 function ComparisonHeader({ result }: { result: ComparisonResult }): React.ReactElement {
+  const leftOverview = getScanOverview(result.left!);
+  const rightOverview = getScanOverview(result.right!);
+
   return (
     <header className={styles.comparisonHeader}>
-      <h1>Scan Comparison</h1>
+      <Link href="/scans" className={styles.comparisonBackLink}>
+        ← Back to scan history
+      </Link>
+      <h2>Scan Comparison</h2>
       <div className={styles.comparisonSides}>
         <div className={styles.comparisonSide}>
-          <h2>Previous / Left</h2>
-          <ScanSummary scan={result.left!.scan} />
+          <h3>Previous / Left</h3>
+          <ScanOverview overview={leftOverview} />
         </div>
         <div className={styles.comparisonSide}>
-          <h2>Current / Right</h2>
-          <ScanSummary scan={result.right!.scan} />
+          <h3>Current / Right</h3>
+          <ScanOverview overview={rightOverview} />
         </div>
       </div>
     </header>
@@ -126,6 +137,46 @@ function ComparisonError({ result }: { result: ComparisonResult }): React.ReactE
         </a>
       </p>
     </div>
+  );
+}
+
+// ─── Comparison summary ────────────────────────────────────────────────
+
+/**
+ * Compact summary of comparison counts, derived directly from the
+ * `ComparisonResult` without recomputing any comparison semantics.
+ *
+ * Shows: Added, Removed, Score changes, Evidence changes, Overall.
+ */
+function ComparisonSummary({ result }: { result: ComparisonResult }): React.ReactElement {
+  const evidenceChangeCount = result.evidenceChanges.filter((e) => e.status !== 'unchanged').length;
+
+  return (
+    <section className={styles.comparisonSummary}>
+      <h2>Comparison summary</h2>
+      <dl>
+        <div>
+          <dt>Added</dt>
+          <dd>{result.added.length}</dd>
+        </div>
+        <div>
+          <dt>Removed</dt>
+          <dd>{result.removed.length}</dd>
+        </div>
+        <div>
+          <dt>Score changes</dt>
+          <dd>{result.scoreChanges.length}</dd>
+        </div>
+        <div>
+          <dt>Evidence changes</dt>
+          <dd>{evidenceChangeCount}</dd>
+        </div>
+        <div>
+          <dt>Overall</dt>
+          <dd>{result.hasChanges ? 'Changes' : 'No Changes'}</dd>
+        </div>
+      </dl>
+    </section>
   );
 }
 

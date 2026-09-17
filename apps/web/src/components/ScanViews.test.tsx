@@ -498,6 +498,70 @@ describe('ScanDetailView', () => {
     expect(html).toContain('No supported technologies were detected');
     expect(html).toContain('Detections (0)');
   });
+
+  // ─── Detection coverage integration (Step 40) ───────────────────────
+
+  it('renders detection coverage for completed scans', () => {
+    const result = makeScanDetail();
+    const html = renderToString(React.createElement(ScanDetailView, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('Detection coverage');
+    expect(cleaned).toContain('Evidence items');
+    expect(cleaned).toContain('Evidence types');
+  });
+
+  it('does not render detection coverage for non-completed scans', () => {
+    const pendingResult: ScanDetailResponse = {
+      scan: makePendingScan(),
+      snapshot: null,
+      detections: [],
+    };
+    const html = renderToString(React.createElement(ScanDetailView, { result: pendingResult }));
+
+    expect(html).not.toContain('Detection coverage');
+  });
+
+  it('does not render detection coverage for failed scans', () => {
+    const failedResult: ScanDetailResponse = {
+      scan: makeFailedScan(),
+      snapshot: null,
+      detections: [],
+    };
+    const html = renderToString(React.createElement(ScanDetailView, { result: failedResult }));
+
+    expect(html).not.toContain('Detection coverage');
+  });
+
+  it('coverage data remains stable when filter is active', () => {
+    const result = makeScanDetail();
+    const html = renderToString(
+      React.createElement(ScanDetailView, {
+        result,
+        initialQuery: 'nginx',
+        initialCategory: '',
+      }),
+    );
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // Coverage should show all evidence (global), not filtered subset
+    expect(cleaned).toContain('Detection coverage');
+    expect(cleaned).toContain('Evidence items');
+    expect(cleaned).toContain('Evidence types');
+  });
+
+  it('zero-detection completed scan shows coverage empty state', () => {
+    const result: ScanDetailResponse = {
+      scan: makeCompletedScan(),
+      snapshot: null,
+      detections: [],
+    };
+    const html = renderToString(React.createElement(ScanDetailView, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('Detection coverage');
+    expect(cleaned).toContain('No evidence available');
+  });
 });
 
 // ─── Step 36: Detection filtering integration ────────────────────────

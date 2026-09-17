@@ -15,6 +15,7 @@ import Link from 'next/link';
 import { fetchScans } from '@/lib/api';
 import { ScansError } from '@/components/ScanViews';
 import { ScanHistory } from '@/components/ScanHistory';
+import { ScanComparisonSelector } from '@/components/ScanComparisonSelector';
 import styles from './page.module.css';
 
 export default async function ScansPage({
@@ -38,11 +39,7 @@ export default async function ScansPage({
           </Link>
         </div>
         <ScanHistory scans={data.scans} />
-        <div className={styles.compareSection}>
-          <Link href="/scans/compare" className={styles.compareLink}>
-            Compare two scans
-          </Link>
-        </div>
+        <ScanComparisonSelector scans={data.scans} />
       </main>
     );
   } catch {

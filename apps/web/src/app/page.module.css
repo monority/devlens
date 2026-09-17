@@ -2,34 +2,185 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  min-height: 100vh;
   padding: 2rem;
+  max-width: 960px;
+  margin: 0 auto;
 }
 
 .title {
   font-size: 2rem;
   font-weight: 700;
-  margin-bottom: 0.5rem;
+  margin: 0 0 0.5rem 0;
 }
 
 .subtitle {
   color: #6b7280;
   font-size: 1rem;
+  margin: 0 0 2rem 0;
 }
 
-.techCatalogLink {
-  margin-top: 1rem;
+/* ─── Dashboard layout ─────────────────────────────────────────────── */
+
+.hero {
+  width: 100%;
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.sectionTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 1rem 0;
+  color: #111827;
+}
+
+/* Quick actions */
+.quickActions {
+  width: 100%;
+  margin-bottom: 2rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.actionButton {
+  display: inline-flex;
+  align-items: center;
   font-size: 0.95rem;
   font-weight: 600;
-  color: #2563eb;
+  color: #ffffff;
+  background-color: #2563eb;
   text-decoration: none;
-  padding: 0.45rem 0.9rem;
-  border: 1px solid #2563eb;
-  border-radius: 0.35rem;
+  padding: 0.5rem 1.1rem;
+  border-radius: 0.375rem;
   transition: background-color 0.15s ease;
 }
 
-.techCatalogLink:hover {
+.actionButton:hover {
+  background-color: #1d4ed8;
+}
+
+.actionLink {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #2563eb;
+  text-decoration: none;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid #2563eb;
+  border-radius: 0.3rem;
+  transition: background-color 0.15s ease;
+}
+
+.actionLink:hover {
   background-color: rgba(37, 99, 235, 0.08);
+}
+
+/* Recent scans section */
+.recentSection {
+  width: 100%;
+  margin-bottom: 2rem;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.viewAllLink {
+  font-size: 0.85rem;
+  color: #6b7280;
+  text-decoration: none;
+}
+
+.viewAllLink:hover {
+  text-decoration: underline;
+}
+
+.scanError {
+  color: #991b1b;
+  font-size: 0.9rem;
+}
+
+.scanEmpty {
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin: 0 0 0.5rem 0;
+}
+
+/* Technology catalog summary */
+.techSummary {
+  width: 100%;
+}
+
+.techTotal {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem 0;
+  color: #111827;
+}
+
+.categoryCounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem 2rem;
+  margin-bottom: 1rem;
+}
+
+.categoryItem {
+  display: flex;
+  flex-direction: column;
+  min-width: 6rem;
+}
+
+.categoryName {
+  font-size: 0.7rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.025rem;
+  margin-bottom: 0.25rem;
+}
+
+.categoryCount {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.catalogLink {
+  display: inline-flex;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.catalogLink:hover {
+  text-decoration: underline;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .actions {
+    flex-direction: column;
+  }
+
+  .categoryCounts {
+    gap: 1rem 1.5rem;
+  }
+
+  .categoryItem {
+    min-width: 4rem;
+  }
+
+  .categoryCount {
+    font-size: 1.4rem;
+  }
 }

@@ -169,6 +169,42 @@ describe('DetectionItem — Step 33 explanation', () => {
     expect(html).toContain('Unknown Tech');
   });
 
+  it('uses canonical technology ID in link (not display name)', () => {
+    const detection = makeDetection({
+      technology: { id: 'react', name: 'React.js', category: 'frontend' },
+    });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+
+    // Link must use the canonical ID ('react'), not the display name
+    expect(html).toContain('href="/technologies/react"');
+    expect(html).not.toContain('href="/technologies/React.js"');
+    // Display name should still be visible as link text
+    expect(html).toContain('React.js');
+  });
+
+  it('preserves detection information when technology is linked', () => {
+    const detection = makeDetection({
+      technology: { id: 'nginx', name: 'nginx', category: 'server' },
+      confidence: 80,
+      evidence: [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+        { type: 'meta_tag', name: 'generator', content: 'WordPress' },
+      ],
+    });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // Technology name is rendered (as a link)
+    expect(cleaned).toContain('nginx');
+    // Category is visible
+    expect(cleaned).toContain('server');
+    // Confidence is visible
+    expect(cleaned).toContain('80');
+    expect(cleaned).toContain('Confidence');
+    // Evidence count is visible
+    expect(cleaned).toContain('2 evidence items');
+  });
+
   it('existing evidence disclosure still works (collapsible tree)', () => {
     const detection = makeDetection({
       evidence: [{ type: 'script_url', url: 'https://cdn.example.com/react.js' }],

@@ -69,6 +69,20 @@ describe('DetectionList', () => {
     expect(html).toContain('React');
   });
 
+  it('produces correct catalog links for each known technology', () => {
+    const detections = [
+      makeDetection('nginx', 'nginx', 'server', 80),
+      makeDetection('react', 'React.js', 'frontend', 95),
+    ];
+    const html = renderToString(React.createElement(DetectionList, { detections }));
+
+    // Each known technology links to its canonical /technologies/{id} route
+    expect(html).toContain('href="/technologies/nginx"');
+    expect(html).toContain('href="/technologies/react"');
+    // Link uses canonical ID, not display name
+    expect(html).not.toContain('/technologies/React.js');
+  });
+
   it('renders technology metadata (id, name, category)', () => {
     const detections = [makeDetection('react', 'React', 'frontend', 95)];
     const html = renderToString(React.createElement(DetectionList, { detections }));

@@ -196,3 +196,21 @@
   background-color: #9ca3af;
   cursor: not-allowed;
 }
+
+/* ─── Focus visible for keyboard accessibility ──────────────────────── */
+
+.compareLink:focus-visible,
+.newScanLink:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
+.compareButton:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.cancelButton:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}

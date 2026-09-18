@@ -255,4 +255,52 @@ describe('getScanOverview', () => {
 
     expect(overview.completedAt).toBeNull();
   });
+
+  it('does not invent an overall/average score — highestConfidence is a max of existing values', () => {
+    // The overview must NOT compute an aggregate score (e.g. average or
+    // weighted index). highestConfidence must be the maximum of the
+    // per-detection confidence values returned by the API — exactly.
+    const detections: DetectionResponse[] = [
+      { technology: { id: 'a', name: 'A', category: 'x' }, confidence: 80, evidence: [] },
+      { technology: { id: 'b', name: 'B', category: 'x' }, confidence: 45, evidence: [] },
+      { technology: { id: 'c', name: 'C', category: 'x' }, confidence: 92, evidence: [] },
+    ];
+    const result: ScanDetailResponse = {
+      scan: makeScan(),
+      snapshot: null,
+      detections,
+    };
+    const overview = getScanOverview(result);
+
+    // Max of {80, 45, 92} is 92 — not an average (which would be 72.33...)
+    expect(overview.highestConfidence).toBe(92);
+    expect(overview.highestConfidence).not.toBe(72);
+  });
+
+  it('highestConfidence is null (not 0 or computed) when there are zero detections', () => {
+    const result: ScanDetailResponse = {
+      scan: makeScan(),
+      snapshot: null,
+      detections: [],
+    };
+    const overview = getScanOverview(result);
+
+    // No invented score for empty scans — null, not 0 or NaN
+    expect(overview.highestConfidence).toBeNull();
+  });
+
+  it('handles failed scans correctly — target and status preserved', () => {
+    const result: ScanDetailResponse = {
+      scan: makeScan({ status: 'failed', error: { code: 'timeout', message: 'Timeout' } }),
+      snapshot: null,
+      detections: [],
+    };
+    const overview = getScanOverview(result);
+
+    expect(overview.status).toBe('failed');
+    expect(overview.target).toBe('https://example.com/');
+    expect(overview.technologyCount).toBe(0);
+    expect(overview.evidenceCount).toBe(0);
+    expect(overview.highestConfidence).toBeNull();
+  });
 });

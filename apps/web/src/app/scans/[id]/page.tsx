@@ -10,8 +10,10 @@
  * - Scan not found (404): renders ScanNotFound component
  * - API/Infrastructure error (500): renders ScansError component
  *
- * Navigation: a "back" link is available in all states.
- * A failed scan is displayed as a valid result with its error information.
+ * Navigation: a "back" link and a "New scan" link are available in all
+ * states, so users can return to scan history or start another scan
+ * without extra clicks. A "Compare" link is available when a scan is
+ * found.
  *
  * Metadata: page `<title>` and `<meta name="description">` are derived
  * from the scan target via `generateMetadata`. Only the target URL
@@ -85,6 +87,9 @@ export default async function ScanDetailPage({
             <Link href="/scans" className={styles.backLink}>
               ← Back to scan history
             </Link>
+            <Link href="/scans/new" className={styles.newScanLink}>
+              New scan →
+            </Link>
           </div>
           <ScanNotFound id={id} />
         </main>
@@ -103,6 +108,9 @@ export default async function ScanDetailPage({
           </p>
           <Link href="/scans" className={styles.backLink}>
             ← Back to scan history
+          </Link>
+          <Link href="/scans/new" className={styles.newScanLink}>
+            New scan →
           </Link>
           <Link
             href={`/scans/compare?left=${encodeURIComponent(id)}`}
@@ -129,6 +137,9 @@ export default async function ScanDetailPage({
           <p className={styles.subtitle}>Scan Detail</p>
           <Link href="/scans" className={styles.backLink}>
             ← Back to scan history
+          </Link>
+          <Link href="/scans/new" className={styles.newScanLink}>
+            New scan →
           </Link>
         </div>
         <ScansError />

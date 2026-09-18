@@ -169,6 +169,7 @@ export function ScanNotFound({ id }: { id: string }): React.ReactElement {
         No scan with ID <code>{id}</code> exists.
       </p>
       <Link href="/scans">← Back to scan history</Link>
+      <Link href="/scans/new">New scan →</Link>
     </div>
   );
 }

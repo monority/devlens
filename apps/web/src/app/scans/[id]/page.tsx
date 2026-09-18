@@ -13,7 +13,9 @@
  * Navigation: a "back" link and a "New scan" link are available in all
  * states, so users can return to scan history or start another scan
  * without extra clicks. A "Compare" link is available when a scan is
- * found.
+ * found. A "Re-scan" link (pointing to `/scans/new?target=...`) is
+ * available when a found scan has a usable target, allowing the user to
+ * quickly re-scan the same target.
  *
  * Metadata: page `<title>` and `<meta name="description">` are derived
  * from the scan target via `generateMetadata`. Only the target URL
@@ -112,6 +114,14 @@ export default async function ScanDetailPage({
           <Link href="/scans/new" className={styles.newScanLink}>
             New scan →
           </Link>
+          {result.scan.target ? (
+            <Link
+              href={`/scans/new?target=${encodeURIComponent(result.scan.target)}`}
+              className={styles.rescanLink}
+            >
+              Re-scan
+            </Link>
+          ) : null}
           <Link
             href={`/scans/compare?left=${encodeURIComponent(id)}`}
             className={styles.compareLink}

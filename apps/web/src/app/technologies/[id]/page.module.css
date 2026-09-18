@@ -58,6 +58,31 @@
   margin: 0;
 }
 
+/* Detected in scans section */
+.detectedSection {
+  width: 100%;
+  margin-bottom: 2rem;
+}
+
+.detectedHeading {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #111827;
+}
+
+.detectedError {
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.detectedEmpty {
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
 /* Footer */
 .footer {
   margin-top: 1.5rem;

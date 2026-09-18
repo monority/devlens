@@ -93,3 +93,23 @@
   outline: 2px solid #2563eb;
   outline-offset: 1px;
 }
+
+.rescanLink {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #2563eb;
+  text-decoration: none;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid #2563eb;
+  border-radius: 0.3rem;
+  transition: background-color 0.15s ease;
+}
+
+.rescanLink:hover {
+  background-color: rgba(37, 99, 235, 0.08);
+}
+
+.rescanLink:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}

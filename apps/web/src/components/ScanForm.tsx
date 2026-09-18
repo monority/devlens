@@ -3,7 +3,7 @@
  * and API calls.
  *
  * This is the ONLY client component in the scan creation flow. It manages:
- * - local URL input state
+ * - local URL input state (optionally pre-filled via `initialUrl`)
  * - client-side validation (immediate feedback)
  * - submitting / loading state
  * - API error handling (400 validation errors and 500 infrastructure errors)
@@ -11,6 +11,11 @@
  *
  * Data fetching is delegated to the typed API client (`lib/api.ts` → `createScan`).
  * The browser never touches the database, repositories, or domain packages.
+ *
+ * `initialUrl` allows the form to be pre-filled when navigating from another
+ * page (e.g. "Re-scan" from a scan detail page). The pre-filled value is
+ * treated like any user-typed input — it goes through the same validation
+ * flow and the server remains authoritative.
  */
 
 'use client';
@@ -21,8 +26,8 @@ import { createScan, ApiError, extractErrorMessage } from '@/lib/api';
 import { validateUrl } from '@/lib/validation';
 import { ScanFormView } from '@/components/ScanFormView';
 
-export function ScanForm(): React.ReactElement {
-  const [url, setUrl] = useState('');
+export function ScanForm({ initialUrl = '' }: { initialUrl?: string }): React.ReactElement {
+  const [url, setUrl] = useState(initialUrl);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();

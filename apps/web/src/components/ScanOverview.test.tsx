@@ -195,4 +195,16 @@ describe('ScanOverview', () => {
 
     expect(html).not.toContain('dateTime="2025-06-01T12:00:05.000Z"');
   });
+
+  it('does not invent an "overall score" label — uses "Highest confidence" only', () => {
+    const overview = getScanOverview(makeResult([]));
+    const html = renderToString(React.createElement(ScanOverview, { overview }));
+
+    // Must NOT contain "overall score", "average", "aggregate", etc.
+    expect(html).not.toContain('overall score');
+    expect(html).not.toContain('Overall');
+    expect(html).not.toContain('Average');
+    // Must contain the actual label used
+    expect(html).toContain('Highest confidence');
+  });
 });

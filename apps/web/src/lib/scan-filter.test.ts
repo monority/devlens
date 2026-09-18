@@ -108,6 +108,24 @@ describe('filterScans', () => {
     const result2 = filterScans([], { search: 'example', status: 'completed' });
     expect(result2).toHaveLength(0);
   });
+
+  it('preserves deterministic ordering: createdAt DESC, id ASC tiebreaker', () => {
+    // The repository orders scans by `createdAt DESC, scanId ASC`.
+    // filterScans must preserve this order exactly — no re-sorting.
+    // Equal timestamps are tie-broken by stable scanId (string ASC).
+    const scans: ScanSummary[] = [
+      // Newest first (already in API order)
+      makeScan({ id: 's3', target: 'https://c.com/', createdAt: '2025-06-03T00:00:00.000Z' }),
+      makeScan({ id: 's1', target: 'https://a.com/', createdAt: '2025-06-02T00:00:00.000Z' }),
+      makeScan({ id: 's2', target: 'https://b.com/', createdAt: '2025-06-02T00:00:00.000Z' }),
+      makeScan({ id: 's0', target: 'https://old.com/', createdAt: '2025-06-01T00:00:00.000Z' }),
+    ];
+
+    const result = filterScans(scans, { search: '', status: '' });
+
+    // Order preserved: newest first, ties broken by id ASC
+    expect(result.map((s) => s.id)).toEqual(['s3', 's1', 's2', 's0']);
+  });
 });
 
 describe('SCAN_STATUSES', () => {

@@ -175,6 +175,57 @@ describe('ScanCard', () => {
 
     expect(html).toContain('Running');
   });
+
+  it('does not show same-target count when sameTargetCount is not provided', () => {
+    const html = renderToString(React.createElement(ScanCard, { scan: makeCompletedScan() }));
+
+    // The sameTargetCount badge uses a specific CSS class — verify it's absent
+    expect(html).not.toMatch(/sameTargetCount/);
+  });
+
+  it('does not show same-target count when sameTargetCount is 1', () => {
+    const html = renderToString(
+      React.createElement(ScanCard, { scan: makeCompletedScan(), sameTargetCount: 1 }),
+    );
+
+    expect(html).not.toMatch(/sameTargetCount/);
+  });
+
+  it('shows "N scans" when sameTargetCount is greater than 1', () => {
+    const html = renderToString(
+      React.createElement(ScanCard, { scan: makeCompletedScan(), sameTargetCount: 3 }),
+    );
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('3 scans');
+  });
+
+  it('sameTargetCount=1 does not render the count badge', () => {
+    // The badge only appears when sameTargetCount > 1
+    const withOne = renderToString(
+      React.createElement(ScanCard, { scan: makeCompletedScan(), sameTargetCount: 1 }),
+    );
+    expect(withOne).not.toMatch(/sameTargetCount/);
+
+    const withTwo = renderToString(
+      React.createElement(ScanCard, { scan: makeCompletedScan(), sameTargetCount: 2 }),
+    );
+    expect(withTwo).toMatch(/sameTargetCount/);
+  });
+
+  it('preserves all scan metadata when sameTargetCount is displayed', () => {
+    const html = renderToString(
+      React.createElement(ScanCard, { scan: makeCompletedScan(), sameTargetCount: 2 }),
+    );
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // Target, hostname, status, timestamp, and detail link all still present
+    expect(cleaned).toContain('https://example.com/');
+    expect(cleaned).toContain('example.com');
+    expect(cleaned).toContain('Completed');
+    expect(cleaned).toContain('href="/scans/scan_001"');
+    expect(cleaned).toContain('2 scans');
+  });
 });
 
 // ─── ScansHistory tests ──────────────────────────────────────────────

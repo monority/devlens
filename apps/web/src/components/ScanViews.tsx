@@ -82,8 +82,19 @@ export function statusClass(status: string): string {
 /**
  * A compact card showing the essential summary of a single scan.
  * Used in the history list. Links to the detail page.
+ *
+ * `sameTargetCount` is the number of scans in the full history that share
+ * this scan's target URL. When greater than 1, a compact indicator is
+ * shown so users can distinguish repeated scans of the same target.
  */
-export function ScanCard({ scan }: { scan: ScanSummary }): React.ReactElement {
+export function ScanCard({
+  scan,
+  sameTargetCount = 0,
+}: {
+  scan: ScanSummary;
+  /** Number of scans in the history sharing this scan's target. */
+  sameTargetCount?: number;
+}): React.ReactElement {
   const status = statusLabel(scan.status);
   const statusCss = statusClass(scan.status);
 
@@ -95,6 +106,11 @@ export function ScanCard({ scan }: { scan: ScanSummary }): React.ReactElement {
       </div>
       <div className={styles.cardBody}>
         <p className={styles.target}>{scan.target}</p>
+        {sameTargetCount > 1 && (
+          <span className={styles.sameTargetCount}>
+            {sameTargetCount} scan{sameTargetCount === 1 ? '' : 's'}
+          </span>
+        )}
         <p className={styles.hostname}>{scan.hostname}</p>
       </div>
       <div className={styles.cardFooter}>

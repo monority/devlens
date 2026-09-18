@@ -192,4 +192,23 @@ describe('ScanDetailPage — Re-scan action', () => {
     expect(cleaned).toContain('New scan');
     expect(cleaned).toContain('Re-scan');
   });
+
+  it('renders the Compare link with correct encoded scan ID', async () => {
+    mockFetchScanById.mockResolvedValue({
+      scan: makeScan('https://example.com/'),
+      snapshot: null,
+      detections: [],
+    });
+
+    const html = renderToString(
+      await ScanDetailPage({
+        params: Promise.resolve({ id: 'scan_001' }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('Compare with another scan');
+    expect(cleaned).toContain('href="/scans/compare?left=scan_001"');
+  });
 });

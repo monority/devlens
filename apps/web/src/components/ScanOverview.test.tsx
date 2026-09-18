@@ -42,9 +42,12 @@ function makeDetection(
   };
 }
 
-function makeResult(detections: DetectionResponse[] = []): ScanDetailResponse {
+function makeResult(
+  detections: DetectionResponse[] = [],
+  scanOverrides: Partial<ScanResponse> = {},
+): ScanDetailResponse {
   return {
-    scan: makeScan(),
+    scan: makeScan(scanOverrides),
     snapshot: null,
     detections,
   };
@@ -206,5 +209,43 @@ describe('ScanOverview', () => {
     expect(html).not.toContain('Average');
     // Must contain the actual label used
     expect(html).toContain('Highest confidence');
+  });
+
+  // ─── Step 61: Robustness tests (long target, missing metadata) ────
+
+  it('renders a long target URL in full without truncation', () => {
+    const longTarget =
+      'https://very-long-subdomain-name.example.com/some/very/long/path/with/many/segments?query=value&another=param#fragment';
+    const overview = getScanOverview(
+      makeResult([], { target: longTarget, hostname: 'very-long-subdomain-name.example.com' }),
+    );
+    const html = renderToString(React.createElement(ScanOverview, { overview }));
+
+    // The full URL must be present — not truncated.
+    // React's renderToString escapes & to &amp;, so normalize for comparison.
+    const decoded = html.replace(/&amp;/g, '&');
+    expect(decoded).toContain(longTarget);
+  });
+
+  it('renders safely when optional timestamp fields are missing', () => {
+    // A scan where startedAt is null and completedAt is also null
+    // (edge case — completedAt normally present for completed, but test robustness)
+    const overview = getScanOverview(makeResult([], { startedAt: null, completedAt: null }));
+    const html = renderToString(React.createElement(ScanOverview, { overview }));
+
+    // Created date still renders
+    expect(html).toContain('Created');
+    expect(html).toContain('dateTime="2025-06-01T12:00:00.000Z"');
+    // No crash, no NaN, no "undefined" in date area
+    expect(html).not.toContain('NaN');
+    expect(html).not.toContain('undefined');
+  });
+
+  it('renders safely when hostname is empty', () => {
+    const overview = getScanOverview(makeResult([], { hostname: '' }));
+    const html = renderToString(React.createElement(ScanOverview, { overview }));
+
+    // Target still renders; empty hostname doesn't crash
+    expect(html).toContain('https://example.com/');
   });
 });

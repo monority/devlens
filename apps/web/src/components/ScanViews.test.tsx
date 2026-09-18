@@ -260,6 +260,21 @@ describe('ScanNotFound', () => {
 
     expect(html).toContain('href="/scans"');
   });
+
+  it('renders a "New scan" link to /scans/new', () => {
+    const html = renderToString(React.createElement(ScanNotFound, { id: 'scan_abc' }));
+
+    expect(html).toContain('href="/scans/new"');
+    expect(html).toContain('New scan');
+  });
+
+  it('renders both back link and new scan link', () => {
+    const html = renderToString(React.createElement(ScanNotFound, { id: 'scan_abc' }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('Back to scan history');
+    expect(cleaned).toContain('New scan');
+  });
 });
 
 // ─── ScanDetailView tests ────────────────────────────────────────────

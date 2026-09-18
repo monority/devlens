@@ -7,6 +7,9 @@
  *
  * The page provides a back link to `/scans` for users who want to
  * cancel and return to scan history.
+ *
+ * A brief helper text explains the end-to-end journey: after entering a
+ * URL and submitting, the page navigates to the scan results view.
  */
 
 import Link from 'next/link';
@@ -18,6 +21,10 @@ export default function NewScanPage(): React.ReactElement {
     <main className={styles.main}>
       <h1 className={styles.title}>New Scan</h1>
       <p className={styles.subtitle}>Enter a target URL to start scanning.</p>
+      <p className={styles.helperText}>
+        DevLens will crawl the target, analyze it for supported technologies, and take you to the
+        results page.
+      </p>
       <Link href="/scans" className={styles.backLink}>
         ← Back to scan history
       </Link>

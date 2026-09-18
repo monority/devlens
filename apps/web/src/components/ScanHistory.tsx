@@ -23,6 +23,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { filterScans, isValidStatus } from '../lib/scan-filter';
+import { countScansByTarget } from '../lib/scan-history';
 import { ScanFilters } from './ScanFilters';
 import { ScanCard } from './ScanViews';
 import styles from '../app/scans/page.module.css';
@@ -76,6 +77,10 @@ export function ScanHistory({ scans }: ScanHistoryProps): React.ReactElement {
   const filters = { search, status };
   const filtered = filterScans(scans, filters);
 
+  // Compute same-target counts from the FULL scan list (before filtering)
+  // so the count reflects all scans of this target, not just the filtered subset.
+  const targetCounts = countScansByTarget(scans);
+
   return (
     <>
       <ScanFilters
@@ -94,7 +99,11 @@ export function ScanHistory({ scans }: ScanHistoryProps): React.ReactElement {
       {filtered.length > 0 ? (
         <div className={styles.cards}>
           {filtered.map((scan: ScanSummary) => (
-            <ScanCard key={scan.id} scan={scan} />
+            <ScanCard
+              key={scan.id}
+              scan={scan}
+              sameTargetCount={targetCounts.get(scan.target) ?? 0}
+            />
           ))}
         </div>
       ) : (

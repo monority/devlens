@@ -317,6 +317,11 @@
   text-decoration: underline;
 }
 
+.newScanLink:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
 /* Empty state with link */
 .empty a {
   color: #2563eb;
@@ -1090,6 +1095,11 @@
   text-decoration: underline;
 }
 
+.techNameLink:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
 /* ─── Step 32: Scan Insights ──────────────────────────────────────── */
 
 .scanInsights {
@@ -1164,6 +1174,11 @@
 
 .techInsightLink:hover {
   text-decoration: underline;
+}
+
+.techInsightLink:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
 }
 
 .evidenceMeta {
@@ -1249,6 +1264,11 @@
 .compositionTechName {
   font-size: 0.85rem;
   color: #111827;
+}
+
+.compositionTechName:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
 }
 
 .compositionTechCategory {

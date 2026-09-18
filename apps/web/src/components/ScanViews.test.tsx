@@ -706,6 +706,22 @@ describe('ScanDetailView — Detection filtering (Step 36)', () => {
     expect(html).toContain('href="/technologies/nginx"');
   });
 
+  it('renders correct catalog links for multiple detected technologies', () => {
+    const detections: DetectionResponse[] = [
+      makeDetection('nginx', 'nginx', 'server', 80),
+      makeDetection('react', 'React.js', 'frontend', 95),
+    ];
+    const result = { ...makeScanDetail(), detections };
+    const html = renderToString(
+      React.createElement(ScanDetailView, { result, initialQuery: '', initialCategory: '' }),
+    );
+
+    // Both known technologies should link to their canonical catalog IDs
+    expect(html).toContain('href="/technologies/nginx"');
+    expect(html).toContain('href="/technologies/react"');
+    expect(html).not.toContain('href="/technologies/React.js"');
+  });
+
   it('preserves detection order (no reordering by filter)', () => {
     const detections: DetectionResponse[] = [
       makeDetection('react', 'React', 'frontend', 95),

@@ -41,6 +41,11 @@
   background-color: rgba(37, 99, 235, 0.08);
 }
 
+.backLink:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
 .scanId {
   background: #f3f4f6;
   padding: 0.15rem 0.4rem;
@@ -60,6 +65,15 @@
   transition: background-color 0.15s ease;
 }
 
+.compareLink:hover {
+  background-color: rgba(5, 150, 105, 0.08);
+}
+
+.compareLink:focus-visible {
+  outline: 2px solid #059669;
+  outline-offset: 1px;
+}
+
 .newScanLink {
   font-size: 0.875rem;
   font-weight: 600;
@@ -73,4 +87,9 @@
 
 .newScanLink:hover {
   background-color: rgba(37, 99, 235, 0.08);
+}
+
+.newScanLink:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
 }

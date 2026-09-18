@@ -628,6 +628,27 @@ describe('ScanDetailView', () => {
     expect(cleaned).toContain('Detection coverage');
     expect(cleaned).toContain('No evidence available');
   });
+
+  // ─── Step 61: Robustness tests ───────────────────────────────
+
+  it('renders long evidence values without truncation', () => {
+    const longValue = 'a'.repeat(2000);
+    const result: ScanDetailResponse = {
+      scan: makeCompletedScan(),
+      snapshot: null,
+      detections: [
+        {
+          technology: { id: 'nginx', name: 'nginx', category: 'server' },
+          confidence: 80,
+          evidence: [{ type: 'http_header', name: 'X-Powered-By', value: longValue }],
+        },
+      ],
+    };
+    const html = renderToString(React.createElement(ScanDetailView, { result }));
+
+    // The full long value must be present
+    expect(html).toContain(longValue);
+  });
 });
 
 // ─── Step 36: Detection filtering integration ────────────────────────

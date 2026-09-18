@@ -530,6 +530,7 @@
 
 .evidenceValue {
   color: #374151;
+  word-break: break-all;
 }
 
 .evidenceCode {

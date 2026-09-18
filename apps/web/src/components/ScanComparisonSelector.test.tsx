@@ -129,3 +129,22 @@ describe('ScanComparisonSelector — selection gate logic', () => {
   // Re-export for discoverability: see comparison-selector.test.ts
   // for full selection-behavior coverage (10 acceptance criteria).
 });
+
+describe('ScanComparisonSelector — accessibility', () => {
+  it('initial button has aria-expanded="false"', () => {
+    const html = renderToString(
+      React.createElement(ScanComparisonSelector, { scans: makeScans() }),
+    );
+
+    expect(html).toContain('aria-expanded="false"');
+  });
+
+  it('renders semantic button elements (not divs masquerading as buttons)', () => {
+    const html = renderToString(
+      React.createElement(ScanComparisonSelector, { scans: makeScans() }),
+    );
+
+    // The collapsed state shows a <button>, not a div or link
+    expect(html).toContain('<button');
+  });
+});

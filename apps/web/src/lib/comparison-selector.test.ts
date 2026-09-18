@@ -118,3 +118,35 @@ describe('isValidSelection', () => {
     expect(isValidSelection(null, null)).toBe(false);
   });
 });
+
+// ─── Selection gate scenarios (Step 58 spec) ────────────────────────
+//
+// These tests verify the end-to-end selection rules that the
+// ScanComparisonSelector component relies on. They document the
+// deterministic selection behavior:
+//   - 0 selected → disabled
+//   - 1 selected → disabled (need a second)
+//   - 2 selected → enabled
+//   - same scan selected twice → disabled (prevented by same-scan protection)
+
+describe('selection gate scenarios', () => {
+  it('0 selected → comparison action disabled (both null)', () => {
+    expect(isValidSelection(null, null)).toBe(false);
+  });
+
+  it('1 selected → comparison action disabled (only left set)', () => {
+    expect(isValidSelection('scan_a', null)).toBe(false);
+  });
+
+  it('1 selected → comparison action disabled (only right set)', () => {
+    expect(isValidSelection(null, 'scan_b')).toBe(false);
+  });
+
+  it('2 distinct scans selected → comparison action enabled', () => {
+    expect(isValidSelection('scan_a', 'scan_b')).toBe(true);
+  });
+
+  it('same scan selected as both left and right → prevented', () => {
+    expect(isValidSelection('scan_a', 'scan_a')).toBe(false);
+  });
+});

@@ -83,6 +83,42 @@ describe('ScanComparison', () => {
     expect(cleaned).toContain('scan_right');
   });
 
+  it('renders a "Different targets" warning when targets differ', () => {
+    const left = makeScan('scan_left', 'completed', [], 'https://example.com/');
+    const right = makeScan('scan_right', 'completed', [], 'https://other.com');
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('Different targets');
+    expect(cleaned).toContain('https://example.com/');
+    expect(cleaned).toContain('https://other.com');
+  });
+
+  it('does not render "Different targets" warning when targets are the same', () => {
+    const left = makeScan('scan_left', 'completed', [], 'https://example.com/');
+    const right = makeScan('scan_right', 'completed', [], 'https://example.com/');
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+
+    expect(html).not.toContain('Different targets');
+  });
+
+  it('renders both scan targets in the overview', () => {
+    const left = makeScan('scan_left', 'completed', [], 'https://example.com/');
+    const right = makeScan('scan_right', 'completed', [], 'https://example.com/');
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // ScanOverview displays the target URL
+    expect(cleaned).toContain('https://example.com/');
+    expect(cleaned).toContain('example.com');
+  });
+
   it('renders missing left scan state', () => {
     const left = null;
     const right = makeScan('scan_right', 'completed', [

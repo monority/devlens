@@ -862,6 +862,11 @@
   text-decoration: underline;
 }
 
+.comparisonBackLink:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
 @media (max-width: 768px) {
   .comparisonSides {
     grid-template-columns: 1fr;

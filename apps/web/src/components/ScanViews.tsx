@@ -275,11 +275,16 @@ export function ScanningState({ scan }: { scan: ScanDetailResponse['scan'] }): R
  *   - ScanningState  (pending/running UI)
  *   - ScanDetectionResults / DetectionFilterView (completed detections,
  *     sorted deterministically by confidence DESC, name ASC)
- *   - DetectionList  (failed scans — preserves existing behavior)
+ *   - DetectionList  (fallback for any remaining non-terminal state)
  *
  * Lifecycle states (pending/running/failed) are preserved exactly as
  * implemented in Step 24. Only the completed-results presentation is
  * enhanced in Step 38.
+ *
+ * Failed scans show a clear "not available" message in the detections
+ * section instead of the completed-scan empty state ("The scan completed
+ * successfully"). Detection results are inherently unavailable for
+ * failed scans — the scan never completed successfully.
  */
 export interface ScanDetailViewProps {
   result: ScanDetailResponse;
@@ -334,6 +339,11 @@ export function ScanDetailView({
           />
         ) : scan.status === 'completed' ? (
           <ScanDetectionResults detections={detections} />
+        ) : scan.status === 'failed' ? (
+          <>
+            <h2>Detections (0)</h2>
+            <p>Detection results are not available because the scan failed.</p>
+          </>
         ) : (
           <DetectionList detections={detections} />
         )}

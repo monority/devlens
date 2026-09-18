@@ -401,6 +401,22 @@ describe('ScanDetailView', () => {
     expect(html).not.toContain('>Snapshot<');
   });
 
+  it('does not show "scan completed successfully" for failed scans', () => {
+    const failedScan: ScanDetailResponse = {
+      scan: makeFailedScan(),
+      snapshot: null,
+      detections: [],
+    };
+    const html = renderToString(React.createElement(ScanDetailView, { result: failedScan }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // A failed scan must not claim success in the detections section.
+    expect(cleaned).not.toContain('The scan completed successfully');
+    // Instead, it shows a clear "not available" notice.
+    expect(cleaned).toContain('Detection results are not available');
+    expect(cleaned).toContain('scan failed');
+  });
+
   it('renders detection count in the heading', () => {
     const result = makeScanDetail();
     const html = renderToString(React.createElement(ScanDetailView, { result }));

@@ -71,7 +71,13 @@ function makeSnapshot(): SiteSnapshot {
       description: 'This domain is for use in illustrative examples.',
       metaTags: [],
       scripts: [],
-      links: [],
+      links: [
+        {
+          rel: 'stylesheet',
+          href: 'https://example.com/app.css',
+          content: '<link rel="stylesheet">',
+        },
+      ],
     },
     resources: [
       {
@@ -316,6 +322,15 @@ integrationDescribe('PostgresScanResultRepository — PostgreSQL integration', (
 
     // Detections are persisted alongside the snapshot
     expect(snapshotRows[0].detections).toEqual([]);
+
+    // Links must round-trip through the jsonb column (Step 63 — Phase 4)
+    expect(snapshotRows[0].htmlLinks).toEqual([
+      {
+        rel: 'stylesheet',
+        href: 'https://example.com/app.css',
+        content: '<link rel="stylesheet">',
+      },
+    ]);
   });
 
   it('propagates database errors as infrastructure failures', async () => {

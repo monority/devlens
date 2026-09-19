@@ -70,15 +70,17 @@ describe('getDetectionExplainability', () => {
       makeDetection('nginx', 'nginx', 'server', 80, [
         { type: 'http_header', name: 'Server', value: 'nginx' },
         { type: 'http_header', name: 'Server', value: 'nginx' }, // exact duplicate
-        { type: 'http_header', name: 'Server', value: 'Apache' }, // same identity (http_header:Server)
+        { type: 'http_header', name: 'Server', value: 'Apache' }, // distinct (value differs)
       ]),
     );
 
-    // All three have the same identity (http_header:Server) → 1 unique
-    expect(result.evidenceCount).toBe(1);
-    expect(result.evidenceSources).toHaveLength(1);
-    // First occurrence's value is preserved
-    expect(result.evidenceSources[0]!.value).toBe('Server: nginx');
+    // The exact nginx duplicate collapses, but Server:Apache is a DISTINCT
+    // evidence item (matching canonical getEvidenceKey semantics).
+    expect(result.evidenceCount).toBe(2);
+    expect(result.evidenceSources).toHaveLength(2);
+    // Sorted by identity ASC: 'Server|Apache' < 'Server|nginx' (capital 'A' < 'n')
+    expect(result.evidenceSources[0]!.value).toBe('Server: Apache');
+    expect(result.evidenceSources[1]!.value).toBe('Server: nginx');
   });
 
   it('produces deterministic ordering (type label ASC → identity ASC)', () => {
@@ -91,12 +93,12 @@ describe('getDetectionExplainability', () => {
       ]),
     );
 
-    // Sorted by type label ASC, then identity ASC:
-    // HTTP Header (X-A) → HTTP Header (X-B) → Meta Tag → Script URL
+    // Sorted by type label ASC, then identity ASC (identity includes value):
+    // HTTP Header (X-A|a) → HTTP Header (X-B|b) → Meta Tag (m|c) → Script URL
     expect(result.evidenceSources.map((s) => s.identity)).toEqual([
-      'http_header:X-A',
-      'http_header:X-B',
-      'meta_tag:m',
+      'http_header:X-A|a',
+      'http_header:X-B|b',
+      'meta_tag:m|c',
       'script_url:https://z.com/late.js',
     ]);
   });
@@ -110,11 +112,11 @@ describe('getDetectionExplainability', () => {
       ]),
     );
 
-    // All same type → sorted by identity ASC
+    // All same type → sorted by identity ASC (identity includes content)
     expect(result.evidenceSources.map((s) => s.identity)).toEqual([
-      'meta_tag:a',
-      'meta_tag:m',
-      'meta_tag:z',
+      'meta_tag:a|c',
+      'meta_tag:m|c',
+      'meta_tag:z|c',
     ]);
   });
 
@@ -131,8 +133,8 @@ describe('getDetectionExplainability', () => {
     // HTML Element, HTTP Header, JS... wait — JavaScript Global not present
     // HTML Element < HTTP Header < Script URL
     // So: [0] = HTML, [1] = HTTP Header, [2] = Script URL
-    expect(result.evidenceSources[0]!.identity).toMatch(/^html:#app$/);
-    expect(result.evidenceSources[1]!.identity).toMatch(/^http_header:Server$/);
+    expect(result.evidenceSources[0]!.identity).toMatch(/^html:#app\|/);
+    expect(result.evidenceSources[1]!.identity).toMatch(/^http_header:Server\|/);
     expect(result.evidenceSources[2]!.identity).toMatch(
       /^script_url:https:\/\/cdn\.example\.com\/app\.js$/,
     );
@@ -226,15 +228,16 @@ describe('getDetectionExplainability', () => {
     const result = getDetectionExplainability(
       makeDetection('nginx', 'nginx', 'server', 80, [
         { type: 'http_header', name: 'Server', value: 'nginx' },
-        { type: 'http_header', name: 'Server', value: 'Apache' }, // same identity
+        { type: 'http_header', name: 'Server', value: 'Apache' }, // distinct (value differs)
       ]),
     );
 
     // evidenceCount should match evidenceSources length after deduplication
     expect(result.evidenceCount).toBe(result.evidenceSources.length);
-    expect(result.evidenceCount).toBe(1);
-    // The evidence array should also be deduplicated
-    expect(result.evidence).toHaveLength(1);
+    // Both are distinct evidence (same name, different value) → 2 unique
+    expect(result.evidenceCount).toBe(2);
+    // The evidence array should also be deduplicated but both kept
+    expect(result.evidence).toHaveLength(2);
   });
 
   it('sorts evidence type labels alphabetically', () => {

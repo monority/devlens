@@ -342,8 +342,12 @@ describe('DetectionItem — Step 39 explainability', () => {
     const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
     const cleaned = html.replace(/<!-- -->/g, '');
 
-    // All three have identity http_header:Server → deduplicated to 1
-    expect(cleaned).toContain('1 evidence item');
+    // The exact nginx duplicate collapses to one, but Server:Apache is a
+    // distinct evidence item (canonical identity includes the value) → 2
+    expect(cleaned).toContain('2 evidence items');
+    // Both values must survive rendering (no silent evidence loss)
+    expect(cleaned).toContain('Server: nginx');
+    expect(cleaned).toContain('Server: Apache');
   });
 
   it('renders evidence sources in deterministic order (type ASC → identity ASC)', () => {

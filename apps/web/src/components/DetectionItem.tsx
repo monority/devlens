@@ -3,7 +3,7 @@
  *
  * Layout:
  *
- *   TechnologyName  ·  Category  ·  Confidence: N%
+ *   TechnologyName  ·  Category  ·  Confidence: N
  *   └── Explanation (evidence coverage summary)
  *   └── Evidence source list (concise origin descriptions)
  *   └── Evidence (collapsible tree)
@@ -51,7 +51,7 @@ export function DetectionItem({ detection, index }: DetectionItemProps): React.R
       <header className={styles.detectionHeader}>
         <span className={styles.techName}>{techName}</span>
         <span className={styles.category}>{technology.category}</span>
-        <span className={styles.score}>Confidence: {confidence}%</span>
+        <span className={styles.score}>Confidence: {confidence}</span>
       </header>
 
       {/* Explanation: neutral summary of evidence coverage */}

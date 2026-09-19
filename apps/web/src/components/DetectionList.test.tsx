@@ -102,10 +102,16 @@ describe('DetectionList', () => {
 
   it('renders empty state for zero detections', () => {
     const html = renderToString(React.createElement(DetectionList, { detections: [] }));
+    const cleaned = html.replace(/<!-- -->/g, '');
 
-    expect(html).toContain('The scan completed successfully');
-    expect(html).toContain('No supported technologies were detected');
-    expect(html).toContain('Detections (0)');
+    expect(cleaned).toContain('The scan completed successfully');
+    expect(cleaned).toContain('No supported technologies were detected');
+    expect(cleaned).toContain('Detections (0)');
+    // Phase 7: zero detections must NOT imply the site is technology-free.
+    expect(cleaned).toContain('This does not mean the site uses no technologies');
+    expect(cleaned).toContain('observable');
+    // Must not claim the site "has no" or "is free of" technologies.
+    expect(cleaned).not.toContain('no technologies were detected on this site');
   });
 
   it('renders many detections without truncation', () => {

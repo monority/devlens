@@ -331,10 +331,10 @@ function TechnologyComparisonItem({
 
       {/* Confidence for added/removed technologies (from the source scan) */}
       {detection.status === 'added' && detection.rightConfidence !== null && (
-        <span className={styles.score}>Confidence: {detection.rightConfidence}%</span>
+        <span className={styles.score}>Confidence: {detection.rightConfidence}</span>
       )}
       {detection.status === 'removed' && detection.leftConfidence !== null && (
-        <span className={styles.score}>Confidence: {detection.leftConfidence}%</span>
+        <span className={styles.score}>Confidence: {detection.leftConfidence}</span>
       )}
 
       {/* Existing: score delta for unchanged technologies with changed confidence */}

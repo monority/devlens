@@ -492,7 +492,8 @@ describe('ScanComparison — added/removed technology explainability', () => {
 
     expect(cleaned).toContain('Added (1)');
     expect(cleaned).toContain('Vue');
-    expect(cleaned).toContain('Confidence: 80%');
+    expect(cleaned).toContain('Confidence: 80');
+    // Confidence is a 0–100 ranking score, not a probability — never rendered with '%'.
   });
 
   it('added technology renders supporting evidence', () => {
@@ -530,7 +531,8 @@ describe('ScanComparison — added/removed technology explainability', () => {
 
     expect(cleaned).toContain('Removed (1)');
     expect(cleaned).toContain('Angular');
-    expect(cleaned).toContain('Confidence: 70%');
+    expect(cleaned).toContain('Confidence: 70');
+    // Confidence is a 0–100 ranking score, not a probability — never rendered with '%'.
   });
 
   it('removed technology renders supporting evidence', () => {
@@ -626,7 +628,8 @@ describe('ScanComparison — added/removed technology explainability', () => {
     const cleaned = html.replace(/<!-- -->/g, '');
 
     expect(cleaned).toContain('Vue');
-    expect(cleaned).toContain('Confidence: 80%');
+    expect(cleaned).toContain('Confidence: 80');
+    // Confidence is a 0–100 ranking score, not a probability — never rendered with '%'.
     // No evidence → no "Evidence (" collapsible summary should appear
     expect(cleaned).not.toContain('Evidence (');
   });
@@ -659,7 +662,9 @@ describe('ScanComparison — added/removed technology explainability', () => {
     // Renders with name + category + confidence, no crash
     expect(cleaned).toContain('Phantom');
     expect(cleaned).toContain('unknown');
-    expect(cleaned).toContain('Confidence: 50%');
+    expect(cleaned).toContain('Confidence: 50');
+    // Confidence is a 0–100 ranking score, not a probability — never rendered with '%'.
+    expect(cleaned).not.toContain('Confidence: 50%');
     // No evidence rendered since the detection is missing
     expect(cleaned).not.toContain('Detected from');
   });
@@ -704,12 +709,15 @@ describe('ScanComparison — added/removed technology explainability', () => {
 
     // Added (React in right, not in left)
     expect(cleaned).toContain('Added (1)');
-    expect(cleaned).toContain('Confidence: 95%');
+    expect(cleaned).toContain('Confidence: 95');
+    // Confidence is a 0–100 ranking score, not a probability — never rendered with '%'.
+    expect(cleaned).not.toContain('Confidence: 95%');
     expect(cleaned).toContain('Detected from');
 
     // Removed (Angular in left, not in right)
     expect(cleaned).toContain('Removed (1)');
-    expect(cleaned).toContain('Confidence: 70%');
+    expect(cleaned).toContain('Confidence: 70');
+    // Confidence is a 0–100 ranking score, not a probability — never rendered with '%'.
     expect(cleaned).toContain('Angular CLI');
   });
 });

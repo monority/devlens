@@ -41,6 +41,23 @@ describe('DetectionItem', () => {
 
     expect(html).toContain('95');
     expect(html).toContain('Confidence');
+    // Phase 4: confidence is a 0–100 ranking score, NOT a probability —
+    // it must never carry a '%' suffix (e.g. no "95%").
+    expect(html).not.toContain('95%');
+  });
+
+  it('never renders confidence as a probability (no "%" suffix)', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, {
+        detection: makeDetection({ confidence: 87 }),
+        index: 0,
+      }),
+    );
+
+    // The raw score is present, but never as a percentage.
+    expect(html).toContain('87');
+    expect(html).not.toContain('87%');
+    expect(html).not.toContain('Confidence: 87%');
   });
 
   it('renders evidence count', () => {

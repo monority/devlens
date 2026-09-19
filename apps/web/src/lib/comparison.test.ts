@@ -325,7 +325,7 @@ describe('evidenceKey backward compatibility (compareScans integration)', () => 
       confidence: 95,
       evidence: [
         { type: 'http_header', name: 'Server', value: 'nginx' },
-        { type: 'http_header', name: 'Server', value: 'Apache' }, // same identity
+        { type: 'http_header', name: 'Server', value: 'Apache' }, // distinct identity
       ],
     };
     const scan: ScanDetailResponse = {
@@ -347,7 +347,8 @@ describe('evidenceKey backward compatibility (compareScans integration)', () => 
     const result = compareScans(scan, scan);
     const unchangedTech = result.unchanged[0]!;
 
-    // Both evidence items have identity "http_header:Server" → deduplicated to 1
-    expect(unchangedTech.evidenceChanges).toHaveLength(1);
+    // Both evidence items now have distinct canonical identities
+    // ('http_header:Server|nginx' vs 'http_header:Server|Apache') → 2 unchanged
+    expect(unchangedTech.evidenceChanges).toHaveLength(2);
   });
 });

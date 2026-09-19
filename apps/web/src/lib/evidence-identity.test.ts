@@ -8,10 +8,11 @@
  * Tests cover:
  * 1. identical evidence → identical identity
  * 2. different evidence → different identity when semantically required
- * 3. normalization behavior (identity depends only on type + key field)
+ * 3. normalization behavior (URLs are lowercased; values/content/snippets
+ *    are part of identity, matching the canonical `getEvidenceKey`)
  * 4. null/missing fields (graceful fallback)
  * 5. URL behavior (URLs are part of identity)
- * 6. header behavior (header name, not value)
+ * 6. header behavior (name AND value)
  * 7. different evidence types
  * 8. deterministic output
  * 9. deduplication through the canonical identity
@@ -35,16 +36,16 @@ describe('getEvidenceIdentity — canonical identity', () => {
     expect(getEvidenceIdentity(a)).not.toBe(getEvidenceIdentity(b));
   });
 
-  it('header value does NOT affect identity (name is the key)', () => {
+  it('header value DOES affect identity (name + value, matching canonical getEvidenceKey)', () => {
     const a = { type: 'http_header' as const, name: 'Server', value: 'nginx' };
     const b = { type: 'http_header' as const, name: 'Server', value: 'Apache' };
-    expect(getEvidenceIdentity(a)).toBe(getEvidenceIdentity(b));
+    expect(getEvidenceIdentity(a)).not.toBe(getEvidenceIdentity(b));
   });
 
-  it('meta_tag name affects identity, content does not', () => {
+  it('meta_tag name AND content affect identity', () => {
     const a = { type: 'meta_tag' as const, name: 'generator', content: 'Hugo' };
     const b = { type: 'meta_tag' as const, name: 'generator', content: 'WordPress' };
-    expect(getEvidenceIdentity(a)).toBe(getEvidenceIdentity(b));
+    expect(getEvidenceIdentity(a)).not.toBe(getEvidenceIdentity(b));
 
     const c = { type: 'meta_tag' as const, name: 'viewport', content: 'width=device-width' };
     expect(getEvidenceIdentity(a)).not.toBe(getEvidenceIdentity(c));
@@ -68,10 +69,10 @@ describe('getEvidenceIdentity — canonical identity', () => {
     expect(getEvidenceIdentity(a)).not.toBe(getEvidenceIdentity(b));
   });
 
-  it('html snippet does NOT affect identity (selector is the key)', () => {
+  it('html snippet DOES affect identity (selector + snippet, matching canonical getEvidenceKey)', () => {
     const a = { type: 'html' as const, selector: '#app', snippet: '<div id="app">' };
     const b = { type: 'html' as const, selector: '#app', snippet: '<span>' };
-    expect(getEvidenceIdentity(a)).toBe(getEvidenceIdentity(b));
+    expect(getEvidenceIdentity(a)).not.toBe(getEvidenceIdentity(b));
   });
 
   it('javascript_global identity depends on globalName', () => {
@@ -94,15 +95,15 @@ describe('getEvidenceIdentity — canonical identity', () => {
 });
 
 describe('getEvidenceIdentity — identity format', () => {
-  it('uses "html:{selector}" format', () => {
+  it('uses "html:{selector}|{snippet}" format', () => {
     expect(getEvidenceIdentity({ type: 'html', selector: '#app', snippet: '<div>' })).toBe(
-      'html:#app',
+      'html:#app|<div>',
     );
   });
 
-  it('uses "http_header:{name}" format', () => {
+  it('uses "http_header:{name}|{value}" format', () => {
     expect(getEvidenceIdentity({ type: 'http_header', name: 'Server', value: 'nginx' })).toBe(
-      'http_header:Server',
+      'http_header:Server|nginx',
     );
   });
 
@@ -118,9 +119,9 @@ describe('getEvidenceIdentity — identity format', () => {
     );
   });
 
-  it('uses "meta_tag:{name}" format', () => {
+  it('uses "meta_tag:{name}|{content}" format', () => {
     expect(getEvidenceIdentity({ type: 'meta_tag', name: 'generator', content: 'Hugo' })).toBe(
-      'meta_tag:generator',
+      'meta_tag:generator|Hugo',
     );
   });
 
@@ -208,24 +209,26 @@ describe('deduplicateEvidence', () => {
     expect(deduplicateEvidence(evidence)).toHaveLength(1);
   });
 
-  it('removes semantically-duplicate evidence (same identity, different values)', () => {
+  it('keeps distinct evidence with the same name but different values', () => {
     const evidence: EvidenceResponse[] = [
       { type: 'http_header', name: 'Server', value: 'nginx' },
       { type: 'http_header', name: 'Server', value: 'Apache' },
     ];
-    expect(deduplicateEvidence(evidence)).toHaveLength(1);
+    expect(deduplicateEvidence(evidence)).toHaveLength(2);
   });
 
-  it('preserves first occurrence', () => {
+  it('preserves both distinct occurrences and their order', () => {
     const evidence: EvidenceResponse[] = [
       { type: 'http_header', name: 'Server', value: 'nginx' },
       { type: 'http_header', name: 'Server', value: 'Apache' },
     ];
     const result = deduplicateEvidence(evidence);
-    expect(result).toHaveLength(1);
-    // result[0] is EvidenceResponse (union), cast for value access
+    expect(result).toHaveLength(2);
+    // result items are EvidenceResponse (union), cast for value access
     const first = result[0] as Extract<EvidenceResponse, { type: 'http_header' }>;
+    const second = result[1] as Extract<EvidenceResponse, { type: 'http_header' }>;
     expect(first.value).toBe('nginx');
+    expect(second.value).toBe('Apache');
   });
 
   it('preserves order of first occurrence for distinct evidence', () => {

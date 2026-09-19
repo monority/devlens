@@ -13,9 +13,12 @@
  *   so it is identified by its parent scan.
  * - `ScanStatus` (a discriminated union) is flattened into columns:
  *   a `status` text column plus status-specific timestamp/error columns.
- * - `HttpObservation.headers` and `SiteSnapshot.resources` are stored
- *   as `jsonb` — they are small value-object arrays without independent
- *   identity, so a separate child table would be over-normalization.
+ * - `HttpObservation.headers`, `HtmlObservation` (metaTags, scripts,
+ *   links), `SiteSnapshot.resources`, and the `detections` array are
+ *   stored as `jsonb` — they are small value-object arrays without
+ *   independent identity, so a separate child table would be
+ *   over-normalization. Each `html.*` array has its own column so that
+ *   every snapshot field round-trips faithfully (see Step 63 — Phase 4).
  */
 
 import { pgTable, text, integer, timestamp, jsonb } from 'drizzle-orm/pg-core';
@@ -60,6 +63,7 @@ export const snapshots = pgTable('snapshots', {
   htmlDescription: text('html_description'),
   htmlMetaTags: jsonb('html_meta_tags').notNull(),
   htmlScripts: jsonb('html_scripts').notNull(),
+  htmlLinks: jsonb('html_links').notNull(),
   headers: jsonb('headers').notNull(),
   resources: jsonb('resources').notNull(),
   detections: jsonb('detections').notNull(),

@@ -33,6 +33,7 @@ import type {
   HttpStatus,
   MetaTag,
   ScriptTag,
+  LinkTag,
 } from '@devlens/core';
 import type { HttpHeader, Resource, ScanStatus } from '@devlens/core';
 
@@ -65,6 +66,7 @@ interface SnapshotRow {
   htmlDescription: string | null;
   htmlMetaTags: Array<{ name: string; content: string }>;
   htmlScripts: Array<{ src: string | null; content: string }>;
+  htmlLinks: LinkTag[];
   headers: HttpHeader[];
   resources: Resource[];
   detections: Detection[];
@@ -129,9 +131,10 @@ function scanToRow(scan: Scan): ScanRow {
 /**
  * Flatten a {@link SiteSnapshot} into a row for the `snapshots` table.
  *
- * `headers` and `resources` are serialized as JSON to `jsonb` columns.
+ * `headers`, `resources`, `detections`, and the `html.*` arrays are
+ * serialized as JSON to `jsonb` columns.
  */
-function snapshotToRow(
+export function snapshotToRow(
   scanId: ScanId,
   snapshot: SiteSnapshot,
   detections: readonly Detection[],
@@ -148,6 +151,7 @@ function snapshotToRow(
     htmlDescription: snapshot.html.description,
     htmlMetaTags: [...snapshot.html.metaTags],
     htmlScripts: [...snapshot.html.scripts],
+    htmlLinks: [...snapshot.html.links],
     headers: [...snapshot.http.headers],
     resources: [...snapshot.resources],
     detections: [...detections],
@@ -212,7 +216,7 @@ function rowToScan(row: ScanRow): Scan {
  * database row. Returns `null` when the row is `undefined`, which happens
  * for failed scans that have no snapshot.
  */
-function rowToSnapshot(row: SnapshotRow | undefined | null): {
+export function rowToSnapshot(row: SnapshotRow | undefined | null): {
   snapshot: SiteSnapshot | null;
   detections: Detection[];
 } {
@@ -236,7 +240,7 @@ function rowToSnapshot(row: SnapshotRow | undefined | null): {
         description: row.htmlDescription,
         metaTags: [...(row.htmlMetaTags as MetaTag[])],
         scripts: [...(row.htmlScripts as ScriptTag[])],
-        links: [], // links were not persisted by the write-side mapper; return empty
+        links: [...(row.htmlLinks as LinkTag[])],
       },
       resources: [...(row.resources as Resource[])],
     },
@@ -307,6 +311,7 @@ export class PostgresScanResultRepository implements ScanResultRepository {
               htmlDescription: snapshotRow.htmlDescription,
               htmlMetaTags: snapshotRow.htmlMetaTags,
               htmlScripts: snapshotRow.htmlScripts,
+              htmlLinks: snapshotRow.htmlLinks,
               headers: snapshotRow.headers,
               resources: snapshotRow.resources,
               detections: snapshotRow.detections,

@@ -162,6 +162,35 @@ describe('getEvidenceKey', () => {
     });
   });
 
+  describe('canonical identity invariants (Step 63 — web layer mirrors these)', () => {
+    // The web layer's `getEvidenceIdentity` is required to produce the
+    // same distinguishability as these canonical keys. These assertions
+    // lock the source-of-truth behavior the web layer must not regress.
+    it('http_header: same name with different value produces different keys', () => {
+      const nginx: Evidence = { type: 'http_header', name: 'Server', value: 'nginx' };
+      const apache: Evidence = { type: 'http_header', name: 'Server', value: 'Apache' };
+      expect(getEvidenceKey(nginx)).not.toBe(getEvidenceKey(apache));
+    });
+
+    it('meta_tag: same name with different content produces different keys', () => {
+      const a: Evidence = { type: 'meta_tag', name: 'generator', content: 'Hugo' };
+      const b: Evidence = { type: 'meta_tag', name: 'generator', content: 'WordPress' };
+      expect(getEvidenceKey(a)).not.toBe(getEvidenceKey(b));
+    });
+
+    it('html: same selector with different snippet produces different keys', () => {
+      const a: Evidence = { type: 'html', selector: '#app', snippet: '<div>' };
+      const b: Evidence = { type: 'html', selector: '#app', snippet: '<span>' };
+      expect(getEvidenceKey(a)).not.toBe(getEvidenceKey(b));
+    });
+
+    it('url evidence is case-insensitive (same resource, different casing)', () => {
+      const a: Evidence = { type: 'link', url: createUrl('https://CDN.Example.COM/app.css') };
+      const b: Evidence = { type: 'link', url: createUrl('https://cdn.example.com/app.css') };
+      expect(getEvidenceKey(a)).toBe(getEvidenceKey(b));
+    });
+  });
+
   describe('key format stability', () => {
     it('key starts with the evidence type', () => {
       const evidence: Evidence = { type: 'http_header', name: 'Server', value: 'nginx' };

@@ -14,8 +14,11 @@
  * NOT display name and NOT array ordering.
  *
  * Evidence identity uses a deterministic key derived from the evidence
- * type and its identifying fields (e.g. `http_header:X-Powered-By`).
- * This is a presentation-level identity, not a detector-level one.
+ * type and ALL of its identifying fields (e.g.
+ * `http_header:Server|nginx`). This mirrors the canonical identity used
+ * by the detector layer (`getEvidenceKey` in `@devlens/detectors`), so
+ * the presentation layer never silently drops evidence that the detector
+ * layer deliberately kept distinct (see Step 63 — Phase 2).
  */
 
 import type { ScanDetailResponse, DetectionResponse, EvidenceResponse } from './types.js';

@@ -6,8 +6,13 @@
  * two evidence items represent "the same evidence" must use
  * `getEvidenceIdentity()`.
  *
- * The algorithm preserves the behavior established by Steps 38–41:
- * each evidence type uses its type-specific primary identifier field.
+ * The identity includes ALL fields that distinguish one evidence item
+ * from another of the same type, and normalizes URL fields to lowercase
+ * for comparison. This mirrors the canonical rules already used by the
+ * detector layer (`getEvidenceKey` in `@devlens/detectors`), so the web
+ * layer never silently drops evidence that the detector layer kept
+ * distinct (see Step 63 — Phase 2).
+ *
  * The default (unknown) case serializes the full item so that the
  * identity is deterministic but unique.
  *
@@ -21,19 +26,30 @@
 import type { EvidenceResponse } from './types.js';
 
 /**
+ * Normalizes a URL string to lowercase for comparison.
+ *
+ * URLs are case-insensitive in the hostname portion. Lowercasing the
+ * whole URL here keeps the web layer's identity comparable to the
+ * detector layer's canonical key (`getEvidenceKey`), which does the same.
+ */
+function normalizeUrl(url: string): string {
+  return String(url).toLowerCase();
+}
+
+/**
  * Produces the canonical identity string for an evidence item.
  *
  * Two evidence items produce the same identity if and only if they
  * represent "the same evidence" — same type and same identifying fields.
  *
- * - `html`               → `"html:{selector}"`
- * - `http_header`        → `"http_header:{name}"`
- * - `script_url`         → `"script_url:{url}"`
+ * - `html`               → `"html:{selector}|{snippet}"`
+ * - `http_header`        → `"http_header:{name}|{value}"`
+ * - `script_url`         → `"script_url:{url}"` (URL lowercased)
  * - `script_content`     → `"script_content:{snippet}"`
- * - `meta_tag`           → `"meta_tag:{name}"`
+ * - `meta_tag`           → `"meta_tag:{name}|{content}"`
  * - `javascript_global`  → `"javascript_global:{globalName}"`
- * - `resource`           → `"resource:{url}"`
- * - `link`               → `"link:{url}"`
+ * - `resource`           → `"resource:{url}"` (URL lowercased)
+ * - `link`               → `"link:{url}"` (URL lowercased)
  * - unknown              → `"{type}:{JSON.stringify(item)}"`
  *
  * @param item A single evidence observation
@@ -42,21 +58,21 @@ import type { EvidenceResponse } from './types.js';
 export function getEvidenceIdentity(item: EvidenceResponse): string {
   switch (item.type) {
     case 'html':
-      return `html:${item.selector}`;
+      return `html:${item.selector}|${item.snippet}`;
     case 'http_header':
-      return `http_header:${item.name}`;
+      return `http_header:${item.name}|${item.value}`;
     case 'script_url':
-      return `script_url:${item.url}`;
+      return `script_url:${normalizeUrl(item.url)}`;
     case 'script_content':
       return `script_content:${item.snippet}`;
     case 'meta_tag':
-      return `meta_tag:${item.name}`;
+      return `meta_tag:${item.name}|${item.content}`;
     case 'javascript_global':
       return `javascript_global:${item.globalName}`;
     case 'resource':
-      return `resource:${item.url}`;
+      return `resource:${normalizeUrl(item.url)}`;
     case 'link':
-      return `link:${item.url}`;
+      return `link:${normalizeUrl(item.url)}`;
     default: {
       // Fallback for unknown/future evidence types — serialize the full
       // item so identity is deterministic but unique. Uses the actual

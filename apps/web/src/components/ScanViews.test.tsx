@@ -855,7 +855,10 @@ describe('ScanDetailView — Scan Overview (Step 37)', () => {
     expect(cleaned).toContain('Technologies');
     expect(cleaned).toContain('Evidence');
     expect(cleaned).toContain('Highest confidence');
-    expect(cleaned).toContain('95%');
+    expect(cleaned).toContain('95');
+    // Phase 4: confidence is a 0–100 ranking value, not a probability —
+    // never suffixed with '%'.
+    expect(cleaned).not.toContain('95%');
   });
 
   it('does not render overview for non-completed scans', () => {
@@ -898,8 +901,14 @@ describe('ScanDetailView — Scan Overview (Step 37)', () => {
     // Technology count (2 unique) and highest confidence (95) must be the same
     expect(cleanedNoFilter).toContain('2');
     expect(cleanedWithFilter).toContain('2');
-    expect(cleanedNoFilter).toContain('95%');
-    expect(cleanedWithFilter).toContain('95%');
+    expect(cleanedNoFilter).toContain('95');
+    // Phase 4: confidence is a 0–100 ranking value, not a probability —
+    // never suffixed with '%'.
+    expect(cleanedNoFilter).not.toContain('95%');
+    expect(cleanedWithFilter).toContain('95');
+    // Phase 4: confidence is a 0–100 ranking value, not a probability —
+    // never suffixed with '%'.
+    expect(cleanedWithFilter).not.toContain('95%');
   });
 
   it('overview and detection list both render for completed scans', () => {

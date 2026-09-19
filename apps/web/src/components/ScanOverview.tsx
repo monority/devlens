@@ -21,7 +21,7 @@
  *   Created: Sep 16, 2025
  *   Completed: Sep 16, 2025
  *
- *   4 Technologies  9 Evidence  95% Highest confidence
+ *   4 Technologies  9 Evidence  95 Highest confidence
  */
 
 import type { ScanOverview } from '../lib/scan-overview.js';
@@ -146,7 +146,7 @@ export function ScanOverview({ overview }: ScanOverviewProps): React.ReactElemen
         </div>
         <div className={styles.overviewMetric}>
           <dd className={styles.overviewMetricValue}>
-            {hasDetections ? `${overview.highestConfidence}%` : '—'}
+            {hasDetections ? overview.highestConfidence : '—'}
           </dd>
           <dt className={styles.overviewMetricLabel}>Highest confidence</dt>
         </div>

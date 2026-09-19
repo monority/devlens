@@ -120,7 +120,10 @@ describe('ScanOverview', () => {
     const html = renderToString(React.createElement(ScanOverview, { overview }));
     const cleaned = html.replace(/<!-- -->/g, '');
 
-    expect(cleaned).toContain('95%');
+    expect(cleaned).toContain('95');
+    // Phase 4: confidence is a 0–100 ranking value, not a probability —
+    // 'Highest confidence' value must never be rendered with a '%' suffix.
+    expect(cleaned).not.toContain('95%');
   });
 
   it('renders a compact header for zero detections', () => {
@@ -147,7 +150,10 @@ describe('ScanOverview', () => {
     expect(cleaned).toContain('Evidence');
     expect(cleaned).toContain('Highest confidence');
     expect(cleaned).toContain('2');
-    expect(cleaned).toContain('95%');
+    expect(cleaned).toContain('95');
+    // Phase 4: confidence is a 0–100 ranking value, not a probability —
+    // 'Highest confidence' value must never be rendered with a '%' suffix.
+    expect(cleaned).not.toContain('95%');
   });
 
   it('uses semantic HTML with proper heading hierarchy', () => {

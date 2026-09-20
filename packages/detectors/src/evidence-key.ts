@@ -63,6 +63,8 @@ export function getEvidenceKey(evidence: Evidence): string {
       return `resource|${normalizeUrl(evidence.url)}`;
     case 'link':
       return `link|${normalizeUrl(evidence.url)}`;
+    case 'resource_content':
+      return `resource_content|${normalizeUrl(evidence.url)}|${evidence.resourceType}|${evidence.match}`;
     case 'html':
       return `html|${evidence.selector}|${evidence.snippet}`;
   }

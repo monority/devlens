@@ -10,4 +10,15 @@ export const svelte: TechnologyDefinition = {
     { matchContent: '__SVELTE__', technologyId: 'svelte', confidence: 95 },
     { matchContent: 'SvelteComponent', technologyId: 'svelte', confidence: 90 },
   ],
+  // Step 71 — fetched Svelte 4 compiled/runtime bundles. `svelte/internal`
+  // is the runtime import specifier (string literal, survives minification)
+  // emitted into every Svelte 4 component bundle.
+  resourceContentSignatures: [
+    {
+      matchType: 'script',
+      matchContent: 'svelte/internal',
+      technologyId: 'svelte',
+      confidence: 90,
+    },
+  ],
 };

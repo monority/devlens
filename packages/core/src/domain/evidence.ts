@@ -9,6 +9,7 @@
  */
 
 import type { Url } from './value-objects.js';
+import type { ResourceType } from './snapshot.js';
 
 /**
  * Evidence that a technology's signature was found in raw HTML.
@@ -86,6 +87,37 @@ export interface LinkEvidence {
 }
 
 /**
+ * Evidence that a technology was detected from the **body** of a fetched
+ * secondary resource (e.g. an Angular/Vue/Svelte/Astro JS bundle fetched
+ * by the crawler's Step-70 resource-intelligence layer).
+ *
+ * Unlike {@link ResourceEvidence} (which is URL-based and carried by an
+ * already-observed resource URL), this evidence records the **content**
+ * observation: the fetched resource body was inspected and a strong,
+ * technology-specific fingerprint was found inside it.
+ *
+ * The evidence carries:
+ * - the resource `url` (so the origin of the signal is explainable),
+ * - the `resourceType` inspected (`'script'` for a JS bundle, `'css'`, …),
+ * - the `match` — the discriminating signature substring that triggered
+ *   the detection (the "signal"),
+ * - a bounded `snippet` — a small window of surrounding context extracted
+ *   around the match. The **full bundle is never stored**; only a short
+ *   fragment is retained for debugging/explainability (§10, §11).
+ */
+export interface ResourceContentEvidence {
+  readonly type: 'resource_content';
+  /** URL of the fetched resource whose body contained the signature. */
+  readonly url: Url;
+  /** The resource type inspected (e.g. `'script'` for a JS bundle body). */
+  readonly resourceType: ResourceType;
+  /** The signature substring that matched — the discriminating signal. */
+  readonly match: string;
+  /** Bounded context around the match (never the full resource body). */
+  readonly snippet: string;
+}
+
+/**
  * Discriminated union of all evidence types.
  *
  * The `type` field is the discriminant — consumers can narrow the type
@@ -99,4 +131,5 @@ export type Evidence =
   | MetaTagEvidence
   | JavaScriptGlobalEvidence
   | ResourceEvidence
-  | LinkEvidence;
+  | LinkEvidence
+  | ResourceContentEvidence;

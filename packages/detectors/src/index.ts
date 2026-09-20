@@ -20,6 +20,7 @@ export { MetaTagDetector } from './meta-tag-detector.js';
 export { ScriptUrlDetector } from './script-url-detector.js';
 export { ContentScriptDetector } from './content-script-detector.js';
 export { ResourceDetector } from './resource-detector.js';
+export { ResourceContentDetector } from './resource-content-detector.js';
 export { LinkDetector } from './link-detector.js';
 export { DeduplicatingDetector } from './deduplicating-detector.js';
 export { CompositeDetector } from './composite-detector.js';
@@ -38,7 +39,8 @@ export {
  * Declarative technology catalog (Step 68). `TECHNOLOGY_DEFINITIONS` is the
  * single source of truth for every detected technology: its metadata *and*
  * all of its signatures across every observable source. `signaturesFor`
- * is what the six detectors use to source their signature tables.
+ * is what the seven detectors (six Step-68 + the Step-71
+ * `ResourceContentDetector`) use to source their signature tables.
  */
 export {
   TECHNOLOGY_DEFINITIONS,
@@ -58,6 +60,7 @@ export type {
   ScriptUrlSignature,
   ContentScriptSignature,
   ResourceSignature,
+  ResourceContentSignature,
   LinkSignature,
   LinkMatchKind,
 } from './catalog/types.js';

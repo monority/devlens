@@ -79,6 +79,21 @@ describe('Evidence types', () => {
     expect(e.url).toBe('https://cdn.shopify.com/s/files/1.js');
   });
 
+  it('creates ResourceContentEvidence', () => {
+    const e: Evidence = {
+      type: 'resource_content',
+      url: createUrl('https://example.com/main.abcdef.js'),
+      resourceType: 'script',
+      match: '@angular/core',
+      snippet: 'import { Component } from "@angular/core";',
+    };
+    if (e.type !== 'resource_content') throw new Error('wrong type');
+    expect(e.url).toBe('https://example.com/main.abcdef.js');
+    expect(e.resourceType).toBe('script');
+    expect(e.match).toBe('@angular/core');
+    expect(e.snippet).toBe('import { Component } from "@angular/core";');
+  });
+
   it('supports LinkEvidence in the discriminated union', () => {
     const evidence: Evidence[] = [
       { type: 'link', url: createUrl('https://cdn.shopify.com/s/files/1.js') },

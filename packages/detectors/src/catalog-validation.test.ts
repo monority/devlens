@@ -363,3 +363,109 @@ describe('validateDefinitions — relationship graph (unknown refs + cycles)', (
     expect(validateDefinitions(TECHNOLOGY_DEFINITIONS)).toEqual([]);
   });
 });
+
+// ─── Step 71 — resourceContentSignatures validation ────────────────────
+// `resourceContentSignatures` feeds into the same generic `allSigs` loop, so
+// it inherits the existing per-signature checks (technologyId, confidence
+// range, version-rule shape, duplicate detection). These cases pin that
+// inheritance for the new group.
+
+describe('Step 71 — resourceContentSignatures validation', () => {
+  const baseRcDef: TechnologyDefinition = {
+    id: 'rc-tech',
+    name: 'RC Tech',
+    category: 'framework',
+    resourceContentSignatures: [
+      {
+        matchType: 'script',
+        matchContent: '@angular/core',
+        technologyId: 'rc-tech',
+        confidence: 95,
+      },
+    ],
+  };
+
+  it('accepts a well-formed resourceContentSignature', () => {
+    expect(validateDefinition(baseRcDef)).toEqual([]);
+  });
+
+  it('accepts a definition whose only signatures are resourceContentSignatures', () => {
+    // A definition with zero signatures in the other 6 groups but a valid
+    // resourceContentSignature group is still well-formed (allSigs > 0).
+    expect(validateDefinition(baseRcDef)).toEqual([]);
+  });
+
+  it('flags an invalid (>100) confidence on a resourceContentSignature', () => {
+    const def = {
+      ...baseRcDef,
+      resourceContentSignatures: [
+        {
+          matchType: 'script',
+          matchContent: '@angular/core',
+          technologyId: 'rc-tech',
+          confidence: 120,
+        },
+      ],
+    } as unknown as TechnologyDefinition;
+    expect(validateDefinition(def).some((e) => /invalid confidence 120/.test(e))).toBe(true);
+  });
+
+  it('flags a resourceContentSignature whose technologyId does not match the definition', () => {
+    const def = {
+      ...baseRcDef,
+      resourceContentSignatures: [
+        {
+          matchType: 'script',
+          matchContent: '@angular/core',
+          technologyId: 'wrong-id',
+          confidence: 95,
+        },
+      ],
+    } as unknown as TechnologyDefinition;
+    expect(validateDefinition(def).some((e) => /technologyId is/.test(e))).toBe(true);
+  });
+
+  it('flags an exact-duplicate resourceContentSignature', () => {
+    const sig = {
+      matchType: 'script',
+      matchContent: '@angular/core',
+      technologyId: 'rc-tech',
+      confidence: 95,
+    };
+    const def = {
+      ...baseRcDef,
+      resourceContentSignatures: [sig, sig],
+    } as unknown as TechnologyDefinition;
+    expect(validateDefinition(def).some((e) => /duplicate signature/.test(e))).toBe(true);
+  });
+
+  it('flags a NaN confidence on a resourceContentSignature', () => {
+    const def = {
+      ...baseRcDef,
+      resourceContentSignatures: [
+        {
+          matchType: 'script',
+          matchContent: '@angular/core',
+          technologyId: 'rc-tech',
+          confidence: Number.NaN,
+        },
+      ],
+    } as unknown as TechnologyDefinition;
+    expect(validateDefinition(def).some((e) => /invalid confidence/.test(e))).toBe(true);
+  });
+
+  it('real catalog Step-71 signatures pass validation (zero errors)', () => {
+    // The 4 technologies that gained resourceContentSignatures must remain valid.
+    const ids = ['angular', 'vue', 'svelte', 'astro'];
+    for (const id of ids) {
+      const def = TECHNOLOGY_DEFINITIONS.find((d) => d.id === id)!;
+      expect(
+        validateDefinition(def),
+        `technology "${id}" has resourceContentSignature errors`,
+      ).toEqual([]);
+      expect(def.resourceContentSignatures?.length).toBeGreaterThan(0);
+    }
+    // And the whole catalog is still clean.
+    expect(validateCatalog()).toEqual([]);
+  });
+});

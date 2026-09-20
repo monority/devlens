@@ -29,6 +29,7 @@ import {
   createTimestampFromString,
   createHttpStatus,
 } from '@devlens/core';
+import { TECHNOLOGY_IDS } from '../technology-catalog.js';
 
 // ─── Fixture type ─────────────────────────────────────────────────────────
 
@@ -112,44 +113,11 @@ function makeSnapshot(parts: {
 // ─── Catalog of all technology IDs ─────────────────────────────────────────
 
 /**
- * All technology IDs from the catalog, used to build forbidden lists
- * without repeating every ID. A fixture's `forbidden` list should be
- * a subset of these.
+ * All technology IDs in the catalog, derived (not hand-maintained) so the
+ * golden fixture-coverage assertions stay in sync with the catalog. A
+ * fixture's `forbidden` list should be a subset of these.
  */
-export const ALL_TECH_IDS = [
-  'nginx',
-  'apache',
-  'iis',
-  'php',
-  'wordpress',
-  'drupal',
-  'webflow',
-  'hugo',
-  'jekyll',
-  'ghost',
-  'express',
-  'laravel',
-  'nextjs',
-  'nuxtjs',
-  'gatsby',
-  'react',
-  'vue',
-  'angular',
-  'svelte',
-  'astro',
-  'bootstrap',
-  'jquery',
-  'lodash',
-  'tailwind',
-  'firebase',
-  'shopify',
-  'woocommerce',
-  'google-fonts',
-  'google-analytics',
-  'cloudflare',
-  'prestashop',
-  'plausible',
-] as const;
+export const ALL_TECH_IDS: readonly string[] = Array.from(TECHNOLOGY_IDS);
 
 // ─── Positive fixtures ─────────────────────────────────────────────────────
 // One fixture per catalog technology. Each fixture simulates a realistic
@@ -261,7 +229,7 @@ export const FIXTURES: readonly Fixture[] = [
         },
       ],
     }),
-    expected: ['nextjs', 'react'],
+    expected: ['nextjs', 'react', 'vercel'],
     forbidden: ['vue', 'angular', 'svelte', 'astro', 'nuxtjs'],
   },
 
@@ -672,7 +640,7 @@ export const FIXTURES: readonly Fixture[] = [
         { src: 'https://www.googletagmanager.com/gtag/js?id=GA_MEASUREMENT_ID', content: '' },
       ],
     }),
-    expected: ['google-analytics'],
+    expected: ['google-analytics', 'google-tag-manager'],
     forbidden: ['google-fonts', 'firebase', 'shopify'],
   },
 
@@ -794,7 +762,7 @@ export const FIXTURES: readonly Fixture[] = [
         },
       ],
     }),
-    expected: ['nextjs', 'react'],
+    expected: ['nextjs', 'react', 'vercel'],
     forbidden: ['vue', 'angular', 'svelte'],
   },
 
@@ -1335,7 +1303,7 @@ export const FIXTURES: readonly Fixture[] = [
         },
       ],
     }),
-    expected: ['nextjs', 'react'],
+    expected: ['nextjs', 'react', 'vercel'],
     forbidden: ['nuxtjs', 'gatsby', 'vue', 'angular'],
   },
 
@@ -1359,5 +1327,491 @@ export const FIXTURES: readonly Fixture[] = [
     }),
     expected: ['wordpress'],
     forbidden: ['shopify', 'drupal', 'laravel'],
+  },
+
+  // ── Step 68: new declarative technologies (one positive fixture each) ──
+
+  {
+    name: 'caddy',
+    description: 'Caddy server (Server header fingerprint + version)',
+    category: 'server',
+    snapshot: makeSnapshot({
+      headers: [{ name: 'Server', value: 'Caddy/v2.8.4 (Fedora)' }],
+    }),
+    expected: ['caddy'],
+    forbidden: ['apache', 'nginx', 'iis', 'openresty', 'litespeed', 'tomcat', 'cloudflare'],
+  },
+
+  {
+    name: 'openresty',
+    description: 'OpenResty (Server header fingerprint + version)',
+    category: 'server',
+    snapshot: makeSnapshot({
+      headers: [{ name: 'Server', value: 'openresty/1.15.8.22' }],
+    }),
+    expected: ['openresty'],
+    forbidden: ['nginx', 'apache', 'iis', 'caddy', 'litespeed', 'tomcat', 'cloudflare'],
+  },
+
+  {
+    name: 'litespeed',
+    description: 'LiteSpeed (Server header fingerprint)',
+    category: 'server',
+    snapshot: makeSnapshot({
+      headers: [{ name: 'Server', value: 'LiteSpeed' }],
+    }),
+    expected: ['litespeed'],
+    forbidden: ['nginx', 'apache', 'iis', 'caddy', 'openresty', 'tomcat', 'cloudflare'],
+  },
+
+  {
+    name: 'tomcat',
+    description: 'Apache Tomcat (Server Apache-Coyote fingerprint + version; co-detects Apache)',
+    category: 'server',
+    snapshot: makeSnapshot({
+      headers: [{ name: 'Server', value: 'Apache-Coyote/1.45' }],
+    }),
+    expected: ['apache', 'tomcat'],
+    forbidden: ['nginx', 'iis', 'caddy', 'openresty', 'litespeed', 'cloudflare', 'express'],
+  },
+
+  {
+    name: 'fastly',
+    description: 'Fastly CDN (Via header fingerprint)',
+    category: 'cdn',
+    snapshot: makeSnapshot({
+      headers: [{ name: 'Via', value: '1.1 varnish, 1.1 fastly-T' }],
+    }),
+    expected: ['fastly'],
+    forbidden: ['cloudflare', 'nginx', 'apache', 'caddy', 'openresty', 'litespeed', 'tomcat'],
+  },
+
+  {
+    name: 'vercel',
+    description: 'Vercel (Server header fingerprint)',
+    category: 'cdn',
+    snapshot: makeSnapshot({
+      headers: [{ name: 'Server', value: 'vercel' }],
+    }),
+    expected: ['vercel'],
+    forbidden: [
+      'nginx',
+      'apache',
+      'iis',
+      'caddy',
+      'cloudflare',
+      'fastly',
+      'openresty',
+      'litespeed',
+      'tomcat',
+    ],
+  },
+
+  {
+    name: 'typo3',
+    description: 'TYPO3 CMS (meta generator fingerprint)',
+    category: 'cms',
+    snapshot: makeSnapshot({
+      metaTags: [{ name: 'generator', content: 'TYPO3' }],
+    }),
+    expected: ['typo3'],
+    forbidden: [
+      'wordpress',
+      'joomla',
+      'craft-cms',
+      'mediawiki',
+      'hugo',
+      'jekyll',
+      'ghost',
+      'jekyll',
+    ],
+  },
+
+  {
+    name: 'joomla',
+    description: 'Joomla CMS (meta generator + version)',
+    category: 'cms',
+    snapshot: makeSnapshot({
+      metaTags: [{ name: 'generator', content: 'Joomla! 4.3.1' }],
+    }),
+    expected: ['joomla'],
+    forbidden: ['wordpress', 'typo3', 'craft-cms', 'mediawiki', 'nextjs', 'hugo'],
+  },
+
+  {
+    name: 'craft-cms',
+    description: 'Craft CMS (meta generator + version)',
+    category: 'cms',
+    snapshot: makeSnapshot({
+      metaTags: [{ name: 'generator', content: 'Craft CMS 4.5.3' }],
+    }),
+    expected: ['craft-cms'],
+    forbidden: ['wordpress', 'typo3', 'joomla', 'mediawiki', 'nextjs', 'hugo'],
+  },
+
+  {
+    name: 'mediawiki',
+    description: 'MediaWiki (meta generator + version)',
+    category: 'cms',
+    snapshot: makeSnapshot({
+      metaTags: [{ name: 'generator', content: 'MediaWiki 1.40.1' }],
+    }),
+    expected: ['mediawiki'],
+    forbidden: ['wordpress', 'typo3', 'joomla', 'craft-cms', 'jekyll', 'ghost'],
+  },
+
+  {
+    name: 'google-tag-manager',
+    description: 'Google Tag Manager (googletagmanager.com script URL) — distinct from GA',
+    category: 'analytics',
+    snapshot: makeSnapshot({
+      scripts: [{ src: 'https://www.googletagmanager.com/gtag/js?id=GTM-ABCD', content: '' }],
+    }),
+    expected: ['google-tag-manager'],
+    forbidden: ['google-analytics', 'google-fonts', 'firebase', 'segment', 'matomo', 'plausible'],
+  },
+
+  {
+    name: 'matomo',
+    description: 'Matomo analytics (matomo.js script URL)',
+    category: 'analytics',
+    snapshot: makeSnapshot({
+      scripts: [{ src: 'https://analytics.example.com/matomo.js', content: '' }],
+    }),
+    expected: ['matomo'],
+    forbidden: ['google-analytics', 'google-tag-manager', 'plausible', 'segment'],
+  },
+
+  {
+    name: 'segment',
+    description: 'Segment (cdn.segment.com script URL)',
+    category: 'analytics',
+    snapshot: makeSnapshot({
+      scripts: [{ src: 'https://cdn.segment.com/analytics.js', content: '' }],
+    }),
+    expected: ['segment'],
+    forbidden: ['google-analytics', 'google-tag-manager', 'matomo', 'plausible'],
+  },
+
+  {
+    name: 'htmx',
+    description: 'HTMX (htmx.org script URL)',
+    category: 'library',
+    snapshot: makeSnapshot({
+      scripts: [{ src: 'https://unpkg.com/htmx.org@1.9.10/dist/htmx.min.js', content: '' }],
+    }),
+    expected: ['htmx'],
+    forbidden: ['alpinejs', 'turbo', 'stimulus', 'jquery', 'lodash'],
+  },
+
+  {
+    name: 'turbo',
+    description: 'Turbo (hotwired/turbo script URL)',
+    category: 'library',
+    snapshot: makeSnapshot({
+      scripts: [{ src: 'https://unpkg.com/@hotwired/turbo@7.2.4/dist/turbo.min.js', content: '' }],
+    }),
+    expected: ['turbo'],
+    forbidden: ['stimulus', 'htmx', 'alpinejs', 'bootstrap'],
+  },
+
+  {
+    name: 'stimulus',
+    description: 'Stimulus (hotwired/stimulus script URL)',
+    category: 'library',
+    snapshot: makeSnapshot({
+      scripts: [
+        { src: 'https://unpkg.com/@hotwired/stimulus@3.2.1/dist/stimulus.min.js', content: '' },
+      ],
+    }),
+    expected: ['stimulus'],
+    forbidden: ['turbo', 'htmx', 'alpinejs', 'bootstrap'],
+  },
+
+  {
+    name: 'alpinejs',
+    description: 'Alpine.js (alpinejs script URL)',
+    category: 'library',
+    snapshot: makeSnapshot({
+      scripts: [{ src: 'https://unpkg.com/alpinejs@3.13.0/cjs/alpine.js', content: '' }],
+    }),
+    expected: ['alpinejs'],
+    forbidden: ['vue', 'svelte', 'react', 'htmx', 'turbo'],
+  },
+
+  {
+    name: 'bigcommerce',
+    description: 'BigCommerce (bcapp.com script URL)',
+    category: 'ecommerce',
+    snapshot: makeSnapshot({
+      scripts: [{ src: 'https://cdn.bcapp.com/storefront/sections/main.js', content: '' }],
+    }),
+    expected: ['bigcommerce'],
+    forbidden: ['shopify', 'woocommerce', 'segment'],
+  },
+
+  {
+    name: 'd3',
+    description: 'D3 (d3.v script URL + version)',
+    category: 'library',
+    snapshot: makeSnapshot({
+      scripts: [{ src: 'https://d3js.org/d3.v7.min.js', content: '' }],
+    }),
+    expected: ['d3'],
+    forbidden: ['jquery', 'lodash', 'bootstrap', 'popperjs'],
+  },
+
+  {
+    name: 'popperjs',
+    description: 'Popper.js (@popperjs script URL)',
+    category: 'library',
+    snapshot: makeSnapshot({
+      scripts: [
+        {
+          src: 'https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js',
+          content: '',
+        },
+      ],
+    }),
+    expected: ['popperjs'],
+    forbidden: ['bootstrap', 'jquery', 'd3', 'alpinejs'],
+  },
+
+  {
+    name: 'ember',
+    description: 'Ember.js (inline Ember. content fingerprint)',
+    category: 'framework',
+    snapshot: makeSnapshot({
+      scripts: [{ src: null, content: 'Ember.VERSION = "4.12.0"; new Ember.Application();' }],
+    }),
+    expected: ['ember'],
+    forbidden: ['backbone', 'react', 'vue', 'laravel'],
+  },
+
+  {
+    name: 'backbone',
+    description: 'Backbone.js (inline Backbone. content fingerprint)',
+    category: 'framework',
+    snapshot: makeSnapshot({
+      scripts: [
+        { src: null, content: 'var app = new Backbone.Router({}); Backbone.View.extend();' },
+      ],
+    }),
+    expected: ['backbone'],
+    forbidden: ['ember', 'react', 'vue', 'laravel'],
+  },
+
+  // ── Step 68: realworld corpus A–F ───────────────────────────────
+
+  {
+    name: 'corpus-A-wordpress-nginx-php-jquery',
+    description:
+      'Corpus A: WordPress blog behind nginx, PHP backend, jQuery (four WordPress modalities)',
+    category: 'realworld',
+    snapshot: makeSnapshot({
+      headers: [
+        { name: 'Server', value: 'nginx/1.21.6 (Ubuntu)' },
+        { name: 'X-Powered-By', value: 'PHP/8.2.10' },
+      ],
+      metaTags: [{ name: 'generator', content: 'WordPress 6.4.2' }],
+      scripts: [
+        { src: 'https://example.com/wp-content/themes/twentytwentythree/script.js', content: '' },
+        { src: 'https://example.com/wp-includes/js/jquery/jquery.min.js', content: '' },
+      ],
+      links: [
+        {
+          rel: 'stylesheet',
+          href: 'https://example.com/wp-content/themes/twentytwentythree/style.css',
+          content: '<link>',
+        },
+      ],
+      resources: [
+        {
+          url: 'https://example.com/robots.txt',
+          type: 'robots',
+          content: 'User-agent: *\nDisallow: /wp-admin/\nAllow: /wp-content/uploads/',
+        },
+        {
+          url: 'https://example.com/style.css',
+          type: 'css',
+          content: '--wp--preset--color-primary: #000;\n.wp-block-group { }',
+        },
+      ],
+    }),
+    expected: ['wordpress', 'nginx', 'php', 'jquery'],
+    forbidden: [
+      'apache',
+      'iis',
+      'express',
+      'cloudflare',
+      'caddy',
+      'openresty',
+      'litespeed',
+      'tomcat',
+      'vercel',
+      'fastly',
+      'hugo',
+      'jekyll',
+      'ghost',
+      'prestashop',
+      'typo3',
+      'joomla',
+      'craft-cms',
+      'mediawiki',
+      'laravel',
+      'nextjs',
+      'nuxtjs',
+      'gatsby',
+      'react',
+      'vue',
+      'angular',
+      'svelte',
+      'astro',
+      'ember',
+      'backbone',
+      'bootstrap',
+      'lodash',
+      'tailwind',
+      'firebase',
+      'shopify',
+      'woocommerce',
+      'bigcommerce',
+      'google-fonts',
+      'google-analytics',
+      'plausible',
+      'google-tag-manager',
+      'matomo',
+      'segment',
+      'htmx',
+      'turbo',
+      'stimulus',
+      'alpinejs',
+      'd3',
+      'popperjs',
+    ],
+  },
+
+  {
+    name: 'corpus-B-shopify-cloudflare-ga',
+    description: 'Corpus B: Shopify storefront on Cloudflare with direct Google Analytics',
+    category: 'realworld',
+    snapshot: makeSnapshot({
+      headers: [{ name: 'Server', value: 'cloudflare' }],
+      links: [
+        {
+          rel: 'stylesheet',
+          href: 'https://cdn.shopify.com/s/files/1/theme.css',
+          content: '<link>',
+        },
+      ],
+      scripts: [{ src: 'https://www.google-analytics.com/analytics.js', content: '' }],
+    }),
+    expected: ['cloudflare', 'shopify', 'google-analytics'],
+    forbidden: [
+      'google-fonts',
+      'google-tag-manager',
+      'nginx',
+      'apache',
+      'iis',
+      'caddy',
+      'openresty',
+      'litespeed',
+      'tomcat',
+      'vercel',
+      'fastly',
+    ],
+  },
+
+  {
+    name: 'corpus-C-react-next-vercel',
+    description: 'Corpus C: React + Next.js rendered on Vercel',
+    category: 'realworld',
+    snapshot: makeSnapshot({
+      headers: [{ name: 'Server', value: 'vercel' }],
+      metaTags: [{ name: 'generator', content: 'Next.js' }],
+      scripts: [
+        { src: 'https://example.com/_next/static/chunks/main.js', content: '' },
+        {
+          src: null,
+          content: 'window.__NEXT_DATA__ = {"props":{}}; import ReactDOM from "react-dom";',
+        },
+      ],
+    }),
+    expected: ['vercel', 'nextjs', 'react'],
+    forbidden: ['nuxtjs', 'gatsby', 'vue', 'angular', 'svelte', 'astro', 'laravel', 'express'],
+  },
+
+  {
+    name: 'corpus-D-vue-nuxt',
+    description: 'Corpus D: Vue.js + Nuxt.js SSR build',
+    category: 'realworld',
+    snapshot: makeSnapshot({
+      metaTags: [{ name: 'generator', content: 'Nuxt.js' }],
+      scripts: [
+        { src: 'https://example.com/_nuxt/entry-abc.js', content: '' },
+        { src: null, content: 'Vue.createApp({ el: "#app" });' },
+      ],
+    }),
+    expected: ['nuxtjs', 'vue'],
+    forbidden: ['nextjs', 'react', 'angular', 'svelte', 'astro', 'laravel', 'express', 'gatsby'],
+  },
+
+  {
+    name: 'corpus-E-drupal-apache-php',
+    description: 'Corpus E: Drupal site on Apache HTTPD behind PHP',
+    category: 'realworld',
+    snapshot: makeSnapshot({
+      headers: [
+        { name: 'Server', value: 'Apache/2.4.41 (Debian)' },
+        { name: 'X-Powered-By', value: 'PHP/8.2' },
+      ],
+      scripts: [{ src: null, content: 'window.drupalSettings = {"path":"/"};' }],
+    }),
+    expected: ['apache', 'php', 'drupal'],
+    forbidden: [
+      'nginx',
+      'iis',
+      'caddy',
+      'openresty',
+      'litespeed',
+      'tomcat',
+      'cloudflare',
+      'vercel',
+      'fastly',
+      'express',
+      'wordpress',
+      'hugo',
+      'jekyll',
+      'ghost',
+      'prestashop',
+      'typo3',
+      'joomla',
+      'craft-cms',
+      'mediawiki',
+      'laravel',
+      'nextjs',
+      'nuxtjs',
+      'gatsby',
+      'react',
+      'vue',
+      'angular',
+      'svelte',
+      'astro',
+      'ember',
+      'backbone',
+      'bootstrap',
+    ],
+  },
+
+  {
+    name: 'corpus-F-static-empty',
+    description: 'Corpus F: static site with no recognizable technology fingerprints',
+    category: 'negative',
+    snapshot: makeSnapshot({
+      headers: [{ name: 'Server', value: 'Unknown' }],
+      metaTags: [{ name: 'description', content: 'Just a static page' }],
+    }),
+    expected: [],
+    forbidden: [],
   },
 ];

@@ -537,3 +537,289 @@ describe('technology-collision', () => {
     });
   });
 });
+
+describe('technology-collision — Step 68 technologies', () => {
+  const makePipeline = () => makeFullPipeline();
+
+  describe('Google Tag Manager ↔ Google Analytics', () => {
+    it('detects GTM from googletagmanager.com without implying Google Analytics', () => {
+      const snapshot = makeSnapshot({
+        html: {
+          title: 'Site',
+          description: null,
+          metaTags: [],
+          scripts: [{ src: 'https://www.googletagmanager.com/gtag/js?id=GTM-XXXX', content: '' }],
+          links: [],
+        },
+      });
+      const techIds = makePipeline()
+        .detect(snapshot)
+        .map((d) => d.technology.id);
+      expect(techIds).toContain('google-tag-manager');
+      expect(techIds).not.toContain('google-analytics');
+    });
+
+    it('detects GA from google-analytics.com without implying GTM', () => {
+      const snapshot = makeSnapshot({
+        html: {
+          title: 'Site',
+          description: null,
+          metaTags: [],
+          scripts: [{ src: 'https://www.google-analytics.com/analytics.js', content: '' }],
+          links: [],
+        },
+      });
+      const techIds = makePipeline()
+        .detect(snapshot)
+        .map((d) => d.technology.id);
+      expect(techIds).toContain('google-analytics');
+      expect(techIds).not.toContain('google-tag-manager');
+    });
+  });
+
+  describe('Vercel vs other Server-header technologies', () => {
+    it('detects Vercel from a bare "vercel" Server header without server collisions', () => {
+      const snapshot = makeSnapshot({
+        http: {
+          statusCode: createHttpStatus(200),
+          headers: [{ name: 'Server', value: 'vercel' }],
+          contentType: 'text/html',
+          finalUrl: createUrl('https://example.com'),
+        },
+        html: { title: 'Site', description: null, metaTags: [], scripts: [], links: [] },
+      });
+      const techIds = makePipeline()
+        .detect(snapshot)
+        .map((d) => d.technology.id);
+      expect(techIds).toContain('vercel');
+      expect(techIds).not.toContain('nginx');
+      expect(techIds).not.toContain('apache');
+      expect(techIds).not.toContain('caddy');
+      expect(techIds).not.toContain('cloudflare');
+      expect(techIds).not.toContain('fastly');
+    });
+  });
+
+  describe('Caddy / OpenResty / Tomcat server-header precision', () => {
+    it('detects Caddy without firing nginx/apache/iis', () => {
+      const snapshot = makeSnapshot({
+        http: {
+          statusCode: createHttpStatus(200),
+          headers: [{ name: 'Server', value: 'Caddy/v2.8.4 (Fedora)' }],
+          contentType: 'text/html',
+          finalUrl: createUrl('https://example.com'),
+        },
+        html: { title: 'Site', description: null, metaTags: [], scripts: [], links: [] },
+      });
+      const techIds = makePipeline()
+        .detect(snapshot)
+        .map((d) => d.technology.id);
+      expect(techIds).toContain('caddy');
+      expect(techIds).not.toContain('nginx');
+      expect(techIds).not.toContain('apache');
+      expect(techIds).not.toContain('iis');
+    });
+
+    it('detects OpenResty without firing nginx', () => {
+      const snapshot = makeSnapshot({
+        http: {
+          statusCode: createHttpStatus(200),
+          headers: [{ name: 'Server', value: 'openresty/1.15.8.22' }],
+          contentType: 'text/html',
+          finalUrl: createUrl('https://example.com'),
+        },
+        html: { title: 'Site', description: null, metaTags: [], scripts: [], links: [] },
+      });
+      const techIds = makePipeline()
+        .detect(snapshot)
+        .map((d) => d.technology.id);
+      expect(techIds).toContain('openresty');
+      expect(techIds).not.toContain('nginx');
+    });
+
+    it('detects Tomcat from Apache-Coyote without firing nginx or iis', () => {
+      const snapshot = makeSnapshot({
+        http: {
+          statusCode: createHttpStatus(200),
+          headers: [{ name: 'Server', value: 'Apache-Coyote/1.45' }],
+          contentType: 'text/html',
+          finalUrl: createUrl('https://example.com'),
+        },
+        html: { title: 'Site', description: null, metaTags: [], scripts: [], links: [] },
+      });
+      const techIds = makePipeline()
+        .detect(snapshot)
+        .map((d) => d.technology.id);
+      expect(techIds).toContain('tomcat');
+      expect(techIds).not.toContain('nginx');
+      expect(techIds).not.toContain('iis');
+    });
+  });
+
+  describe('Fastly vs Cloudflare (Via vs Server header)', () => {
+    it('detects Fastly from a Via header without firing Cloudflare', () => {
+      const snapshot = makeSnapshot({
+        http: {
+          statusCode: createHttpStatus(200),
+          headers: [{ name: 'Via', value: '1.1 varnish, 1.1 fastly-T' }],
+          contentType: 'text/html',
+          finalUrl: createUrl('https://example.com'),
+        },
+        html: { title: 'Site', description: null, metaTags: [], scripts: [], links: [] },
+      });
+      const techIds = makePipeline()
+        .detect(snapshot)
+        .map((d) => d.technology.id);
+      expect(techIds).toContain('fastly');
+      expect(techIds).not.toContain('cloudflare');
+    });
+  });
+
+  describe('D3 vs jQuery / Lodash', () => {
+    it('detects D3 from a d3.v7 URL without firing jQuery or Lodash', () => {
+      const snapshot = makeSnapshot({
+        html: {
+          title: 'Site',
+          description: null,
+          metaTags: [],
+          scripts: [{ src: 'https://d3js.org/d3.v7.min.js', content: '' }],
+          links: [],
+        },
+      });
+      const techIds = makePipeline()
+        .detect(snapshot)
+        .map((d) => d.technology.id);
+      expect(techIds).toContain('d3');
+      expect(techIds).not.toContain('jquery');
+      expect(techIds).not.toContain('lodash');
+    });
+
+    it('does not detect D3 from a jQuery URL', () => {
+      const snapshot = makeSnapshot({
+        html: {
+          title: 'Site',
+          description: null,
+          metaTags: [],
+          scripts: [{ src: 'https://code.jquery.com/jquery-3.7.1.min.js', content: '' }],
+          links: [],
+        },
+      });
+      const techIds = makePipeline()
+        .detect(snapshot)
+        .map((d) => d.technology.id);
+      expect(techIds).not.toContain('d3');
+      expect(techIds).toContain('jquery');
+    });
+  });
+
+  describe('Ember / Backbone content-shape precision', () => {
+    it('detects Ember only when the "ember." shape is present', () => {
+      const pipeline = makePipeline();
+      const withDot = pipeline
+        .detect(
+          makeSnapshot({
+            html: {
+              title: 'S',
+              description: null,
+              metaTags: [],
+              scripts: [
+                { src: null, content: 'Ember.VERSION = "4.12.0"; new Ember.Application();' },
+              ],
+              links: [],
+            },
+          }),
+        )
+        .map((d) => d.technology.id);
+      expect(withDot).toContain('ember');
+
+      const noDot = pipeline
+        .detect(
+          makeSnapshot({
+            html: {
+              title: 'S',
+              description: null,
+              metaTags: [],
+              scripts: [{ src: null, content: 'var myEmber = require("x");' }],
+              links: [],
+            },
+          }),
+        )
+        .map((d) => d.technology.id);
+      expect(noDot).not.toContain('ember');
+    });
+
+    it('detects Backbone only when the "backbone." shape is present', () => {
+      const pipeline = makePipeline();
+      const withDot = pipeline
+        .detect(
+          makeSnapshot({
+            html: {
+              title: 'S',
+              description: null,
+              metaTags: [],
+              scripts: [
+                {
+                  src: null,
+                  content: 'var app = new Backbone.Router({}); Backbone.View.extend();',
+                },
+              ],
+              links: [],
+            },
+          }),
+        )
+        .map((d) => d.technology.id);
+      expect(withDot).toContain('backbone');
+
+      const noDot = pipeline
+        .detect(
+          makeSnapshot({
+            html: {
+              title: 'S',
+              description: null,
+              metaTags: [],
+              scripts: [{ src: null, content: 'var x = "backbone framework";' }],
+              links: [],
+            },
+          }),
+        )
+        .map((d) => d.technology.id);
+      expect(noDot).not.toContain('backbone');
+    });
+  });
+
+  describe('Matomo ↔ Google Analytics and BigCommerce ↔ Shopify', () => {
+    it('detects Matomo from matomo.js without implying GA', () => {
+      const snapshot = makeSnapshot({
+        html: {
+          title: 'S',
+          description: null,
+          metaTags: [],
+          scripts: [{ src: 'https://analytics.example.com/matomo.js', content: '' }],
+          links: [],
+        },
+      });
+      const techIds = makePipeline()
+        .detect(snapshot)
+        .map((d) => d.technology.id);
+      expect(techIds).toContain('matomo');
+      expect(techIds).not.toContain('google-analytics');
+    });
+
+    it('detects BigCommerce from bcapp.com without implying Shopify', () => {
+      const snapshot = makeSnapshot({
+        html: {
+          title: 'S',
+          description: null,
+          metaTags: [],
+          scripts: [{ src: 'https://cdn.bcapp.com/storefront/main.js', content: '' }],
+          links: [],
+        },
+      });
+      const techIds = makePipeline()
+        .detect(snapshot)
+        .map((d) => d.technology.id);
+      expect(techIds).toContain('bigcommerce');
+      expect(techIds).not.toContain('shopify');
+    });
+  });
+});

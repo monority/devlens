@@ -48,7 +48,6 @@ import type {
   Detection,
   SiteSnapshot,
   Technology,
-  ResourceType,
   Evidence,
   TechnologyVersion,
 } from '@devlens/core';
@@ -56,27 +55,9 @@ import { createConfidence, createDetection } from '@devlens/core';
 import type { Detector } from './detector.js';
 import { getTechnology } from './technology-catalog.js';
 import { getEvidenceKey } from './evidence-key.js';
-import { extractVersion, type VersionExtraction } from './version.js';
-
-/**
- * A single resource-based detection signature.
- */
-interface ResourceSignature {
-  /** The `Resource.type` this signature applies to. */
-  readonly matchType: ResourceType;
-  /** Case-insensitive substring to search for in the resource `content`. */
-  readonly matchContent: string;
-  /** Technology ID — lookup key in {@link TECHNOLOGY_CATALOG}. */
-  readonly technologyId: string;
-  /** Confidence score (0–100). */
-  readonly confidence: number;
-  /**
-   * Optional, declarative version-extraction rule. When present, the
-   * version is extracted from the matched resource content. `null` when
-   * absent (the signature declares no version extraction).
-   */
-  readonly version?: VersionExtraction;
-}
+import { extractVersion } from './version.js';
+import { signaturesFor } from './catalog/index.js';
+import type { ResourceSignature } from './catalog/types.js';
 
 /**
  * A single match result for a signature.
@@ -89,56 +70,13 @@ interface Match {
 }
 
 /**
- * The supported resource signatures.
- *
- * Ordered so that more specific fingerprints are processed before
- * more general ones. Multiple signatures may match the same technology
- * (e.g. `wp-admin` and `wp-includes` both → WordPress); the detector
- * merges them into a single detection with the highest confidence and
- * combined evidence.
+ * The supported resource signatures, sourced declaratively from the
+ * per-technology catalog (`catalog/technologies/*.ts`). Multiple signatures
+ * may match the same technology (e.g. `wp-admin` and `--wp--preset--` both
+ * → WordPress); the detector merges them into a single detection with the
+ * highest confidence and combined evidence.
  */
-const SIGNATURES: readonly ResourceSignature[] = [
-  // ── WordPress (robots.txt) ──────────────────────────────────────
-  {
-    matchType: 'robots',
-    matchContent: 'wp-admin',
-    technologyId: 'wordpress',
-    confidence: 90,
-  },
-  {
-    matchType: 'robots',
-    matchContent: 'wp-includes',
-    technologyId: 'wordpress',
-    confidence: 90,
-  },
-  // ── WordPress (CSS — very specific block-editor patterns) ───────
-  {
-    matchType: 'css',
-    matchContent: '--wp--preset--',
-    technologyId: 'wordpress',
-    confidence: 95,
-  },
-  {
-    matchType: 'css',
-    matchContent: 'wp-block-',
-    technologyId: 'wordpress',
-    confidence: 90,
-  },
-  // ── Tailwind CSS ───────────────────────────────────────────────
-  {
-    matchType: 'css',
-    matchContent: '@tailwind',
-    technologyId: 'tailwind',
-    confidence: 85,
-  },
-  // ── Firebase (manifest) ─────────────────────────────────────────
-  {
-    matchType: 'manifest',
-    matchContent: 'gcm_sender_id',
-    technologyId: 'firebase',
-    confidence: 95,
-  },
-];
+const SIGNATURES: readonly ResourceSignature[] = signaturesFor('resource');
 
 /**
  * A `Detector` that identifies technologies from observed resource

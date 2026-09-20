@@ -46,115 +46,16 @@ import type { Detection, SiteSnapshot } from '@devlens/core';
 import { createConfidence, createDetection } from '@devlens/core';
 import type { Detector } from './detector.js';
 import { getTechnology } from './technology-catalog.js';
-import { extractVersion, type VersionExtraction } from './version.js';
+import { extractVersion } from './version.js';
+import { signaturesFor } from './catalog/index.js';
+import type { ContentScriptSignature } from './catalog/types.js';
 
 /**
- * A single content-based detection signature.
+ * The supported inline script content signatures, sourced declaratively
+ * from the per-technology catalog (`catalog/technologies/*.ts`). The
+ * detector's `detect()` matching logic is unchanged.
  */
-interface ContentScriptSignature {
-  /** Case-insensitive substring to search for in inline script content. */
-  readonly matchContent: string;
-  /** Technology ID — lookup key in {@link TECHNOLOGY_CATALOG}. */
-  readonly technologyId: string;
-  /** Confidence score (0–100). */
-  readonly confidence: number;
-  /**
-   * Optional, declarative version-extraction rule. When present, the
-   * version is extracted from the matched inline script content. `null`
-   * when absent (the signature declares no version extraction).
-   */
-  readonly version?: VersionExtraction;
-}
-
-/**
- * The supported inline script content signatures.
- *
- * Ordered so that higher-confidence fingerprints are processed before
- * lower-confidence ones within each technology. Within the Svelte pair
- * (`__SVELTE__` before `SvelteComponent`), ordering ensures the strongest
- * signature is used as evidence when both appear.
- */
-const SIGNATURES: readonly ContentScriptSignature[] = [
-  // ── Next.js ─────────────────────────────────────────────────────
-  {
-    matchContent: '__NEXT_DATA__',
-    technologyId: 'nextjs',
-    confidence: 95,
-  },
-  {
-    matchContent: 'next/router',
-    technologyId: 'nextjs',
-    confidence: 90,
-  },
-  {
-    matchContent: 'next/navigation',
-    technologyId: 'nextjs',
-    confidence: 90,
-  },
-  // ── React ───────────────────────────────────────────────────────
-  {
-    matchContent: 'react-dom',
-    technologyId: 'react',
-    confidence: 90,
-  },
-  {
-    matchContent: 'ReactDOM',
-    technologyId: 'react',
-    confidence: 90,
-  },
-  // ── Vue ─────────────────────────────────────────────────────────
-  {
-    matchContent: 'Vue.createApp',
-    technologyId: 'vue',
-    confidence: 95,
-  },
-  // ── Angular ─────────────────────────────────────────────────────
-  {
-    matchContent: '@angular/core',
-    technologyId: 'angular',
-    confidence: 95,
-  },
-  {
-    matchContent: 'platformBrowserDynamic',
-    technologyId: 'angular',
-    confidence: 90,
-  },
-  // ── Svelte ──────────────────────────────────────────────────────
-  {
-    matchContent: '__SVELTE__',
-    technologyId: 'svelte',
-    confidence: 95,
-  },
-  {
-    matchContent: 'SvelteComponent',
-    technologyId: 'svelte',
-    confidence: 90,
-  },
-  // ── Astro ───────────────────────────────────────────────────────
-  {
-    matchContent: 'astro-island',
-    technologyId: 'astro',
-    confidence: 95,
-  },
-  // ── Drupal ───────────────────────────────────────────────────────
-  {
-    matchContent: 'drupalSettings',
-    technologyId: 'drupal',
-    confidence: 90,
-  },
-  // ── Laravel (Blade-rendered pages expose window.Laravel) ───────
-  {
-    matchContent: 'window.Laravel',
-    technologyId: 'laravel',
-    confidence: 90,
-  },
-  // ── Webflow ─────────────────────────────────────────────────────
-  {
-    matchContent: 'Webflow.',
-    technologyId: 'webflow',
-    confidence: 90,
-  },
-];
+const SIGNATURES: readonly ContentScriptSignature[] = signaturesFor('content_script');
 
 /**
  * A `Detector` that identifies technologies from inline `<script>` content

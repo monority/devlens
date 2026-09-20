@@ -40,105 +40,16 @@ import type { Detection, SiteSnapshot } from '@devlens/core';
 import { createConfidence, createDetection, createUrl } from '@devlens/core';
 import type { Detector } from './detector.js';
 import { getTechnology } from './technology-catalog.js';
-import { extractVersion, type VersionExtraction } from './version.js';
+import { extractVersion } from './version.js';
+import { signaturesFor } from './catalog/index.js';
+import type { ScriptUrlSignature } from './catalog/types.js';
 
 /**
- * A single script-URL-based detection signature.
+ * The supported script URL signatures, sourced declaratively from the
+ * per-technology catalog (`catalog/technologies/*.ts`). The detector's
+ * `detect()` matching logic is unchanged.
  */
-interface ScriptUrlSignature {
-  /** Case-insensitive substring to search for in the script src URL. */
-  readonly matchUrl: string;
-  /** Technology ID — lookup key in {@link TECHNOLOGY_CATALOG}. */
-  readonly technologyId: string;
-  /** Confidence score (0–100). */
-  readonly confidence: number;
-  /**
-   * Optional, declarative version-extraction rule. When present, the
-   * version is extracted from the matched script URL (the same URL that
-   * produced this detection's evidence). `null` when absent.
-   */
-  readonly version?: VersionExtraction;
-}
-
-/**
- * The supported script URL signatures.
- *
- * Ordered so that more specific fingerprints are processed before
- * more general ones. Within the WordPress pair (`wp-content` before
- * `wp-includes`), ordering determines which URL is used as evidence
- * when both appear (though both produce the same `wordpress` detection).
- */
-const SIGNATURES: readonly ScriptUrlSignature[] = [
-  // ── CMS ───────────────────────────────────────────────────────
-  {
-    matchUrl: 'wp-content',
-    technologyId: 'wordpress',
-    confidence: 90,
-  },
-  {
-    matchUrl: 'wp-includes',
-    technologyId: 'wordpress',
-    confidence: 90,
-  },
-  // ── JS Frameworks ─────────────────────────────────────────────
-  {
-    matchUrl: '/_next/',
-    technologyId: 'nextjs',
-    confidence: 90,
-  },
-  {
-    matchUrl: '/_nuxt/',
-    technologyId: 'nuxtjs',
-    confidence: 90,
-  },
-  {
-    matchUrl: 'gatsby',
-    technologyId: 'gatsby',
-    confidence: 85,
-  },
-  // ── Libraries ─────────────────────────────────────────────────
-  {
-    matchUrl: 'jquery',
-    technologyId: 'jquery',
-    confidence: 85,
-    version: {
-      source: 'matchedValue',
-      rule: { pattern: /jquery-(\d+(?:\.\d+){0,2})/i },
-    },
-  },
-  {
-    matchUrl: 'bootstrap.',
-    technologyId: 'bootstrap',
-    confidence: 80,
-  },
-  {
-    matchUrl: 'lodash',
-    technologyId: 'lodash',
-    confidence: 80,
-    version: {
-      source: 'matchedValue',
-      rule: { pattern: /lodash[-@/](\d+(?:\.\d+){0,2})/ },
-    },
-  },
-  // ── WooCommerce ───────────────────────────────────────────────
-  {
-    matchUrl: 'woocommerce',
-    technologyId: 'woocommerce',
-    confidence: 85,
-  },
-  // ── Google Analytics ─────────────────────────────────────────
-  {
-    matchUrl: 'google-analytics',
-    technologyId: 'google-analytics',
-    confidence: 85,
-  },
-  // ── Plausible Analytics ────────────────────────────────────
-  {
-    matchUrl: 'plausible.io',
-    technologyId: 'plausible',
-    confidence: 90,
-  },
-];
+const SIGNATURES: readonly ScriptUrlSignature[] = signaturesFor('script_url');
 
 /**
  * A `Detector` that identifies technologies from external script URLs

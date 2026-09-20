@@ -34,6 +34,31 @@ export {
   getTechnology,
 } from './technology-catalog.js';
 
+/**
+ * Declarative technology catalog (Step 68). `TECHNOLOGY_DEFINITIONS` is the
+ * single source of truth for every detected technology: its metadata *and*
+ * all of its signatures across every observable source. `signaturesFor`
+ * is what the six detectors use to source their signature tables.
+ */
+export {
+  TECHNOLOGY_DEFINITIONS,
+  findDefinition,
+  signaturesFor,
+  validateCatalog,
+  validateDefinition,
+  validateDefinitions,
+} from './catalog/index.js';
+export type {
+  TechnologyDefinition,
+  HeaderSignature,
+  MetaTagSignature,
+  ScriptUrlSignature,
+  ContentScriptSignature,
+  ResourceSignature,
+  LinkSignature,
+  LinkMatchKind,
+} from './catalog/types.js';
+
 export { createProductionDetector } from './production-detector.js';
 
 // Declarative version-extraction primitives (reusable across the

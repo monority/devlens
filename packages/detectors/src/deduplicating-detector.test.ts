@@ -611,5 +611,55 @@ describe('DeduplicatingDetector', () => {
       expect(first[0]!.version).toBe(second[0]!.version);
       expect(first[0]!.version).toBe('6.4.2');
     });
+
+    it('Step 72 — surfaces versionConflict + provenance evidence on conflict', () => {
+      // Two disagreeing versioned detections for the same technology.
+      const detections = [
+        makeVersioned(
+          wpTech,
+          95,
+          [metaTagEvidence('generator', 'WordPress 6.4.2')],
+          createTechnologyVersion('6.4.2'),
+        ),
+        makeVersioned(
+          wpTech,
+          90,
+          [scriptUrlEvidence('https://example.com/wp-content/style.css')],
+          createTechnologyVersion('6.5.0'),
+        ),
+      ];
+      const result = new DeduplicatingDetector(makeMockDetector(detections)).detect(snapshot);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]!.version).toBeNull();
+      // Step 72 §11 — conflict is observable, version is refused (no fake).
+      expect(result[0]!.versionConflict).toBe(true);
+      // The disagreeing evidence is retained for explainability — never silenced.
+      expect(result[0]!.versionEvidence).toHaveLength(2);
+      expect(result[0]!.versionSource).toBeUndefined();
+    });
+
+    it('Step 72 — attaches versionSource + versionEvidence on agreement (single source)', () => {
+      // One versioned detection (meta) + one unversioned (header). The single
+      // agreeing observation yields a source + provenance, no conflict.
+      const detections = [
+        makeVersioned(wpTech, 95, [httpHeaderEvidence('Server', 'nginx/1.21')], null),
+        makeVersioned(
+          wpTech,
+          90,
+          [metaTagEvidence('generator', 'WordPress 6.4.2')],
+          createTechnologyVersion('6.4.2'),
+        ),
+      ];
+      const result = new DeduplicatingDetector(makeMockDetector(detections)).detect(snapshot);
+
+      expect(result[0]!.version).toBe('6.4.2');
+      expect(result[0]!.versionConflict).toBeUndefined();
+      expect(result[0]!.versionSource).toBe('meta');
+      expect(result[0]!.versionEvidence).toHaveLength(1);
+      expect(result[0]!.versionEvidence?.[0]).toEqual(
+        expect.objectContaining({ type: 'meta_tag' }),
+      );
+    });
   });
 });

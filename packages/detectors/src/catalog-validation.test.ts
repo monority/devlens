@@ -215,6 +215,44 @@ describe('validateDefinition — rejects malformed definitions', () => {
     } as unknown as TechnologyDefinition;
     expect(validateDefinition(def).some((e) => /invalid source/.test(e))).toBe(true);
   });
+
+  it('§26 — flags a version rule with an invalid normalize value', () => {
+    const def = {
+      ...baseDef,
+      headerSignatures: [
+        {
+          headerName: 'server',
+          matchValue: 'x',
+          technologyId: 'test-tech',
+          confidence: 90,
+          version: {
+            source: 'matchedValue',
+            rule: { pattern: /x/, normalize: 'bogus' as unknown as 'version' },
+          },
+        },
+      ],
+    } as unknown as TechnologyDefinition;
+    expect(validateDefinition(def).some((e) => /invalid normalize/.test(e))).toBe(true);
+  });
+
+  it('§26 — accepts a version rule with a valid normalize: "version"', () => {
+    const def = {
+      ...baseDef,
+      headerSignatures: [
+        {
+          headerName: 'server',
+          matchValue: 'x',
+          technologyId: 'test-tech',
+          confidence: 90,
+          version: {
+            source: 'matchedValue',
+            rule: { pattern: /(v?\\d+(?:\\.\\d+){0,2})/, normalize: 'version' },
+          },
+        },
+      ],
+    } as unknown as TechnologyDefinition;
+    expect(validateDefinition(def)).toEqual([]);
+  });
 });
 
 describe('validateDefinitions — cross-definition integrity', () => {

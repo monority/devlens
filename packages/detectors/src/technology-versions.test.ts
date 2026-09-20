@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createProductionDetector } from './production-detector.js';
-import type { SiteSnapshot } from '@devlens/core';
+import type { SiteSnapshot, Detection } from '@devlens/core';
 import {
   createUrl,
   createHostname,
@@ -40,6 +40,12 @@ function versionOf(snapshot: SiteSnapshot, id: string): string | null | undefine
     .detect(snapshot)
     .find((d) => d.technology.id === id);
   return detection?.version ?? null;
+}
+
+function detectionOf(snapshot: SiteSnapshot, id: string): Detection | undefined {
+  return createProductionDetector()
+    .detect(snapshot)
+    .find((d) => d.technology.id === id);
 }
 
 describe('Step 68 technology version extraction', () => {
@@ -173,5 +179,69 @@ describe('Step 68 technology version extraction', () => {
         'litespeed',
       ),
     ).toBeNull();
+  });
+});
+
+describe('Step 72 — version provenance (§15 §13 versionSource)', () => {
+  it('§15 — Angular version extracted from the @angular/core bundle resource content', () => {
+    const detection = detectionOf(
+      makeSnapshot({
+        resources: [
+          {
+            url: createUrl('https://example.com/main.js'),
+            type: 'script',
+            size: 200,
+            content: 'import { VERSION } from "@angular/core"; window.__NG__={ full: "16.2.0" };',
+            httpStatus: createHttpStatus(200),
+            contentType: 'application/javascript',
+          },
+        ],
+      }),
+      'angular',
+    );
+    expect(detection).toBeDefined();
+    expect(detection?.version).toBe('16.2.0');
+    // §72 — the resolved version's source modality is explainable.
+    expect(detection?.versionSource).toBe('resource_content');
+    expect(detection?.versionConflict).toBeUndefined();
+    expect(detection?.versionEvidence).toHaveLength(1);
+  });
+
+  it('§13 — a tech with no version signal surfaces no version provenance (no placeholder)', () => {
+    // LiteSpeed has no version rule; the detection carries no version,
+    // no conflict, no source, and no versionEvidence.
+    const detection = detectionOf(
+      makeSnapshot({
+        http: {
+          statusCode: createHttpStatus(200),
+          headers: [{ name: 'Server', value: 'LiteSpeed' }],
+          contentType: 'text/html',
+          finalUrl: createUrl('https://example.com'),
+        },
+      }),
+      'litespeed',
+    );
+    expect(detection).toBeDefined();
+    expect(detection?.version).toBeNull();
+    expect(detection?.versionConflict).toBeUndefined();
+    expect(detection?.versionSource).toBeUndefined();
+    expect(detection?.versionEvidence).toBeUndefined();
+  });
+
+  it('emits versionSource for an existing header-sourced tech (caddy)', () => {
+    const detection = detectionOf(
+      makeSnapshot({
+        http: {
+          statusCode: createHttpStatus(200),
+          headers: [{ name: 'Server', value: 'Caddy/v2.8.4 (Fedora)' }],
+          contentType: 'text/html',
+          finalUrl: createUrl('https://example.com'),
+        },
+      }),
+      'caddy',
+    );
+    expect(detection?.version).toBe('2.8.4');
+    expect(detection?.versionSource).toBe('header');
+    expect(detection?.versionConflict).toBeUndefined();
   });
 });

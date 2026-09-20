@@ -25,10 +25,15 @@
  * @see {@link CompositeDetector}
  */
 
-import type { Detection, SiteSnapshot, Evidence, TechnologyVersion } from '@devlens/core';
+import type { Detection, SiteSnapshot, Evidence } from '@devlens/core';
 import { createDetection } from '@devlens/core';
 import type { Detector } from './detector.js';
 import { getEvidenceKey } from './evidence-key.js';
+import {
+  collectVersionObservations,
+  resolveVersionConsensus,
+  type VersionConsensusResult,
+} from './version-consensus.js';
 
 /**
  * A {@link Detector} decorator that deduplicates technology detections
@@ -104,14 +109,25 @@ export class DeduplicatingDetector implements Detector {
       const group = groups.get(key)!;
       const representative = this.selectRepresentative(group);
       const mergedEvidence = this.mergeEvidence(group);
-      const version = this.selectVersion(group);
+      const consensus = this.selectVersion(group);
 
       result.push(
         createDetection(
           representative.technology,
           representative.confidence,
           mergedEvidence,
-          version,
+          consensus.version,
+          {
+            // Step 72 — version-intelligence provenance. Each field is included
+            // only when meaningful (conditional spreads) so a plain detection
+            // stays byte-identical to the pre-Step-72 shape and existing
+            // `toEqual` fixtures remain valid (§11/§13).
+            ...(consensus.conflict ? { versionConflict: consensus.conflict } : {}),
+            ...(consensus.source ? { versionSource: consensus.source } : {}),
+            ...(consensus.evidence && consensus.evidence.length > 0
+              ? { versionEvidence: [...consensus.evidence] }
+              : {}),
+          },
         ),
       );
     }
@@ -142,36 +158,24 @@ export class DeduplicatingDetector implements Detector {
 
   /**
    * Selects the technology version for a deduplicated detection, if any,
-   * applying the version-consistency rules:
+   * applying the version-consensus rules via Step-72's pure consensus
+   * engine ({@link resolveVersionConsensus}).
    *
-   * - The `version` is read **only** from detections in the group that
-   *   carry a non-null version (i.e. a tech-specific signature actually
-   *   extracted one from its evidence).
-   * - `null`/undefined versions are ignored — they mean "no version
-   *   extracted," not "this technology is at an unknown version."
-   * - If every versioned detection agrees on the same version string,
-   *   that version is kept.
-   * - If two versioned detections carry **different** version strings
-   *   (a conflict), the result is conservatively `null` — we do not
-   *   guess which is authoritative.
-   * - If no detection in the group has a version, the result is `null`.
+   * One {@link VersionObservation} is built per detection in the group that
+   * carries a version, pairing the version with the evidence that produced
+   * it and its source modality. The engine then applies:
    *
-   * This is a **consensus over the existing dedup group** — it introduces
-   * no new precedence ordering and never invents a version. It ensures a
-   * version extracted by any evidence source for a technology survives
-   * deduplication as long as all extractable versions agree.
+   * - the same version observed by every versioned detection → that version
+   *   (with provenance `source` + `versionEvidence` attached downstream);
+   * - disagreeing versions → `conflict: true`, `version = null` (the
+   *   disagreeing evidence is retained for explainability — Step 72 §11);
+   * - no versioned detection → `null`, no conflict.
+   *
+   * This is a **consensus over the existing dedup group** — it introduces no
+   * new precedence ordering and never invents a version (Step 72 §10/§11).
    */
-  private selectVersion(group: Detection[]): TechnologyVersion | null {
-    const distinct = new Set<string>();
-    for (const detection of group) {
-      if (detection.version) {
-        distinct.add(String(detection.version));
-      }
-    }
-    if (distinct.size === 1) {
-      return Array.from(distinct)[0] as TechnologyVersion;
-    }
-    return null;
+  private selectVersion(group: Detection[]): VersionConsensusResult {
+    return resolveVersionConsensus(collectVersionObservations(group));
   }
 
   /**

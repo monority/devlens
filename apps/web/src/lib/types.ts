@@ -85,7 +85,20 @@ export interface DetectionResponse {
    * signature. Optional (omitted/null when absent) — mirrors the API
    * contract where `version` is only present when known.
    */
-  version?: string;
+  version?: string | null;
+  /**
+   * Step 72 — `true` when multiple evidence sources extracted disagreeing
+   * versions and the consensus layer refused to pick one. The `version` is
+   * then `null` and the UI renders "version conflict detected" (§11/§19/§20).
+   * Absent when there is no conflict.
+   */
+  versionConflict?: boolean;
+  /**
+   * The evidence-source modality the resolved `version` came from, when
+   * unambiguous. Absent when there is no version or when sources disagree
+   * (Step 72 §4/§10).
+   */
+  versionSource?: string;
   /**
    * Step 69 — How this detection entered the result set. Omitted when
    * the detection is a direct observation; `'relationship'` means it was

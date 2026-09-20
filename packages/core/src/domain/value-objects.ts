@@ -154,6 +154,14 @@ export function createConfidence(value: number): Confidence {
 export type TechnologyVersion = string & { readonly _brand: 'TechnologyVersion' };
 
 /**
+ * Versions that carry no actual version information (Step 72 §9). A
+ * captured token such as `latest`, `unknown`, or `current` is rejected at
+ * the boundary — a technology's version must be an observable, concrete
+ * value, never a placeholder that would surface as a fabricated version.
+ */
+const RESERVED_VERSION_WORDS = new Set(['latest', 'unknown', 'current']);
+
+/**
  * Creates a {@link TechnologyVersion} from a raw extracted string.
  *
  * The value is validated at this boundary so that no malformed version
@@ -172,6 +180,9 @@ export function createTechnologyVersion(value: string): TechnologyVersion {
   const trimmed = value.trim();
   if (trimmed.length === 0) {
     throw new Error('TechnologyVersion must not be empty');
+  }
+  if (RESERVED_VERSION_WORDS.has(trimmed.toLowerCase())) {
+    throw new Error(`TechnologyVersion must not be a reserved placeholder word (${trimmed})`);
   }
   if (trimmed.length > 64) {
     throw new Error('TechnologyVersion must be at most 64 characters');

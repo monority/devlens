@@ -296,6 +296,11 @@ export function validateDefinition(def: TechnologyDefinition, knownIds?: Set<str
       if (!(v.rule?.pattern instanceof RegExp)) {
         errors.push(`Technology "${def.id}" has a version rule without a RegExp pattern`);
       }
+      if (v.rule?.normalize !== undefined && v.rule.normalize !== 'version') {
+        errors.push(
+          `Technology "${def.id}" has a version rule with invalid normalize "${String(v.rule.normalize)}"`,
+        );
+      }
       if (
         v.rule?.captureGroup !== undefined &&
         (!Number.isInteger(v.rule.captureGroup) || v.rule.captureGroup < 0)

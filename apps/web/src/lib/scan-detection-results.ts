@@ -106,6 +106,9 @@ export function getScanDetectionResults(detections: DetectionResponse[]): Detect
       technology: tech,
       confidence: detection.confidence,
       evidence,
+      // Version is omitted when absent (exactOptionalPropertyTypes), so
+      // callers can rely on "present ⇒ known version".
+      ...(detection.version ? { version: detection.version } : {}),
     });
   }
 

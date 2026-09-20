@@ -135,6 +135,53 @@ export function createConfidence(value: number): Confidence {
   return value as Confidence;
 }
 
+// ─── Technology Version ──────────────────────────────────────────
+
+/**
+ * An optional technology version extracted from evidence (e.g.
+ * `1.21.6` from `Server: nginx/1.21.6`, or `6.4.2` from a WordPress
+ * generator meta tag).
+ *
+ * Branded to distinguish it from arbitrary strings — a version is only
+ * ever constructed through {@link createTechnologyVersion}, which enforces
+ * the domain invariants below. This prevents malformed or fabricated
+ * versions from entering a {@link Detection}.
+ *
+ * Invariant: non-empty (after trimming), single-line, and at most 64
+ * characters. No format is enforced beyond that — version strings are
+ * intentionally allowed to vary (e.g. `10.0`, `8.2.10`, `4.17.21`).
+ */
+export type TechnologyVersion = string & { readonly _brand: 'TechnologyVersion' };
+
+/**
+ * Creates a {@link TechnologyVersion} from a raw extracted string.
+ *
+ * The value is validated at this boundary so that no malformed version
+ * can enter the domain model:
+ * - must be a string
+ * - must be non-empty after trimming surrounding whitespace
+ * - must be a single line (no tabs / newlines / carriage returns)
+ * - must be at most 64 characters long
+ *
+ * @throws {Error} if any invariant is violated.
+ */
+export function createTechnologyVersion(value: string): TechnologyVersion {
+  if (typeof value !== 'string') {
+    throw new Error('TechnologyVersion must be a string');
+  }
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    throw new Error('TechnologyVersion must not be empty');
+  }
+  if (trimmed.length > 64) {
+    throw new Error('TechnologyVersion must be at most 64 characters');
+  }
+  if (/[\r\n\t]/.test(trimmed)) {
+    throw new Error('TechnologyVersion must be a single line');
+  }
+  return trimmed as TechnologyVersion;
+}
+
 // ─── HTTP Status ──────────────────────────────────────────────────
 
 /**

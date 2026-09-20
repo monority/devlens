@@ -400,4 +400,64 @@ describe('ScriptUrlDetector', () => {
       expect(detections).toEqual([]);
     });
   });
+
+  describe('version extraction', () => {
+    it('extracts the jQuery version from the script URL', () => {
+      const snapshot = makeSnapshot([
+        { src: 'https://code.jquery.com/jquery-3.7.1.min.js', content: '' },
+      ]);
+      const d = detector.detect(snapshot)[0]!;
+      expect(d.version).toBe('3.7.1');
+    });
+
+    it('extracts a two-part jQuery version', () => {
+      const snapshot = makeSnapshot([
+        { src: 'https://code.jquery.com/jquery-3.4.1.js', content: '' },
+      ]);
+      const d = detector.detect(snapshot)[0]!;
+      expect(d.version).toBe('3.4.1');
+    });
+
+    it('extracts the Lodash version from an `@`-style CDN URL', () => {
+      const snapshot = makeSnapshot([
+        { src: 'https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js', content: '' },
+      ]);
+      const d = detector.detect(snapshot)[0]!;
+      expect(d.version).toBe('4.17.21');
+    });
+
+    it('extracts the Lodash version from a slash-style URL', () => {
+      const snapshot = makeSnapshot([
+        { src: 'https://cdn.example.com/lodash/4.17.21/lodash.min.js', content: '' },
+      ]);
+      const d = detector.detect(snapshot)[0]!;
+      expect(d.version).toBe('4.17.21');
+    });
+
+    it('yields null version when jQuery has no version in the URL', () => {
+      const snapshot = makeSnapshot([{ src: 'https://example.com/jquery.min.js', content: '' }]);
+      const d = detector.detect(snapshot)[0]!;
+      expect(d.technology.id).toBe('jquery');
+      expect(d.version).toBeNull();
+    });
+
+    it('does not extract a version for Bootstrap (no version rule)', () => {
+      const snapshot = makeSnapshot([
+        {
+          src: 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/bootstrap.bundle.min.js',
+          content: '',
+        },
+      ]);
+      const d = detector.detect(snapshot)[0]!;
+      expect(d.version).toBeNull();
+    });
+
+    it('does not extract a version for Next.js (no version rule)', () => {
+      const snapshot = makeSnapshot([
+        { src: 'https://example.com/_next/static/chunks/main.js', content: '' },
+      ]);
+      const d = detector.detect(snapshot)[0]!;
+      expect(d.version).toBeNull();
+    });
+  });
 });

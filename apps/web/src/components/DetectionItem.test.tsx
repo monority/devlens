@@ -390,3 +390,64 @@ describe('DetectionItem — Step 39 explainability', () => {
     expect(poweredByPos).toBeLessThan(scriptPos);
   });
 });
+
+describe('DetectionItem — version rendering', () => {
+  const makeDetection = (overrides: Partial<DetectionResponse> = {}): DetectionResponse => ({
+    technology: { id: 'nginx', name: 'nginx', category: 'server' },
+    confidence: 95,
+    evidence: [{ type: 'http_header', name: 'Server', value: 'nginx/1.21.6' }],
+    ...overrides,
+  });
+
+  it('renders the version when the detection carries one', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, {
+        detection: makeDetection({ version: '1.21.6' }),
+        index: 0,
+      }),
+    );
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('Version: 1.21.6');
+  });
+
+  it('omits the version entirely when the detection has no version', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, { detection: makeDetection(), index: 0 }),
+    );
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).not.toContain('Version:');
+  });
+
+  it('never renders a version with a percent suffix (version is not a probability)', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, {
+        detection: makeDetection({ version: '6.4.2' }),
+        index: 0,
+      }),
+    );
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('Version: 6.4.2');
+    expect(cleaned).not.toContain('6.4.2%');
+    expect(cleaned).not.toContain('Version: 6.4.2%');
+  });
+
+  it('version is subordinate to technology name, confidence, and evidence', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, {
+        detection: makeDetection({ version: '1.21.6' }),
+        index: 0,
+      }),
+    );
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // Primary signals still render...
+    expect(cleaned).toContain('nginx');
+    expect(cleaned).toContain('Confidence: 95');
+    expect(cleaned).toContain('HTTP Header');
+    // ...and the version renders alongside them.
+    expect(cleaned).toContain('Version: 1.21.6');
+  });
+});

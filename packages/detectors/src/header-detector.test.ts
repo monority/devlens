@@ -298,4 +298,68 @@ describe('HeaderDetector', () => {
       }
     });
   });
+
+  describe('version extraction', () => {
+    it('extracts the nginx version from the Server header', () => {
+      const snapshot = makeSnapshot([{ name: 'Server', value: 'nginx/1.21.6' }]);
+      const d = detector.detect(snapshot)[0]!;
+      expect(d.version).toBe('1.21.6');
+    });
+
+    it('extracts nginx version when the token has a trailing OS bracket', () => {
+      const snapshot = makeSnapshot([{ name: 'Server', value: 'nginx/1.25.2 (Ubuntu)' }]);
+      const d = detector.detect(snapshot)[0]!;
+      expect(d.version).toBe('1.25.2');
+    });
+
+    it('extracts the Apache version (case-insensitive value match)', () => {
+      const snapshot = makeSnapshot([{ name: 'Server', value: 'Apache/2.4.52 (Debian)' }]);
+      const d = detector.detect(snapshot)[0]!;
+      expect(d.version).toBe('2.4.52');
+    });
+
+    it('extracts the IIS version', () => {
+      const snapshot = makeSnapshot([{ name: 'Server', value: 'Microsoft-IIS/10.0' }]);
+      const d = detector.detect(snapshot)[0]!;
+      expect(d.version).toBe('10.0');
+    });
+
+    it('extracts the PHP version from X-Powered-By', () => {
+      const snapshot = makeSnapshot([{ name: 'X-Powered-By', value: 'PHP/8.1' }]);
+      const d = detector.detect(snapshot)[0]!;
+      expect(d.version).toBe('8.1');
+    });
+
+    it('extracts a multi-part PHP version', () => {
+      const snapshot = makeSnapshot([{ name: 'X-Powered-By', value: 'PHP/8.2.10' }]);
+      const d = detector.detect(snapshot)[0]!;
+      expect(d.version).toBe('8.2.10');
+    });
+
+    it('does not extract a version for Express (no version rule)', () => {
+      const snapshot = makeSnapshot([{ name: 'X-Powered-By', value: 'Express' }]);
+      const d = detector.detect(snapshot)[0]!;
+      expect(d.version).toBeNull();
+    });
+
+    it('does not extract a version for Cloudflare (no version rule)', () => {
+      const snapshot = makeSnapshot([{ name: 'Server', value: 'cloudflare' }]);
+      const d = detector.detect(snapshot)[0]!;
+      expect(d.version).toBeNull();
+    });
+
+    it('yields null version when the signature matches but no version is present', () => {
+      const snapshot = makeSnapshot([{ name: 'Server', value: 'nginx' }]);
+      const d = detector.detect(snapshot)[0]!;
+      expect(d.technology.id).toBe('nginx');
+      expect(d.version).toBeNull();
+    });
+
+    it('version extraction does not alter the detection confidence', () => {
+      const snapshot = makeSnapshot([{ name: 'Server', value: 'nginx/1.21.6' }]);
+      const d = detector.detect(snapshot)[0]!;
+      expect(d.confidence).toBe(95);
+      expect(d.version).toBe('1.21.6');
+    });
+  });
 });

@@ -721,3 +721,42 @@ describe('ScanComparison — added/removed technology explainability', () => {
     expect(cleaned).toContain('Angular CLI');
   });
 });
+
+describe('ScanComparison — version rendering', () => {
+  it('renders the version for an added technology that carries one', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+      {
+        technology: { id: 'nginx', name: 'nginx', category: 'server' },
+        confidence: 95,
+        evidence: [{ type: 'http_header', name: 'Server', value: 'nginx/1.21.6' }],
+        version: '1.21.6',
+      },
+    ]);
+    const result = compareScans(left, right);
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // Version is subordinate to name > confidence > evidence.
+    expect(cleaned).toContain('Version: 1.21.6');
+    // Version is never rendered with a percent suffix.
+    expect(cleaned).not.toContain('1.21.6%');
+  });
+
+  it('does not render a version label when the added technology has no version', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+      makeDetection('vue', 'Vue', 'frontend', 80),
+    ]);
+    const result = compareScans(left, right);
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+
+    expect(html).not.toContain('Version:');
+  });
+});

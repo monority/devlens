@@ -1,12 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { DeduplicatingDetector } from './deduplicating-detector.js';
 import type { Detector } from './detector.js';
-import type { Detection, Evidence, SiteSnapshot, Technology } from '@devlens/core';
+import type {
+  Detection,
+  Evidence,
+  SiteSnapshot,
+  Technology,
+  TechnologyVersion,
+} from '@devlens/core';
 import {
   createTechnologyId,
   createTechnologyCategory,
   createConfidence,
   createDetection,
+  createTechnologyVersion,
   createUrl,
   createHostname,
   createTimestampFromString,
@@ -489,6 +496,120 @@ describe('DeduplicatingDetector', () => {
       expect(result[2]!.technology.id).toBe('wordpress');
       expect(result[2]!.confidence).toBe(90);
       expect(result[2]!.evidence).toHaveLength(1);
+    });
+  });
+
+  describe('version consensus', () => {
+    const makeVersioned = (
+      technology: Technology,
+      confidence: number,
+      evidence: Evidence[],
+      version: TechnologyVersion | null,
+    ): Detection => createDetection(technology, createConfidence(confidence), evidence, version);
+
+    it('keeps a version extracted by any source — survives even when the representative has none', () => {
+      // Highest-confidence detection carries NO version; a lower-confidence
+      // duplicate carries '6.4.2'. The consensus must still surface the
+      // version (mirrors the WordPress case: meta '6.4.2' vs. CSS-resource null).
+      const detections = [
+        makeVersioned(wpTech, 95, [httpHeaderEvidence('Server', 'nginx/1.21')], null),
+        makeVersioned(
+          wpTech,
+          90,
+          [metaTagEvidence('generator', 'WordPress 6.4.2')],
+          createTechnologyVersion('6.4.2'),
+        ),
+      ];
+      const result = new DeduplicatingDetector(makeMockDetector(detections)).detect(snapshot);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]!.version).toBe('6.4.2');
+    });
+
+    it('keeps a version when all duplicate detections agree', () => {
+      const detections = [
+        makeVersioned(
+          wpTech,
+          90,
+          [metaTagEvidence('generator', 'WordPress 6.4.2')],
+          createTechnologyVersion('6.4.2'),
+        ),
+        makeVersioned(
+          wpTech,
+          95,
+          [scriptUrlEvidence('https://example.com/wp-content/style.css')],
+          createTechnologyVersion('6.4.2'),
+        ),
+      ];
+      const result = new DeduplicatingDetector(makeMockDetector(detections)).detect(snapshot);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]!.version).toBe('6.4.2');
+    });
+
+    it('returns null when duplicate detections carry conflicting versions', () => {
+      const detections = [
+        makeVersioned(
+          wpTech,
+          95,
+          [metaTagEvidence('generator', 'WordPress 6.4.2')],
+          createTechnologyVersion('6.4.2'),
+        ),
+        makeVersioned(
+          wpTech,
+          90,
+          [scriptUrlEvidence('https://example.com/wp-content/')],
+          createTechnologyVersion('6.5.0'),
+        ),
+      ];
+      const result = new DeduplicatingDetector(makeMockDetector(detections)).detect(snapshot);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]!.version).toBeNull();
+    });
+
+    it('returns null when no duplicate detection carries a version', () => {
+      const detections = [
+        makeDetection(wpTech, 95, [scriptContentEvidence('__NEXT_DATA__')]),
+        makeDetection(wpTech, 90, [metaTagEvidence('generator', 'WordPress')]),
+      ];
+      const result = new DeduplicatingDetector(makeMockDetector(detections)).detect(snapshot);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]!.version).toBeNull();
+    });
+
+    it('version is deterministic across repeated runs', () => {
+      const detections = [
+        makeVersioned(wpTech, 95, [httpHeaderEvidence('Server', 'nginx/1.21')], null),
+        makeVersioned(
+          wpTech,
+          90,
+          [metaTagEvidence('generator', 'WordPress 6.4.2')],
+          createTechnologyVersion('6.4.2'),
+        ),
+      ];
+      const detector = new DeduplicatingDetector(makeMockDetector(detections));
+      const a = detector.detect(snapshot);
+      const b = detector.detect(snapshot);
+
+      expect(a[0]!.version).toBe(b[0]!.version);
+      expect(a[0]!.version).toBe('6.4.2');
+    });
+
+    it('selects the version independently of evidence-merge ordering', () => {
+      // Two orders of the same two detections → identical version.
+      const a = makeVersioned(wpTech, 95, [httpHeaderEvidence('Server', 'nginx/1.21')], null);
+      const b = makeVersioned(
+        wpTech,
+        90,
+        [metaTagEvidence('generator', 'WordPress 6.4.2')],
+        createTechnologyVersion('6.4.2'),
+      );
+      const first = new DeduplicatingDetector(makeMockDetector([a, b])).detect(snapshot);
+      const second = new DeduplicatingDetector(makeMockDetector([b, a])).detect(snapshot);
+      expect(first[0]!.version).toBe(second[0]!.version);
+      expect(first[0]!.version).toBe('6.4.2');
     });
   });
 });

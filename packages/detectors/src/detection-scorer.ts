@@ -196,6 +196,7 @@ export class ConfidenceScorer implements DetectionScorer {
       technology: detection.technology,
       confidence: createConfidence(scoredValue),
       evidence: [...detection.evidence],
+      version: detection.version ?? null,
     };
   }
 

@@ -21,6 +21,7 @@ import {
   createHostname,
   createHttpStatus,
   createTimestampFromString,
+  createTechnologyVersion,
 } from '@devlens/core';
 import { snapshotToRow, rowToSnapshot } from './postgres-repository.js';
 import type { Detection, LinkTag, MetaTag, Resource, ScriptTag, SiteSnapshot } from '@devlens/core';
@@ -111,5 +112,35 @@ describe('PostgresScanResultRepository — snapshot mapper round-trip (no DB)', 
 
     expect(snapshot).toBeNull();
     expect(detections).toEqual([]);
+  });
+
+  describe('detection version round-trip (no DB required)', () => {
+    it('round-trips a versioned detection through snapshotToRow → rowToSnapshot', () => {
+      const versionedDetection = {
+        technology: { id: 'nginx' as never, name: 'nginx', category: 'server' as never },
+        confidence: 95 as never,
+        evidence: [{ type: 'http_header' as const, name: 'Server', value: 'nginx/1.21.6' }],
+        version: createTechnologyVersion('1.21.6'),
+      };
+
+      const row = snapshotToRow('scan_version_roundtrip' as never, makeSnapshot(), [
+        versionedDetection,
+      ]);
+      const { detections: reconstructed } = rowToSnapshot(row);
+
+      expect(reconstructed).toHaveLength(1);
+      expect(reconstructed[0]!.version).toBe('1.21.6');
+    });
+
+    it('reconstructs legacy rows that lack a version field (forward compatible)', () => {
+      // `makeDetections()` returns detections WITHOUT a `version` key —
+      // this simulates rows persisted by the pre-Step-67 repository.
+      const row = snapshotToRow('scan_legacy_version' as never, makeSnapshot(), makeDetections());
+      const { detections: reconstructed } = rowToSnapshot(row);
+
+      expect(reconstructed).toHaveLength(1);
+      // No crash, no fabricated version — the legacy field is simply absent.
+      expect(reconstructed[0]!.version).toBeUndefined();
+    });
   });
 });

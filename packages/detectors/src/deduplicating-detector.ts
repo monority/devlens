@@ -25,7 +25,7 @@
  * @see {@link CompositeDetector}
  */
 
-import type { Detection, SiteSnapshot, Evidence } from '@devlens/core';
+import type { Detection, SiteSnapshot, Evidence, TechnologyVersion } from '@devlens/core';
 import { createDetection } from '@devlens/core';
 import type { Detector } from './detector.js';
 import { getEvidenceKey } from './evidence-key.js';
@@ -104,9 +104,15 @@ export class DeduplicatingDetector implements Detector {
       const group = groups.get(key)!;
       const representative = this.selectRepresentative(group);
       const mergedEvidence = this.mergeEvidence(group);
+      const version = this.selectVersion(group);
 
       result.push(
-        createDetection(representative.technology, representative.confidence, mergedEvidence),
+        createDetection(
+          representative.technology,
+          representative.confidence,
+          mergedEvidence,
+          version,
+        ),
       );
     }
 
@@ -132,6 +138,40 @@ export class DeduplicatingDetector implements Detector {
     }
 
     return best;
+  }
+
+  /**
+   * Selects the technology version for a deduplicated detection, if any,
+   * applying the version-consistency rules:
+   *
+   * - The `version` is read **only** from detections in the group that
+   *   carry a non-null version (i.e. a tech-specific signature actually
+   *   extracted one from its evidence).
+   * - `null`/undefined versions are ignored — they mean "no version
+   *   extracted," not "this technology is at an unknown version."
+   * - If every versioned detection agrees on the same version string,
+   *   that version is kept.
+   * - If two versioned detections carry **different** version strings
+   *   (a conflict), the result is conservatively `null` — we do not
+   *   guess which is authoritative.
+   * - If no detection in the group has a version, the result is `null`.
+   *
+   * This is a **consensus over the existing dedup group** — it introduces
+   * no new precedence ordering and never invents a version. It ensures a
+   * version extracted by any evidence source for a technology survives
+   * deduplication as long as all extractable versions agree.
+   */
+  private selectVersion(group: Detection[]): TechnologyVersion | null {
+    const distinct = new Set<string>();
+    for (const detection of group) {
+      if (detection.version) {
+        distinct.add(String(detection.version));
+      }
+    }
+    if (distinct.size === 1) {
+      return Array.from(distinct)[0] as TechnologyVersion;
+    }
+    return null;
   }
 
   /**

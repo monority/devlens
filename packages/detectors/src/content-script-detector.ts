@@ -46,6 +46,7 @@ import type { Detection, SiteSnapshot } from '@devlens/core';
 import { createConfidence, createDetection } from '@devlens/core';
 import type { Detector } from './detector.js';
 import { getTechnology } from './technology-catalog.js';
+import { extractVersion, type VersionExtraction } from './version.js';
 
 /**
  * A single content-based detection signature.
@@ -57,6 +58,12 @@ interface ContentScriptSignature {
   readonly technologyId: string;
   /** Confidence score (0–100). */
   readonly confidence: number;
+  /**
+   * Optional, declarative version-extraction rule. When present, the
+   * version is extracted from the matched inline script content. `null`
+   * when absent (the signature declares no version extraction).
+   */
+  readonly version?: VersionExtraction;
 }
 
 /**
@@ -206,13 +213,19 @@ export class ContentScriptDetector implements Detector {
             : sig.matchContent;
 
         const technology = getTechnology(sig.technologyId);
+        const version = extractVersion(matchedScript.content, sig.version);
 
-        const detection = createDetection(technology, createConfidence(sig.confidence), [
-          {
-            type: 'script_content',
-            snippet,
-          },
-        ]);
+        const detection = createDetection(
+          technology,
+          createConfidence(sig.confidence),
+          [
+            {
+              type: 'script_content',
+              snippet,
+            },
+          ],
+          version,
+        );
 
         detections.push(detection);
         seen.add(sig.technologyId);

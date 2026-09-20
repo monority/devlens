@@ -35,3 +35,9 @@ export {
 } from './technology-catalog.js';
 
 export { createProductionDetector } from './production-detector.js';
+
+// Declarative version-extraction primitives (reusable across the
+// signature tables of every detector). `version` extraction is optional
+// and declared per-signature — there is no separate detection engine.
+export { extractVersion } from './version.js';
+export type { VersionRule, VersionExtraction } from './version.js';

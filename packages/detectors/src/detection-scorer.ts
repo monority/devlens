@@ -197,6 +197,15 @@ export class ConfidenceScorer implements DetectionScorer {
       confidence: createConfidence(scoredValue),
       evidence: [...detection.evidence],
       version: detection.version ?? null,
+      // Step 72 — preserve version-intelligence provenance through scoring so
+      // the downstream `RelationshipResolver` (which spreads the scored
+      // detection) can surface it to the API. Omitted when absent so a plain
+      // detection stays byte-identical to the pre-Step-72 shape.
+      ...(detection.versionConflict ? { versionConflict: detection.versionConflict } : {}),
+      ...(detection.versionSource ? { versionSource: detection.versionSource } : {}),
+      ...(detection.versionEvidence && detection.versionEvidence.length > 0
+        ? { versionEvidence: [...detection.versionEvidence] }
+        : {}),
     };
   }
 

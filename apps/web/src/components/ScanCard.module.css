@@ -462,6 +462,19 @@
   font-weight: 400;
 }
 
+.versionSource {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  font-weight: 400;
+  margin-left: 0.5rem;
+}
+
+.versionConflict {
+  font-size: 0.8rem;
+  color: #dc2626;
+  font-weight: 600;
+}
+
 .detectionMeta {
   margin-bottom: 0.5rem;
 }

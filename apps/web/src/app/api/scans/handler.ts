@@ -19,7 +19,7 @@ import {
 import type { ScanResult } from '@devlens/application';
 import type { Crawler } from '@devlens/crawler';
 import type { ScanResultRepository } from '@devlens/application';
-import type { Scan, Detection } from '@devlens/core';
+import type { Scan, Detection, VersionSource } from '@devlens/core';
 import type { Evidence } from '@devlens/core';
 import type { Detector } from '@devlens/detectors';
 
@@ -38,10 +38,26 @@ export interface DetectionResponse {
   evidence: ReadonlyArray<Evidence>;
   /**
    * Technology version extracted from evidence, when a tech-specific
-   * signature produced one. Omitted from the JSON response when no
-   * version was extracted (never fabricated/null in the API contract).
+   * signature produced one. Present (non-null) when a version is resolved;
+   * `null` when version sources disagreed (conflict — see `versionConflict`);
+   * omitted entirely when no version signal was observed (Step 72 §13 —
+   * never a fabricated placeholder).
    */
-  version?: string;
+  version?: string | null;
+  /**
+   * Step 72 — `true` when multiple evidence sources extracted disagreeing
+   * versions and the consensus layer refused to pick one. The `version` is
+   * then `null` and the UI renders "version conflict detected" rather than
+   * an arbitrary version (§11/§19/§20). Absent when there is no conflict.
+   */
+  versionConflict?: boolean;
+  /**
+   * The evidence-source modality the resolved `version` came from
+   * (`'header' | 'meta' | 'script_url' | 'resource_url' | 'resource_content'
+   * | 'content' | 'link`), when unambiguous. Absent when there is no
+   * version or when sources disagree / are mixed (Step 72 §4/§10).
+   */
+  versionSource?: VersionSource;
   /**
    * Step 69 — How this detection entered the result set.
    *
@@ -258,9 +274,12 @@ function detectionToResponse(detection: Detection): DetectionResponse {
     },
     confidence: detection.confidence,
     evidence: detection.evidence,
-    // Version is omitted from the response when absent (never emitted as
-    // a fabricated value) — see DetectionResponse.version.
+    // Version intelligence (Step 72). `version` is emitted when resolved;
+    // `null` + `versionConflict: true` when sources disagree (§19); omitted
+    // entirely when no version signal was observed (§13 — no placeholder).
     ...(detection.version ? { version: detection.version } : {}),
+    ...(detection.versionConflict ? { version: null as string | null, versionConflict: true } : {}),
+    ...(detection.versionSource ? { versionSource: detection.versionSource } : {}),
     // Step 69: propagate relationship metadata, omitting absent fields so
     // a direct observation (no `source`) is indistinguishable from an
     // omitted optional field. Derived/conflicted detections carry the

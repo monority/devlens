@@ -31,6 +31,12 @@ import { createTechnologyVersion, type TechnologyVersion } from '@devlens/core';
  * The pattern is expected to be anchored/literal enough to describe
  * *this technology's* version format only — there is no global version
  * heuristics layer.
+ *
+ * - `normalize` — optional, opt-in cosmetic normalization applied to the
+ *   raw capture **before** validation. `'version'` strips a leading
+ *   `v`/`V` prefix, a leading `version` word, and surrounding whitespace
+ *   (Step 72 §8: accept `v3.7.1`, `3.7.1`, `version 3.7.1`). Default
+ *   **off** — rules that do not set it behave exactly as in Step 67.
  */
 export interface VersionRule {
   /** Regex applied to the matched observable value. */
@@ -40,6 +46,11 @@ export interface VersionRule {
    * the pattern has a capturing group, otherwise `0` (the full match).
    */
   readonly captureGroup?: number;
+  /**
+   * Optional opt-in normalization of the raw capture (Step 72 §8).
+   * `'version'` strips a leading `v`/`V` or `version` prefix + whitespace.
+   */
+  readonly normalize?: 'version';
 }
 
 /**
@@ -75,14 +86,28 @@ export function extractVersion(value: string, spec?: VersionExtraction): Technol
   if (!spec) {
     return null;
   }
-  const match = value.match(spec.rule.pattern);
+  // §7 — a malformed regex must never crash the scan.
+  let match: RegExpMatchArray | null;
+  try {
+    match = value.match(spec.rule.pattern);
+  } catch {
+    return null;
+  }
   if (match === null) {
     return null;
   }
   const groupIndex = spec.rule.captureGroup ?? (match[1] !== undefined ? 1 : 0);
-  const raw = match[groupIndex];
+  let raw = match[groupIndex];
   if (raw === undefined) {
     return null;
+  }
+  // §8 — opt-in normalization of common cosmetic prefixes. Default off
+  // (no `normalize`) so every pre-Step-72 rule renders the same output.
+  if (spec.rule.normalize === 'version') {
+    // §8 — strip a leading `version` word OR a lone `v`/`V` prefix plus any
+    // following whitespace. `version` is listed first so it wins over the
+    // `v` alternative (otherwise `version 3.7.1` would shed only its `v`).
+    raw = raw.replace(/^(?:version\s*|v\s*)/i, '').trim();
   }
   try {
     return createTechnologyVersion(raw);

@@ -323,4 +323,65 @@ describe('PostgresScanResultRepository — snapshot mapper round-trip (no DB)', 
       });
     });
   });
+
+  // ─── Step 72 — version conflict + provenance survive the jsonb round-trip ──
+  // `snapshots.detections` is transparent jsonb; the additive Step-72 fields
+  // (versionConflict, versionSource, versionEvidence) must round-trip with no
+  // schema migration, and legacy detections lacking them must still deserialize.
+  describe('Step 72 — version conflict round-trip (no DB)', () => {
+    it('round-trips a conflicting detection (version: null, versionConflict: true)', () => {
+      const conflicted: Detection = {
+        technology: { id: 'wordpress' as never, name: 'WordPress', category: 'cms' as never },
+        confidence: 90 as never,
+        evidence: [
+          { type: 'http_header' as const, name: 'Server', value: 'nginx' },
+          { type: 'meta_tag' as const, name: 'generator', content: 'WordPress' },
+        ],
+        version: null,
+        versionConflict: true,
+        versionEvidence: [{ type: 'http_header' as const, name: 'Server', value: 'nginx' }],
+      };
+
+      const row = snapshotToRow('scan_vconf' as never, makeSnapshot(), [conflicted]);
+      const { detections: reconstructed } = rowToSnapshot(row);
+
+      expect(reconstructed).toEqual([conflicted]);
+      expect(reconstructed[0]!.versionConflict).toBe(true);
+      expect(reconstructed[0]!.version).toBe(null);
+    });
+
+    it('round-trips a resolved-version detection with versionSource + versionEvidence', () => {
+      const resolved: Detection = {
+        technology: { id: 'nginx' as never, name: 'nginx', category: 'server' as never },
+        confidence: 95 as never,
+        evidence: [{ type: 'http_header' as const, name: 'Server', value: 'nginx/1.21.6' }],
+        version: createTechnologyVersion('1.21.6'),
+        versionSource: 'header',
+        versionEvidence: [{ type: 'http_header' as const, name: 'Server', value: 'nginx/1.21.6' }],
+      };
+
+      const row = snapshotToRow('scan_vresolved' as never, makeSnapshot(), [resolved]);
+      const { detections: reconstructed } = rowToSnapshot(row);
+
+      expect(reconstructed[0]!.version).toBe('1.21.6');
+      expect(reconstructed[0]!.versionSource).toBe('header');
+      expect(reconstructed[0]!.versionEvidence).toHaveLength(1);
+    });
+
+    it('reconstructs legacy detections without Step-72 fields (forward compatible)', () => {
+      const legacy: Detection = {
+        technology: { id: 'nginx' as never, name: 'nginx', category: 'server' as never },
+        confidence: 80 as never,
+        evidence: [{ type: 'http_header' as const, name: 'Server', value: 'nginx' }],
+      };
+
+      const row = snapshotToRow('scan_legacy_v2' as never, makeSnapshot(), [legacy]);
+      const { detections: reconstructed } = rowToSnapshot(row);
+
+      expect(reconstructed).toEqual([legacy]);
+      expect(reconstructed[0]!.versionConflict).toBeUndefined();
+      expect(reconstructed[0]!.versionSource).toBeUndefined();
+      expect(reconstructed[0]!.versionEvidence).toBeUndefined();
+    });
+  });
 });

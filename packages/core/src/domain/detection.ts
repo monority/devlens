@@ -77,6 +77,39 @@ export interface RelationshipConflict {
 }
 
 /**
+ * Label for *which observable source* a version was extracted from.
+ *
+ * Step 72 — Version Intelligence. This is the "source" dimension of a
+ * {@link VersionObservation}: each evidence modality maps to a single
+ * `VersionSource` so a resolved version can always be explained as
+ * "came from a header / a meta tag / a script URL / …".
+ *
+ * The label is **derived from the evidence type that produced the
+ * version** (see {@link evidenceTypeToVersionSource}), NOT declared per
+ * catalog rule — this generalizes the Step-67 `VersionExtraction.source`
+ * model without duplicating it (Step 72 §6: "generalize, don't duplicate").
+ */
+export type VersionSource =
+  'header' | 'meta' | 'script_url' | 'resource_url' | 'resource_content' | 'content' | 'link';
+
+/**
+ * A single, explainable version observation: a version extracted from a
+ * concrete piece of evidence, tagged with the source modality it came from.
+ *
+ * Step 72 §4 — a version is no longer a bare string detached from its
+ * origin; it is always paired with the evidence that produced it and a
+ * source label, so every resolved version is accountable.
+ */
+export interface VersionObservation {
+  /** The extracted technology version. */
+  readonly version: TechnologyVersion;
+  /** Which evidence modality the version was read from. */
+  readonly source: VersionSource;
+  /** The evidence item whose matched value yielded this version. */
+  readonly evidence: Evidence;
+}
+
+/**
  * A detection of a technology within a site snapshot.
  *
  * Invariants enforced by {@link createDetection}:
@@ -109,6 +142,30 @@ export interface Detection {
    */
   readonly version?: TechnologyVersion | null;
   /**
+   * When `true`, multiple evidence sources extracted **disagreeing**
+   * versions for this technology and the consensus layer refused to pick
+   * one (Step 72 §11). The `version` is then `null` and **must not** be
+   * displayed as any version — the UI surfaces "version conflict detected"
+   * instead (Step 72 §20). Absent ⇔ no conflict was observed.
+   */
+  readonly versionConflict?: boolean;
+  /**
+   * The source modality the resolved `version` came from (Step 72 §4/§12).
+   * Present only when `version` is non-null and the agreeing observations
+   * share a single, unambiguous source; absent when there is no version,
+   * when sources are mixed, or on a conflict. Derived from the evidence
+   * type — never fabricated.
+   */
+  readonly versionSource?: VersionSource;
+  /**
+   * The evidence item(s) whose matched value yielded the resolved
+   * `version` (Step 72 §4/§10). Present only when `version` is non-null
+   * and explainable; absent when there is no version. On a
+   * `versionConflict`, this carries the disagreeing observations' evidence
+   * so the conflict is inspectable rather than silent.
+   */
+  readonly versionEvidence?: ReadonlyArray<Evidence>;
+  /**
    * How this detection entered the result set. Absent ⇒ directly observed
    * (a detector produced the evidence). `'relationship'` ⇒ derived from an
    * `implies` edge; the detection then carries {@link Detection.derivedFrom}
@@ -131,6 +188,22 @@ export interface Detection {
 }
 
 /**
+ * Optional Step-72 version-intelligence metadata attached to a
+ * {@link Detection} by the consensus layer: an observable version conflict,
+ * the source modality a resolved version came from, and the evidence that
+ * yielded it. All fields are optional; when absent the detection behaves
+ * exactly as before (Step 72 §4/§11/§13).
+ */
+export interface DetectionOptions {
+  /** True when disagreeing version observations were merged (conflict). */
+  readonly versionConflict?: boolean;
+  /** Source modality the resolved version came from (when unambiguous). */
+  readonly versionSource?: VersionSource;
+  /** Evidence item(s) that produced the resolved version. */
+  readonly versionEvidence?: readonly Evidence[];
+}
+
+/**
  * Creates a {@link Detection}.
  *
  * @throws {Error} if the evidence array is empty.
@@ -138,6 +211,12 @@ export interface Detection {
  * The evidence array is copied so that external mutations cannot affect
  * the domain object. The optional `version` defaults to `null` (not
  * extracted); callers that extract a version pass it explicitly.
+ *
+ * The optional `options` carries Step-72 version metadata
+ * (`versionConflict` / `versionSource` / `versionEvidence`). These are
+ * omitted from the returned object when absent so that a plain detection
+ * is byte-for-byte identical to the pre-Step-72 shape (existing object
+ * literals and `toEqual` fixtures stay valid).
  *
  * The returned detection has **no** `source` — i.e. it is a direct
  * observation. Use {@link createDerivedDetection} for inferred detections.
@@ -147,6 +226,7 @@ export function createDetection(
   confidence: Confidence,
   evidence: Evidence[],
   version: TechnologyVersion | null = null,
+  options?: DetectionOptions,
 ): Detection {
   if (evidence.length === 0) {
     throw new Error('Detection must have at least one evidence item');
@@ -159,6 +239,11 @@ export function createDetection(
     confidence,
     evidence: [...evidence],
     version: version ?? null,
+    ...(options?.versionConflict ? { versionConflict: options.versionConflict } : {}),
+    ...(options?.versionSource ? { versionSource: options.versionSource } : {}),
+    ...(options?.versionEvidence && options.versionEvidence.length > 0
+      ? { versionEvidence: [...options.versionEvidence] }
+      : {}),
   };
 }
 

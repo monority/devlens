@@ -28,7 +28,16 @@ export interface DetectionItemProps {
 }
 
 export function DetectionItem({ detection, index }: DetectionItemProps): React.ReactElement {
-  const { technology, confidence, version, source, derivedFrom, relationshipConflicts } = detection;
+  const {
+    technology,
+    confidence,
+    version,
+    versionConflict,
+    versionSource,
+    source,
+    derivedFrom,
+    relationshipConflicts,
+  } = detection;
   const isDerived = source === 'relationship';
   const derivedSource = derivedFrom?.[0];
   const derivedLabel = derivedSource
@@ -58,6 +67,13 @@ export function DetectionItem({ detection, index }: DetectionItemProps): React.R
         <span className={styles.category}>{technology.category}</span>
         <span className={styles.score}>Confidence: {confidence}</span>
         {version ? <span className={styles.version}>Version: {version}</span> : null}
+        {/* Step 72 — conflict override. When evidence sources disagreed the
+            consensus is refused, `version` is null and we render a conflict
+            notice (never a fabricated/placeholder version). */}
+        {versionConflict ? (
+          <span className={styles.versionConflict}>Version: unavailable — conflict detected</span>
+        ) : null}
+        {versionSource ? <span className={styles.versionSource}>{versionSource}</span> : null}
 
         {/* Step 69: distinguisher for inferred detections and conflicts */}
         {isDerived ? <span className={styles.derived}>Derived from {derivedLabel}</span> : null}

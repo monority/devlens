@@ -191,3 +191,101 @@ describe('getScanDetectionResults', () => {
     expect(results[0]!.technology.category).toBe('server');
   });
 });
+
+describe('getScanDetectionResults — Step 69 relationship metadata', () => {
+  it('propagates source and derivedFrom when present', () => {
+    const detections: DetectionResponse[] = [
+      {
+        technology: { id: 'react', name: 'React', category: 'frontend' },
+        confidence: 0,
+        evidence: [],
+        source: 'relationship',
+        derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
+      },
+    ];
+    const results = getScanDetectionResults(detections);
+
+    expect(results[0]!.source).toBe('relationship');
+    expect(results[0]!.derivedFrom).toEqual([
+      { source: 'nextjs', sourceName: 'Next.js', type: 'implies' },
+    ]);
+  });
+
+  it('omits source/derivedFrom/conflicts when absent (exactOptionalPropertyTypes)', () => {
+    const detections: DetectionResponse[] = [
+      {
+        technology: { id: 'nginx', name: 'nginx', category: 'server' },
+        confidence: 95,
+        evidence: [{ type: 'http_header', name: 'Server', value: 'nginx' }],
+      },
+    ];
+    const results = getScanDetectionResults(detections);
+
+    expect(results[0]!.source).toBeUndefined();
+    expect(results[0]!.derivedFrom).toBeUndefined();
+    expect(results[0]!.relationshipConflicts).toBeUndefined();
+  });
+
+  it('propagates relationshipConflicts on a direct detection without marking it derived', () => {
+    const detections: DetectionResponse[] = [
+      {
+        technology: { id: 'woocommerce', name: 'WooCommerce', category: 'ecommerce' },
+        confidence: 85,
+        evidence: [{ type: 'script_url', url: 'https://example.com/wc.js' }],
+        relationshipConflicts: [
+          { type: 'requires', other: 'wordpress', reason: 'missing_requirement' },
+        ],
+      },
+    ];
+    const results = getScanDetectionResults(detections);
+
+    expect(results[0]!.source).toBeUndefined(); // still a direct detection
+    expect(results[0]!.relationshipConflicts).toEqual([
+      { type: 'requires', other: 'wordpress', reason: 'missing_requirement' },
+    ]);
+  });
+
+  it('sorts a zero-confidence derived detection last (below all direct detections)', () => {
+    const detections: DetectionResponse[] = [
+      {
+        technology: { id: 'react', name: 'React', category: 'frontend' },
+        confidence: 0,
+        evidence: [],
+        source: 'relationship',
+        derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
+      },
+      {
+        technology: { id: 'nginx', name: 'nginx', category: 'server' },
+        confidence: 95,
+        evidence: [{ type: 'http_header', name: 'Server', value: 'nginx' }],
+      },
+    ];
+    const results = getScanDetectionResults(detections);
+
+    expect(results.map((r) => r.technology.id)).toEqual(['nginx', 'react']);
+  });
+
+  it('is deterministic with relationship metadata (same input → same output)', () => {
+    const detections: DetectionResponse[] = [
+      {
+        technology: { id: 'react', name: 'React', category: 'frontend' },
+        confidence: 0,
+        evidence: [],
+        source: 'relationship',
+        derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
+      },
+      {
+        technology: { id: 'woocommerce', name: 'WooCommerce', category: 'ecommerce' },
+        confidence: 85,
+        evidence: [{ type: 'script_url', url: 'https://example.com/wc.js' }],
+        relationshipConflicts: [
+          { type: 'requires', other: 'wordpress', reason: 'missing_requirement' },
+        ],
+      },
+    ];
+
+    const first = getScanDetectionResults(detections);
+    const second = getScanDetectionResults(detections);
+    expect(first).toEqual(second);
+  });
+});

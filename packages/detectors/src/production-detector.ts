@@ -32,27 +32,46 @@ import { CompositeDetector } from './composite-detector.js';
 import { DeduplicatingDetector } from './deduplicating-detector.js';
 import { ConfidenceScorer } from './detection-scorer.js';
 import { ScoringDetector } from './scoring-detector.js';
+import { RelationshipResolver } from './relationships.js';
 
 /**
  * Constructs the canonical production detector pipeline.
  *
+ * ```text
+ * CompositeDetector([...])   — ordered sub-detectors, results concatenated
+ *   → DeduplicatingDetector — one Detection per technology (highest confidence, evidence merged)
+ *   → ScoringDetector       — final confidence via ConfidenceScorer, ranked output
+ *   → RelationshipResolver  — Step 69: post-scoring `implies`/`requires`/`excludes` resolution
+ * ```
+ *
+ * The {@link RelationshipResolver} is the **outermost** layer: it runs after
+ * scoring (so it never alters a direct detection's confidence — Phase 11) and
+ * appends relationship-derived detections or surfaces conflicts on direct
+ * detections. It is the single place relationships are wired, so the `makeRealPipeline()`
+ * helper in tests (which omits it) stays a pure three-layer stack for golden
+ * assertions, while the production factory is the single source of truth for
+ * web + worker.
+ *
  * @returns A `Detector` that runs all six sub-detectors through
  *          ``CompositeDetector``, deduplicates by technology ID via
- *          ``DeduplicatingDetector``, and applies confidence scoring via
- *          ``ScoringDetector(ConfidenceScorer)``.
+ *          ``DeduplicatingDetector``, applies confidence scoring via
+ *          ``ScoringDetector(ConfidenceScorer)``, and finally resolves
+ *          catalog relationships via ``RelationshipResolver``.
  */
 export function createProductionDetector(): Detector {
-  return new ScoringDetector(
-    new DeduplicatingDetector(
-      new CompositeDetector([
-        new HeaderDetector(),
-        new MetaTagDetector(),
-        new ScriptUrlDetector(),
-        new ContentScriptDetector(),
-        new ResourceDetector(),
-        new LinkDetector(),
-      ]),
+  return new RelationshipResolver(
+    new ScoringDetector(
+      new DeduplicatingDetector(
+        new CompositeDetector([
+          new HeaderDetector(),
+          new MetaTagDetector(),
+          new ScriptUrlDetector(),
+          new ContentScriptDetector(),
+          new ResourceDetector(),
+          new LinkDetector(),
+        ]),
+      ),
+      new ConfidenceScorer(),
     ),
-    new ConfidenceScorer(),
   );
 }

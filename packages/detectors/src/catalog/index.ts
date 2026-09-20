@@ -30,6 +30,8 @@ import type {
   ContentScriptSignature,
   ResourceSignature,
   LinkSignature,
+  RelationshipDef,
+  RelationshipType,
   TechnologyDefinition,
 } from './types.js';
 import { nginx } from './technologies/nginx.js';
@@ -165,6 +167,24 @@ export function findDefinition(id: string): TechnologyDefinition | undefined {
 }
 
 /**
+ * Returns the declarative relationship edges declared by the technology
+ * with the given id (Step 69). Empty when the technology declares no
+ * relationships — this is the common case and is safe for the
+ * relationship-resolution layer to skip.
+ */
+export function relationshipsFor(sourceId: string): readonly RelationshipDef[] {
+  return findDefinition(sourceId)?.relationships ?? [];
+}
+
+/**
+ * Returns `true` if the given relationship type is one of the three
+ * semantically-valid kinds (`implies` / `requires` / `excludes`).
+ */
+export function isValidRelationshipType(type: unknown): type is RelationshipType {
+  return type === 'implies' || type === 'requires' || type === 'excludes';
+}
+
+/**
  * Flattens every definition's signatures for a given observable source into
  * the typed array a detector consumes (preserving per-technology order).
  *
@@ -214,7 +234,7 @@ export function signaturesFor(
  * Returns a list of human-readable error strings (empty when the definition
  * is well-formed).
  */
-export function validateDefinition(def: TechnologyDefinition): string[] {
+export function validateDefinition(def: TechnologyDefinition, knownIds?: Set<string>): string[] {
   const errors: string[] = [];
 
   if (!def.id || typeof def.id !== 'string' || def.id.trim() === '') {
@@ -282,16 +302,93 @@ export function validateDefinition(def: TechnologyDefinition): string[] {
     errors.push(`Technology "${def.id}" has no signatures`);
   }
 
+  // ─── Step 69: relationship validation (per-definition) ────────────
+  // `knownIds` lets us also reject references to unknown technology ids;
+  // it is only available when validating the full catalog. Self-references,
+  // duplicates, and invalid types are self-contained and always checked.
+  errors.push(...validateRelationships(def, knownIds));
+
+  return errors;
+}
+
+/**
+ * Validates the `relationships` declared by a single definition.
+ *
+ * Checks (each emits a distinct error):
+ * - an invalid relationship `type` (not one of `implies`/`requires`/`excludes`)
+ * - an empty/whitespace `target` id
+ * - a self-reference (`target === def.id`)
+ * - a duplicate `(type, target)` pair within the same definition
+ * - a reference to an unknown technology id (only when `knownIds` is set)
+ *
+ * Cross-definition cycle detection is performed separately by
+ * `validateDefinitions` (it requires the full graph).
+ */
+export function validateRelationships(def: TechnologyDefinition, knownIds?: Set<string>): string[] {
+  const errors: string[] = [];
+  const rels = def.relationships;
+  if (!rels || rels.length === 0) {
+    return errors;
+  }
+
+  const seen = new Set<string>();
+  for (const rel of rels) {
+    if (!isValidRelationshipType(rel.type)) {
+      errors.push(
+        `Technology "${def.id}" has a relationship with invalid type "${String(rel.type)}"`,
+      );
+      continue;
+    }
+    if (!rel.target || typeof rel.target !== 'string' || rel.target.trim() === '') {
+      errors.push(`Technology "${def.id}" has a relationship with an empty target id`);
+      continue;
+    }
+    if (rel.target === def.id) {
+      errors.push(
+        `Technology "${def.id}" has a self-referential relationship (${rel.type} → itself)`,
+      );
+    }
+    const key = `${rel.type}→${rel.target}`;
+    if (seen.has(key)) {
+      errors.push(`Technology "${def.id}" has a duplicate relationship (${key})`);
+    }
+    seen.add(key);
+
+    if (knownIds !== undefined && !knownIds.has(rel.target)) {
+      errors.push(
+        `Technology "${def.id}" relationship "${rel.type}" references unknown technology "${rel.target}"`,
+      );
+    }
+  }
+
   return errors;
 }
 
 /**
  * Validates a list of definitions, including cross-definition integrity:
- * duplicate ids are rejected. Aggregates {@link validateDefinition} results.
+ * duplicate ids are rejected, relationship targets are checked against the
+ * full id set, and relationship cycles (direct / transitive) are detected.
+ * Aggregates {@link validateDefinition} results.
+ *
+ * Step 69 adds: unknown-referenced-id rejection and cycle detection over the
+ * full relationship graph. Self-references and duplicates are caught per
+ * definition by `validateDefinition` — here we additionally catch
+ * direct two-step cycles (`A↔B`) and longer transitive cycles
+ * (`A→B→C→A`).
  */
 export function validateDefinitions(defs: readonly TechnologyDefinition[]): string[] {
   const errors: string[] = [];
   const seenIds = new Set<string>();
+
+  // Pre-build the full set of known ids so that a relationship referencing
+  // a technology declared *later* in the array is not wrongly rejected as
+  // "unknown" (e.g. Next.js → React, where Next.js precedes React).
+  const idSet = new Set<string>();
+  for (const def of defs) {
+    if (def.id && def.id.trim() !== '') {
+      idSet.add(def.id);
+    }
+  }
 
   for (const def of defs) {
     if (def.id && def.id.trim() !== '') {
@@ -300,7 +397,94 @@ export function validateDefinitions(defs: readonly TechnologyDefinition[]): stri
       }
       seenIds.add(def.id);
     }
-    errors.push(...validateDefinition(def));
+    errors.push(...validateDefinition(def, idSet));
+  }
+
+  // Step 69: relationship cycle detection across the full graph.
+  errors.push(...detectRelationshipCycles(defs));
+
+  return errors;
+}
+
+/**
+ * Detects cycles in the relationship graph (any edge type — `implies`,
+ * `requires`, `excludes` all participate). Self-references are already
+ * rejected by `validateDefinition`; this catches 2-cycles and longer
+ * transitive cycles.
+ *
+ * Uses iterative DFS colouring (WHITE unvisited, GRAY on-stack, BLACK
+ * done) to avoid stack growth on wide graphs and to remain deterministic:
+ * nodes are visited in id-sorted order, and the reported cycle path is
+ * canonical (starting from the earliest id in the cycle).
+ */
+function detectRelationshipCycles(defs: readonly TechnologyDefinition[]): string[] {
+  const errors: string[] = [];
+
+  const graph = new Map<string, string[]>();
+  const ids = new Set<string>();
+  for (const def of defs) {
+    if (def.id && def.id.trim() !== '') {
+      ids.add(def.id);
+      if (def.relationships && def.relationships.length > 0) {
+        // Self-references are already rejected per-definition by
+        // `validateDefinition`; exclude them here so the graph check only
+        // reports genuine multi-node cycles.
+        const targets = def.relationships.filter((r) => r.target !== def.id).map((r) => r.target);
+        graph.set(def.id, targets);
+      }
+    }
+  }
+  const WHITE = 0;
+  const GRAY = 1;
+  const BLACK = 2;
+  const color = new Map<string, number>();
+  // path stack for cycle reconstruction (deterministic id-sorted traversal).
+  const stack: string[] = [];
+
+  const visit = (start: string) => {
+    // Iterative DFS with explicit colour + stack tracking.
+    const work: Array<{ node: string; edges: string[]; i: number }> = [
+      { node: start, edges: (graph.get(start) ?? []).slice().sort(), i: 0 },
+    ];
+    color.set(start, GRAY);
+    stack.push(start);
+
+    while (work.length > 0) {
+      const frame = work[work.length - 1]!;
+      const edges = frame.edges;
+      if (frame.i < edges.length) {
+        const next = edges[frame.i]!;
+        frame.i += 1;
+        const nextColor = color.get(next) ?? WHITE;
+        if (nextColor === GRAY) {
+          // Found a cycle: reconstruct the cycle path from the stack
+          // starting at `next` (the re-entered node), then close it.
+          const cycleStart = stack.indexOf(next);
+          const cycle = stack.slice(cycleStart).concat(next);
+          errors.push(`Technology relationship cycle detected: ${cycle.join(' → ')}`);
+        } else if (nextColor === WHITE) {
+          color.set(next, GRAY);
+          stack.push(next);
+          work.push({
+            node: next,
+            edges: (graph.get(next) ?? []).slice().sort(),
+            i: 0,
+          });
+        }
+        // nextColor === BLACK → already explored, skip.
+      } else {
+        // Done with this frame.
+        color.set(frame.node, BLACK);
+        stack.pop();
+        work.pop();
+      }
+    }
+  };
+
+  for (const id of [...ids].sort()) {
+    if ((color.get(id) ?? WHITE) === WHITE) {
+      visit(id);
+    }
   }
 
   return errors;
@@ -309,6 +493,11 @@ export function validateDefinitions(defs: readonly TechnologyDefinition[]): stri
 /**
  * Convenience wrapper that validates the real catalog. Used by the
  * module-load fail-fast guard below.
+ *
+ * Step 69: the real catalog's three relationships
+ * (`woocommerce requires wordpress`, `nextjs implies react`,
+ * `nuxtjs implies vue`) all resolve to known ids and form no cycles, so
+ * this still returns an empty array.
  */
 export function validateCatalog(): readonly string[] {
   return validateDefinitions(TECHNOLOGY_DEFINITIONS);

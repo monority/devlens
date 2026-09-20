@@ -451,3 +451,118 @@ describe('DetectionItem — version rendering', () => {
     expect(cleaned).toContain('Version: 1.21.6');
   });
 });
+
+describe('DetectionItem — Step 69 derived & conflict rendering', () => {
+  const makeDetection = (overrides: Partial<DetectionResponse> = {}): DetectionResponse => ({
+    technology: { id: 'react', name: 'React', category: 'frontend' },
+    confidence: 0,
+    evidence: [],
+    ...overrides,
+  });
+
+  it('renders a "Derived from … (implies)" banner for a relationship-derived detection', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, {
+        detection: makeDetection({
+          technology: { id: 'react', name: 'React', category: 'frontend' },
+          source: 'relationship',
+          derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
+        }),
+        index: 0,
+      }),
+    );
+
+    expect(html).toContain('Derived from');
+    expect(html).toContain('Next.js (implies)');
+  });
+
+  it('renders no derived banner for a direct (directly-observed) detection', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, {
+        detection: makeDetection({
+          confidence: 95,
+          evidence: [{ type: 'script_url', url: 'https://cdn.example.com/react.js' }],
+        }),
+        index: 0,
+      }),
+    );
+
+    expect(html).not.toContain('Derived from');
+    expect(html).not.toContain('Conflict:');
+  });
+
+  it('renders a requires conflict banner', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, {
+        detection: makeDetection({
+          confidence: 85,
+          evidence: [{ type: 'script_url', url: 'https://example.com/wc/cart.min.js' }],
+          relationshipConflicts: [
+            { type: 'requires', other: 'wordpress', reason: 'missing_requirement' },
+          ],
+        }),
+        index: 0,
+      }),
+    );
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('Conflict: requires (wordpress)');
+  });
+
+  it('renders an excludes conflict banner', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, {
+        detection: makeDetection({
+          confidence: 90,
+          evidence: [{ type: 'http_header', name: 'Server', value: 'nginx' }],
+          relationshipConflicts: [
+            { type: 'excludes', other: 'vercel', reason: 'both_directly_observed' },
+          ],
+        }),
+        index: 0,
+      }),
+    );
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('Conflict: excludes (vercel)');
+  });
+
+  it('still renders the zero-evidence state for a derived detection', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, {
+        detection: makeDetection({
+          source: 'relationship',
+          derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
+        }),
+        index: 0,
+      }),
+    );
+
+    expect(html).toContain('No evidence details are available.');
+    // And the derived banner, so it is never mistaken for a direct detection.
+    expect(html).toContain('Derived from');
+  });
+
+  it('renders both a derived banner and a conflict on the same direct detection', () => {
+    // A direct detection can carry both a derived-banner-style marker is
+    // impossible (direct ⇒ no source), but it CAN carry a conflict. This
+    // guards that a conflicted DIRECT detection never shows a derived
+    // banner while still showing its conflict.
+    const html = renderToString(
+      React.createElement(DetectionItem, {
+        detection: makeDetection({
+          confidence: 85,
+          evidence: [{ type: 'script_url', url: 'https://example.com/wc/cart.min.js' }],
+          relationshipConflicts: [
+            { type: 'requires', other: 'wordpress', reason: 'missing_requirement' },
+          ],
+        }),
+        index: 0,
+      }),
+    );
+
+    expect(html).not.toContain('Derived from');
+    const cleaned = html.replace(/<!-- -->/g, '');
+    expect(cleaned).toContain('Conflict: requires (wordpress)');
+  });
+});

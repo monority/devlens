@@ -143,4 +143,77 @@ describe('PostgresScanResultRepository — snapshot mapper round-trip (no DB)', 
       expect(reconstructed[0]!.version).toBeUndefined();
     });
   });
+
+  // ─── Step 69 — relationship fields survive the jsonb round-trip ───────
+  // `snapshots.detections` is stored as `jsonb` and round-trips the entire
+  // `Detection[]` object; the new optional Step-69 fields (source,
+  // derivedFrom, relationshipConflicts) must therefore persist transparently
+  // with no schema migration and no row-mapper changes.
+  describe('Step 69 — relationship detection round-trip (no DB required)', () => {
+    it('round-trips a relationship-derived detection', () => {
+      const derived: Detection = {
+        technology: { id: 'react' as never, name: 'React', category: 'framework' as never },
+        confidence: 0 as never,
+        evidence: [],
+        version: null,
+        source: 'relationship',
+        derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
+      };
+
+      const row = snapshotToRow('scan_derived' as never, makeSnapshot(), [derived]);
+      const { detections: reconstructed } = rowToSnapshot(row);
+
+      expect(reconstructed).toEqual([derived]);
+      expect(reconstructed[0]!.source).toBe('relationship');
+      expect(reconstructed[0]!.derivedFrom).toEqual([
+        { source: 'nextjs', sourceName: 'Next.js', type: 'implies' },
+      ]);
+    });
+
+    it('round-trips a direct detection carrying a relationship conflict', () => {
+      const conflicted: Detection = {
+        technology: {
+          id: 'woocommerce' as never,
+          name: 'WooCommerce',
+          category: 'ecommerce' as never,
+        },
+        confidence: 85 as never,
+        evidence: [{ type: 'http_header' as const, name: 'Server', value: 'nginx' }],
+        version: null,
+        relationshipConflicts: [
+          { type: 'requires', other: 'wordpress', reason: 'missing_requirement' },
+        ],
+      };
+
+      const row = snapshotToRow('scan_conflict' as never, makeSnapshot(), [conflicted]);
+      const { detections: reconstructed } = rowToSnapshot(row);
+
+      expect(reconstructed).toEqual([conflicted]);
+      expect(reconstructed[0]!.relationshipConflicts).toEqual([
+        { type: 'requires', other: 'wordpress', reason: 'missing_requirement' },
+      ]);
+    });
+
+    it('round-trips a mixed set (direct + derived + conflicted) losslessly', () => {
+      const direct: Detection = {
+        technology: { id: 'nextjs' as never, name: 'Next.js', category: 'framework' as never },
+        confidence: 95 as never,
+        evidence: [{ type: 'meta_tag' as const, name: 'generator', content: 'Next.js' }],
+        version: null,
+      };
+      const derived: Detection = {
+        technology: { id: 'react' as never, name: 'React', category: 'framework' as never },
+        confidence: 0 as never,
+        evidence: [],
+        version: null,
+        source: 'relationship',
+        derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
+      };
+
+      const row = snapshotToRow('scan_mixed' as never, makeSnapshot(), [direct, derived]);
+      const { detections: reconstructed } = rowToSnapshot(row);
+
+      expect(reconstructed).toEqual([direct, derived]);
+    });
+  });
 });

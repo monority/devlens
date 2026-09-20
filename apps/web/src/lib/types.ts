@@ -86,6 +86,20 @@ export interface DetectionResponse {
    * contract where `version` is only present when known.
    */
   version?: string;
+  /**
+   * Step 69 — How this detection entered the result set. Omitted when
+   * the detection is a direct observation; `'relationship'` means it was
+   * derived from an `implies` edge (no direct evidence — see `derivedFrom`).
+   */
+  source?: 'direct' | 'relationship';
+  /** Provenance for a derived detection (present iff source === 'relationship'). */
+  derivedFrom?: ReadonlyArray<{ source: string; sourceName: string; type: 'implies' }>;
+  /** Conflicts surfaced on a direct detection (excludes both-detected / requires missing). */
+  relationshipConflicts?: ReadonlyArray<{
+    type: 'excludes' | 'requires';
+    other: string;
+    reason: 'both_directly_observed' | 'missing_requirement';
+  }>;
 }
 
 // ─── Full scan result (by ID and by POST) ─────────────────────────────

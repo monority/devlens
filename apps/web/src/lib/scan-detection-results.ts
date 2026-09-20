@@ -109,6 +109,13 @@ export function getScanDetectionResults(detections: DetectionResponse[]): Detect
       // Version is omitted when absent (exactOptionalPropertyTypes), so
       // callers can rely on "present ⇒ known version".
       ...(detection.version ? { version: detection.version } : {}),
+      // Step 69: propagate relationship metadata (omit when absent) so the
+      // UI can distinguish direct observations from derived/conflicted ones.
+      ...(detection.source ? { source: detection.source } : {}),
+      ...(detection.derivedFrom ? { derivedFrom: detection.derivedFrom } : {}),
+      ...(detection.relationshipConflicts
+        ? { relationshipConflicts: detection.relationshipConflicts }
+        : {}),
     });
   }
 

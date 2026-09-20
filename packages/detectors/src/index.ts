@@ -43,6 +43,7 @@ export {
 export {
   TECHNOLOGY_DEFINITIONS,
   findDefinition,
+  relationshipsFor,
   signaturesFor,
   validateCatalog,
   validateDefinition,
@@ -50,6 +51,8 @@ export {
 } from './catalog/index.js';
 export type {
   TechnologyDefinition,
+  RelationshipType,
+  RelationshipDef,
   HeaderSignature,
   MetaTagSignature,
   ScriptUrlSignature,
@@ -60,6 +63,21 @@ export type {
 } from './catalog/types.js';
 
 export { createProductionDetector } from './production-detector.js';
+
+// ─── Step 69: Technology Relationship Semantics ──────────────────────
+// The relationship-resolution layer is the outermost decorator in the
+// production pipeline (after `ScoringDetector`). `resolveRelationships` is
+// the pure, testable core; `RelationshipResolver` is the `Detector`
+// decorator that wires it around the scoring layer. `TECHNOLOGY_DEFINITIONS`
+// (above) is the default catalog the resolver reads relationships from.
+export { resolveRelationships, RelationshipResolver } from './relationships.js';
+export type { RelationshipResolutionOptions } from './relationships.js';
+export {
+  createDerivedDetection,
+  createExcludesConflict,
+  createRequiresConflict,
+} from '@devlens/core';
+export type { DetectionSource, RelationshipProvenance, RelationshipConflict } from '@devlens/core';
 
 // Declarative version-extraction primitives (reusable across the
 // signature tables of every detector). `version` extraction is optional

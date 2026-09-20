@@ -62,40 +62,9 @@ import { createConfidence, createDetection, createUrl } from '@devlens/core';
 import type { Detector } from './detector.js';
 import { getTechnology } from './technology-catalog.js';
 import { getEvidenceKey } from './evidence-key.js';
-import { extractVersion, type VersionExtraction } from './version.js';
-
-/**
- * The kind of matching a signature performs on the resolved URL.
- *
- * - `'hostname'` — compares the resolved URL's hostname against an
- *   expected value **exactly** (not as a substring). Used for CDN
- *   domains like `cdn.shopify.com`.
- * - `'path_segment'` — checks whether the resolved URL's pathname
- *   contains a specific path segment **exactly** (not as a substring).
- *   Used for path-based signatures like `wp-content`.
- */
-type MatchKind = 'hostname' | 'path_segment';
-
-/**
- * A single link-tag-based detection signature.
- */
-interface LinkSignature {
-  /** The kind of match this signature performs. */
-  readonly matchKind: MatchKind;
-  /** The value to match (hostname or path segment, never a glob). */
-  readonly matchValue: string;
-  /** Technology ID — lookup key in {@link TECHNOLOGY_CATALOG}. */
-  readonly technologyId: string;
-  /** Confidence score (0–100). */
-  readonly confidence: number;
-  /**
-   * Optional, declarative version-extraction rule. When present, the
-   * version is extracted from the resolved link URL (the same URL that
-   * produced this detection's evidence). `null` when absent (the
-   * signature declares no version extraction).
-   */
-  readonly version?: VersionExtraction;
-}
+import { extractVersion } from './version.js';
+import { signaturesFor } from './catalog/index.js';
+import type { LinkSignature } from './catalog/types.js';
 
 /**
  * A single match result for a signature.
@@ -108,55 +77,13 @@ interface Match {
 }
 
 /**
- * The supported link signatures.
- *
- * Ordered so that more specific fingerprints are processed before
- * more general ones. Multiple signatures may match the same technology
- * (e.g. `wp-content` and `wp-includes` both → WordPress); the detector
- * merges them into a single detection with the highest confidence and
- * combined evidence.
+ * The supported link signatures, sourced declaratively from the
+ * per-technology catalog (`catalog/technologies/*.ts`). Multiple signatures
+ * may match the same technology (e.g. `wp-content` and `wp-json` both →
+ * WordPress); the detector merges them into a single detection with the
+ * highest confidence and combined evidence.
  */
-const SIGNATURES: readonly LinkSignature[] = [
-  // ── WordPress (path-segment signatures — must be exact segment match) ──
-  {
-    matchKind: 'path_segment',
-    matchValue: 'wp-content',
-    technologyId: 'wordpress',
-    confidence: 90,
-  },
-  {
-    matchKind: 'path_segment',
-    matchValue: 'wp-includes',
-    technologyId: 'wordpress',
-    confidence: 90,
-  },
-  {
-    matchKind: 'path_segment',
-    matchValue: 'wp-json',
-    technologyId: 'wordpress',
-    confidence: 90,
-  },
-  // ── Shopify (hostname signatures — must be exact hostname match) ────────
-  {
-    matchKind: 'hostname',
-    matchValue: 'cdn.shopify.com',
-    technologyId: 'shopify',
-    confidence: 95,
-  },
-  {
-    matchKind: 'hostname',
-    matchValue: 'shopifycdn.com',
-    technologyId: 'shopify',
-    confidence: 95,
-  },
-  // ── Google Fonts (hostname signature) ────────────────────────────────────
-  {
-    matchKind: 'hostname',
-    matchValue: 'fonts.googleapis.com',
-    technologyId: 'google-fonts',
-    confidence: 90,
-  },
-];
+const SIGNATURES: readonly LinkSignature[] = signaturesFor('link');
 
 /**
  * Checks whether a URL's hostname exactly matches the expected value.

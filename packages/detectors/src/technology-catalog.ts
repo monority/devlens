@@ -1,46 +1,54 @@
 /**
- * Centralized technology catalog — the single source of truth for
- * technology metadata (id, name, category).
+ * Centralized technology catalog — the single source of truth.
  *
  * ## Purpose
  *
- * Before this module, technology metadata (`id`, `name`, `category`) was
- * duplicated across the signature tables of six detectors:
- * `HeaderDetector`, `MetaTagDetector`, `ScriptUrlDetector`,
- * `ContentScriptDetector`, `ResourceDetector`, and `LinkDetector`.
- * Each signature table repeated `technologyName` and
- * `technologyCategory` alongside `technologyId`, creating a risk of
- * divergence (e.g. WordPress documented as `cms` in one detector and
- * `framework` in another).
+ * Before Step 68 this module held a hand-authored `TECHNOLOGY_CATALOG`
+ * mapping and the signature data lived separately in each detector's
+ * `SIGNATURES` table. That created two risks:
+ * 1. a technology's metadata (id/name/category) could diverge from its
+ *    signatures, and
+ * 2. a single technology's fingerprints were spread across up to six
+ *    detector files.
  *
- * This catalog centralizes all technology definitions in one place.
- * Detectors reference the catalog by `technologyId` (a plain string key)
- * and retrieve the canonical `Technology` object. This eliminates
- * duplication without adding a new domain concept — it simply uses the
- * existing `Technology` interface from `@devlens/core`.
+ * Step 67 introduced the architecture; Step 68 makes the catalog
+ * **declarative**: every technology is described by a single
+ * `TechnologyDefinition` in `catalog/technologies/<id>.ts` (metadata +
+ * *all* of its signatures across every observable source). This module is
+ * now a *facade* that derives the canonical metadata objects
+ * (`TECHNOLOGY_CATALOG`, `TECHNOLOGY_IDS`, `TECHNOLOGY_CATEGORIES`,
+ * `getTechnology`) directly from {@link TECHNOLOGY_DEFINITIONS}.
+ *
+ * The catalog's `signaturesFor(kind)` accessor feeds the six detectors,
+ * whose matching logic is unchanged — they simply read their signatures
+ * from the catalog instead of a local literal.
  *
  * ## What the catalog does NOT do
  *
- * - It does NOT define signatures, conficiencies, or evidence. Those
- *   remain in the individual detector signature tables.
  * - It does NOT change the `Technology` interface or domain model.
- * - It does NOT create a new abstraction — `Technology` is already a
- *   plain data structure; the catalog is just a collection of instances.
+ * - It does NOT add a new detection abstraction — `Technology` is a plain
+ *   data structure; the catalog is just a collection of instances.
+ * - It does NOT alter the `ScoringDetector` ranking
+ *   (`confidence DESC, technology.id ASC`) — cross-technology ordering is
+ *   normalized, so relocating signatures does not change results.
  *
  * ## Adding a new technology
  *
- * To add a new technology:
- * 1. Add an entry to `TECHNOLOGY_CATALOG` below.
- * 2. Add the corresponding signature to the appropriate detector's
- *   `SIGNATURES` table (referencing the catalog key).
- * 3. Document the new technology in `docs/architecture/detectors.md`.
+ * 1. Add a `catalog/technologies/<id>.ts` file exporting a single
+ *    `TechnologyDefinition`.
+ * 2. Import it into `catalog/index.ts` and append it to
+ *    `TECHNOLOGY_DEFINITIONS`.
+ * 3. Add a positive fixture to `fixtures/detector-fixtures.ts`.
+ *
+ * That is it — no detector, scorer, deduplicator, or engine file changes.
  */
 
 import type { Technology } from '@devlens/core';
 import { createTechnologyId, createTechnologyCategory } from '@devlens/core';
+import { TECHNOLOGY_DEFINITIONS } from './catalog/index.js';
 
 /**
- * A single technology entry in the catalog.
+ * A single technology entry in the catalog (public metadata).
  */
 export interface CatalogEntry {
   /** The canonical technology ID (matches `TechnologyId` branding). */
@@ -53,193 +61,31 @@ export interface CatalogEntry {
 
 /**
  * The full technology catalog — a record mapping technology ID keys
- * to their canonical `Technology` objects.
+ * to their canonical `Technology` objects, derived from the declarative
+ * `TECHNOLOGY_DEFINITIONS`.
  *
  * Categories in use:
- * - `server` — web servers (nginx, Apache, IIS)
+ * - `server` — web servers (nginx, Apache, IIS, Caddy, OpenResty, LiteSpeed, Tomcat)
  * - `language` — server-side languages (PHP)
- * - `framework` — web frameworks (Next.js, React, Vue, etc.)
- * - `library` — client-side libraries (jQuery, Lodash)
- * - `cms` — content management systems (WordPress, Hugo, Jekyll, Ghost)
- * - `service_worker` — PWA/service worker platforms (Firebase)
- * - `ecommerce` — e-commerce platforms (Shopify, WooCommerce)
+ * - `framework` — web frameworks (Next.js, React, Vue, Angular, Svelte, ...)
+ * - `library` — client-side libraries (jQuery, Lodash, D3, Popper.js, ...)
+ * - `cms` — content management systems (WordPress, Hugo, Jekyll, Ghost, TYPO3, ...)
+ * - `service_worker` — PWA / service-worker platforms (Firebase)
+ * - `ecommerce` — e-commerce platforms (Shopify, WooCommerce, BigCommerce)
  * - `fonts` — font delivery services (Google Fonts)
- * - `analytics` — analytics & marketing tools (Google Analytics, Plausible)
- * - `cdn` — content delivery networks & edge platforms (Cloudflare)
+ * - `analytics` — analytics & marketing tools (Google Analytics, GTM, Matomo, ...)
+ * - `cdn` — content delivery networks & edge platforms (Cloudflare, Fastly, Vercel)
  */
-export const TECHNOLOGY_CATALOG: Record<string, Technology> = {
-  // ── Servers ───────────────────────────────────────────────
-  nginx: {
-    id: createTechnologyId('nginx'),
-    name: 'nginx',
-    category: createTechnologyCategory('server'),
-  },
-  apache: {
-    id: createTechnologyId('apache'),
-    name: 'Apache',
-    category: createTechnologyCategory('server'),
-  },
-  iis: {
-    id: createTechnologyId('iis'),
-    name: 'IIS',
-    category: createTechnologyCategory('server'),
-  },
-
-  // ── Languages ─────────────────────────────────────────────
-  php: {
-    id: createTechnologyId('php'),
-    name: 'PHP',
-    category: createTechnologyCategory('language'),
-  },
-
-  // ── CMS ───────────────────────────────────────────────────
-  wordpress: {
-    id: createTechnologyId('wordpress'),
-    name: 'WordPress',
-    category: createTechnologyCategory('cms'),
-  },
-  drupal: {
-    id: createTechnologyId('drupal'),
-    name: 'Drupal',
-    category: createTechnologyCategory('cms'),
-  },
-  webflow: {
-    id: createTechnologyId('webflow'),
-    name: 'Webflow',
-    category: createTechnologyCategory('cms'),
-  },
-  hugo: {
-    id: createTechnologyId('hugo'),
-    name: 'Hugo',
-    category: createTechnologyCategory('cms'),
-  },
-  jekyll: {
-    id: createTechnologyId('jekyll'),
-    name: 'Jekyll',
-    category: createTechnologyCategory('cms'),
-  },
-  ghost: {
-    id: createTechnologyId('ghost'),
-    name: 'Ghost',
-    category: createTechnologyCategory('cms'),
-  },
-  prestashop: {
-    id: createTechnologyId('prestashop'),
-    name: 'PrestaShop',
-    category: createTechnologyCategory('cms'),
-  },
-
-  // ── Frameworks ─────────────────────────────────────────────
-  express: {
-    id: createTechnologyId('express'),
-    name: 'Express',
-    category: createTechnologyCategory('framework'),
-  },
-  laravel: {
-    id: createTechnologyId('laravel'),
-    name: 'Laravel',
-    category: createTechnologyCategory('framework'),
-  },
-  nextjs: {
-    id: createTechnologyId('nextjs'),
-    name: 'Next.js',
-    category: createTechnologyCategory('framework'),
-  },
-  nuxtjs: {
-    id: createTechnologyId('nuxtjs'),
-    name: 'Nuxt.js',
-    category: createTechnologyCategory('framework'),
-  },
-  gatsby: {
-    id: createTechnologyId('gatsby'),
-    name: 'Gatsby',
-    category: createTechnologyCategory('framework'),
-  },
-  react: {
-    id: createTechnologyId('react'),
-    name: 'React',
-    category: createTechnologyCategory('framework'),
-  },
-  vue: {
-    id: createTechnologyId('vue'),
-    name: 'Vue.js',
-    category: createTechnologyCategory('framework'),
-  },
-  angular: {
-    id: createTechnologyId('angular'),
-    name: 'Angular',
-    category: createTechnologyCategory('framework'),
-  },
-  svelte: {
-    id: createTechnologyId('svelte'),
-    name: 'Svelte',
-    category: createTechnologyCategory('framework'),
-  },
-  astro: {
-    id: createTechnologyId('astro'),
-    name: 'Astro',
-    category: createTechnologyCategory('framework'),
-  },
-  bootstrap: {
-    id: createTechnologyId('bootstrap'),
-    name: 'Bootstrap',
-    category: createTechnologyCategory('framework'),
-  },
-
-  // ── Libraries ──────────────────────────────────────────────
-  jquery: {
-    id: createTechnologyId('jquery'),
-    name: 'jQuery',
-    category: createTechnologyCategory('library'),
-  },
-  lodash: {
-    id: createTechnologyId('lodash'),
-    name: 'Lodash',
-    category: createTechnologyCategory('library'),
-  },
-  tailwind: {
-    id: createTechnologyId('tailwind'),
-    name: 'Tailwind CSS',
-    category: createTechnologyCategory('library'),
-  },
-
-  // ── Services ───────────────────────────────────────────────
-  firebase: {
-    id: createTechnologyId('firebase'),
-    name: 'Firebase',
-    category: createTechnologyCategory('service_worker'),
-  },
-  shopify: {
-    id: createTechnologyId('shopify'),
-    name: 'Shopify',
-    category: createTechnologyCategory('ecommerce'),
-  },
-  woocommerce: {
-    id: createTechnologyId('woocommerce'),
-    name: 'WooCommerce',
-    category: createTechnologyCategory('ecommerce'),
-  },
-  cloudflare: {
-    id: createTechnologyId('cloudflare'),
-    name: 'Cloudflare',
-    category: createTechnologyCategory('cdn'),
-  },
-  'google-fonts': {
-    id: createTechnologyId('google-fonts'),
-    name: 'Google Fonts',
-    category: createTechnologyCategory('fonts'),
-  },
-  'google-analytics': {
-    id: createTechnologyId('google-analytics'),
-    name: 'Google Analytics',
-    category: createTechnologyCategory('analytics'),
-  },
-  plausible: {
-    id: createTechnologyId('plausible'),
-    name: 'Plausible Analytics',
-    category: createTechnologyCategory('analytics'),
-  },
-} as const;
+export const TECHNOLOGY_CATALOG: Record<string, Technology> = Object.fromEntries(
+  TECHNOLOGY_DEFINITIONS.map((def) => [
+    def.id,
+    {
+      id: createTechnologyId(def.id),
+      name: def.name,
+      category: createTechnologyCategory(def.category),
+    },
+  ]),
+);
 
 /**
  * The set of all technology IDs defined in the catalog.

@@ -36,89 +36,16 @@ import type { Detection, SiteSnapshot } from '@devlens/core';
 import { createConfidence, createDetection } from '@devlens/core';
 import type { Detector } from './detector.js';
 import { getTechnology } from './technology-catalog.js';
-import { extractVersion, type VersionExtraction } from './version.js';
+import { extractVersion } from './version.js';
+import { signaturesFor } from './catalog/index.js';
+import type { MetaTagSignature } from './catalog/types.js';
 
 /**
- * A single meta-tag-based detection signature.
+ * The supported meta tag signatures, sourced declaratively from the
+ * per-technology catalog (`catalog/technologies/*.ts`). The detector's
+ * `detect()` matching logic is unchanged.
  */
-interface MetaTagSignature {
-  /** Canonical lowercase meta tag name to match (e.g. `"generator"`). */
-  readonly tagName: string;
-  /** Case-insensitive substring to search for in the meta tag content. */
-  readonly matchContent: string;
-  /** Technology ID — lookup key in {@link TECHNOLOGY_CATALOG}. */
-  readonly technologyId: string;
-  /** Confidence score (0–100). */
-  readonly confidence: number;
-  /**
-   * Optional, declarative version-extraction rule. When present, the
-   * version is extracted from the matched meta tag content (the same
-   * content that produced this detection's evidence). `null` when absent.
-   */
-  readonly version?: VersionExtraction;
-}
-
-/**
- * The supported meta tag signatures.
- *
- * Ordered so that more specific matches are processed before
- * more general ones. In the current set, each technology has
- * exactly one signature, so ordering does not affect the result.
- */
-const SIGNATURES: readonly MetaTagSignature[] = [
-  {
-    tagName: 'generator',
-    matchContent: 'wordpress',
-    technologyId: 'wordpress',
-    confidence: 90,
-    version: {
-      source: 'matchedValue',
-      rule: { pattern: /wordpress\s+(\d+(?:\.\d+){0,2})/i },
-    },
-  },
-  {
-    tagName: 'generator',
-    matchContent: 'hugo',
-    technologyId: 'hugo',
-    confidence: 85,
-  },
-  {
-    tagName: 'generator',
-    matchContent: 'jekyll',
-    technologyId: 'jekyll',
-    confidence: 85,
-  },
-  {
-    tagName: 'generator',
-    matchContent: 'ghost',
-    technologyId: 'ghost',
-    confidence: 85,
-  },
-  {
-    tagName: 'generator',
-    matchContent: 'next.js',
-    technologyId: 'nextjs',
-    confidence: 85,
-  },
-  {
-    tagName: 'generator',
-    matchContent: 'gatsby',
-    technologyId: 'gatsby',
-    confidence: 85,
-  },
-  {
-    tagName: 'generator',
-    matchContent: 'nuxt.js',
-    technologyId: 'nuxtjs',
-    confidence: 85,
-  },
-  {
-    tagName: 'generator',
-    matchContent: 'prestashop',
-    technologyId: 'prestashop',
-    confidence: 90,
-  },
-];
+const SIGNATURES: readonly MetaTagSignature[] = signaturesFor('meta');
 
 /**
  * A `Detector` that identifies technologies from HTML `<meta>` tags.

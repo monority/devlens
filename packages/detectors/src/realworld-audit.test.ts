@@ -239,19 +239,20 @@ describe('Step 64 real-world detection audit', () => {
 
   describe('G2 — Known limitation: GA4 via Google Tag Manager only', () => {
     // GA4 is very commonly loaded through GTM
-    // (`googletagmanager.com/gtag/js?id=G-...`). The google-analytics
-    // signature matches the `google-analytics` substring, which this URL
-    // lacks, so GA4-via-GTM is NOT detected. Adding `googletagmanager.com`
-    // would false-positive on GTM-only (non-GA) sites. Pinned as a known
-    // gap.
+    // (`googletagmanager.com/gtag/js?id=G-...`). The `google-analytics`
+    // signature matches only the `google-analytics` substring, which this
+    // URL lacks, so GA4-via-GTM is NOT (and cannot be) detected as
+    // Analytics. Step 68 added a dedicated `google-tag-manager` technology
+    // for the `googletagmanager.com` fingerprint; it correctly fires here
+    // without implying Google Analytics.
     const snapshot = makeSnapshot({
       scripts: [{ src: 'https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX', content: '' }],
     });
 
-    it('does NOT detect google-analytics from GTM alone', () => {
+    it('detects Google Tag Manager but NOT Google Analytics', () => {
       const detections = pipeline.detect(snapshot);
+      expect(detections.map((d) => d.technology.id)).toEqual(['google-tag-manager']);
       expect(detections.map((d) => d.technology.id)).not.toContain('google-analytics');
-      expect(detections).toHaveLength(0);
     });
   });
 });

@@ -33,92 +33,18 @@ import type { Detection, SiteSnapshot } from '@devlens/core';
 import { createConfidence, createDetection } from '@devlens/core';
 import type { Detector } from './detector.js';
 import { getTechnology } from './technology-catalog.js';
-import { extractVersion, type VersionExtraction } from './version.js';
+import { extractVersion } from './version.js';
+import { signaturesFor } from './catalog/index.js';
+import type { HeaderSignature } from './catalog/types.js';
 
 /**
- * A single header-based detection signature.
+ * The supported header signatures, sourced declaratively from the
+ * per-technology catalog (`catalog/technologies/*.ts`). The detector's
+ * `detect()` matching logic is unchanged — only the *source* of the
+ * signatures moved. Per-technology signature order is preserved by the
+ * catalog; cross-technology order is normalized by `ScoringDetector#rank`.
  */
-interface HeaderSignature {
-  /** Canonical lowercase header name to match (e.g. `"server"`). */
-  readonly headerName: string;
-  /** Case-insensitive substring to search for in the header value. */
-  readonly matchValue: string;
-  /** Technology ID — lookup key in {@link TECHNOLOGY_CATALOG}. */
-  readonly technologyId: string;
-  /** Confidence score (0–100). */
-  readonly confidence: number;
-  /**
-   * Optional, declarative version-extraction rule. When present, the
-   * version is extracted from the matched header value (the same value
-   * that produced this detection's evidence). `null` when absent.
-   */
-  readonly version?: VersionExtraction;
-}
-
-/**
- * The supported header signatures.
- *
- * Ordered so that more specific matches are processed before
- * more general ones. In the current set, each technology has
- * exactly one signature, so ordering does not affect the result.
- */
-const SIGNATURES: readonly HeaderSignature[] = [
-  // ── Server header ──────────────────────────────────────────
-  {
-    headerName: 'server',
-    matchValue: 'nginx',
-    technologyId: 'nginx',
-    confidence: 95,
-    version: {
-      source: 'matchedValue',
-      rule: { pattern: /nginx\/(\d+(?:\.\d+){0,2})/ },
-    },
-  },
-  {
-    headerName: 'server',
-    matchValue: 'apache',
-    technologyId: 'apache',
-    confidence: 95,
-    version: {
-      source: 'matchedValue',
-      rule: { pattern: /apache\/(\d+(?:\.\d+){0,2})/i },
-    },
-  },
-  {
-    headerName: 'server',
-    matchValue: 'microsoft-iis',
-    technologyId: 'iis',
-    confidence: 95,
-    version: {
-      source: 'matchedValue',
-      rule: { pattern: /microsoft-iis\/(\d+(?:\.\d+){0,2})/i },
-    },
-  },
-  // ── X-Powered-By header ────────────────────────────────────
-  {
-    headerName: 'x-powered-by',
-    matchValue: 'express',
-    technologyId: 'express',
-    confidence: 90,
-  },
-  {
-    headerName: 'x-powered-by',
-    matchValue: 'php',
-    technologyId: 'php',
-    confidence: 90,
-    version: {
-      source: 'matchedValue',
-      rule: { pattern: /php\/(\d+(?:\.\d+){0,2})/i },
-    },
-  },
-  // ── Cloudflare (CDN) ───────────────────────────────────────
-  {
-    headerName: 'server',
-    matchValue: 'cloudflare',
-    technologyId: 'cloudflare',
-    confidence: 95,
-  },
-];
+const SIGNATURES: readonly HeaderSignature[] = signaturesFor('header');
 
 /**
  * A `Detector` that identifies technologies from HTTP response headers.

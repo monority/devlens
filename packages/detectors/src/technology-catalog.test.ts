@@ -56,6 +56,34 @@ const EXPECTED_TECHNOLOGIES: Record<string, { name: string; category: string }> 
   // LinkDetector
   shopify: { name: 'Shopify', category: 'ecommerce' },
   'google-fonts': { name: 'Google Fonts', category: 'fonts' },
+
+  // ── Step 68 declarative additions ──────────────────────────
+  // HeaderDetector
+  caddy: { name: 'Caddy', category: 'server' },
+  openresty: { name: 'OpenResty', category: 'server' },
+  litespeed: { name: 'LiteSpeed', category: 'server' },
+  tomcat: { name: 'Tomcat', category: 'server' },
+  fastly: { name: 'Fastly', category: 'cdn' },
+  vercel: { name: 'Vercel', category: 'cdn' },
+  // MetaTagDetector
+  typo3: { name: 'TYPO3', category: 'cms' },
+  joomla: { name: 'Joomla', category: 'cms' },
+  'craft-cms': { name: 'Craft CMS', category: 'cms' },
+  mediawiki: { name: 'MediaWiki', category: 'cms' },
+  // ScriptUrlDetector
+  'google-tag-manager': { name: 'Google Tag Manager', category: 'analytics' },
+  matomo: { name: 'Matomo', category: 'analytics' },
+  segment: { name: 'Segment', category: 'analytics' },
+  htmx: { name: 'HTMX', category: 'library' },
+  turbo: { name: 'Turbo', category: 'library' },
+  stimulus: { name: 'Stimulus', category: 'library' },
+  alpinejs: { name: 'Alpine.js', category: 'library' },
+  bigcommerce: { name: 'BigCommerce', category: 'ecommerce' },
+  d3: { name: 'D3', category: 'library' },
+  popperjs: { name: 'Popper.js', category: 'library' },
+  // ContentScriptDetector
+  ember: { name: 'Ember', category: 'framework' },
+  backbone: { name: 'Backbone', category: 'framework' },
 };
 
 // ─── Tests ─────────────────────────────────────────────────────────
@@ -71,8 +99,8 @@ describe('TechnologyCatalog', () => {
       }
     });
 
-    it('contains exactly 32 technologies', () => {
-      expect(Object.keys(TECHNOLOGY_CATALOG)).toHaveLength(32);
+    it('contains exactly 54 technologies', () => {
+      expect(Object.keys(TECHNOLOGY_CATALOG)).toHaveLength(54);
     });
 
     it('every expected technology is present with correct metadata', () => {

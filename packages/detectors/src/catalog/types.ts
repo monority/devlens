@@ -108,6 +108,41 @@ export interface ResourceSignature {
 }
 
 /**
+ * A single **resource-content** detection signature.
+ *
+ * Step 71 — Advanced Resource-Based Detection. This is the content
+ * observation variant of {@link ResourceSignature}: instead of matching a
+ * *resource URL* (the URL-based `resource` evidence), it matches a
+ * **fetched resource body** (e.g. an Angular/Vue/Svelte/Astro JS bundle
+ * fetched by the crawler's Step-70 resource-intelligence layer) for a
+ * technology-specific fingerprint found *inside* the body.
+ *
+ * Shape rules (`matchType`/`matchContent`/`technologyId`/`confidence`/
+ * `version`) intentionally mirror {@link ResourceSignature} exactly — the
+ * same matching predicate (a resource `type` match + case-insensitive
+ * `matchContent` substring search over `resource.content`) is reused by
+ * {@link ResourceContentDetector}, which is a structural sibling of
+ * {@link ResourceDetector}. No new matching engine is introduced.
+ *
+ * `matchContent` MUST be a discriminating, minification-robust token
+ * (e.g. an import-specifier string literal like `@angular/core` or a
+ * runtime global like `__astro`) — never a generic substring such as
+ * `react`/`vue` (see Step-71 §7).
+ */
+export interface ResourceContentSignature {
+  /** The `Resource.type` this signature applies to (e.g. `'script'`). */
+  readonly matchType: ResourceType;
+  /** Case-insensitive substring to search for in the resource `content`. */
+  readonly matchContent: string;
+  /** Technology ID — lookup key in {@link TECHNOLOGY_CATALOG}. */
+  readonly technologyId: string;
+  /** Confidence score (0–100). */
+  readonly confidence: number;
+  /** Optional declarative version-extraction rule read from the matched value. */
+  readonly version?: VersionExtraction;
+}
+
+/**
  * A single link-tag-based detection signature.
  */
 export interface LinkSignature {
@@ -187,6 +222,14 @@ export interface TechnologyDefinition {
   readonly scriptUrlSignatures?: readonly ScriptUrlSignature[];
   readonly contentSignatures?: readonly ContentScriptSignature[];
   readonly resourceSignatures?: readonly ResourceSignature[];
+  /**
+   * Step 71 — Signatures that match a **fetched resource body** (not the
+   * resource URL). Consumed by {@link ResourceContentDetector} as
+   * `signaturesFor('resource_content')`. Each signature matches its
+   * `matchType` resource's `content` for `matchContent` (case-insensitive
+   * substring), exactly like {@link ResourceSignature}.
+   */
+  readonly resourceContentSignatures?: readonly ResourceContentSignature[];
   readonly linkSignatures?: readonly LinkSignature[];
   /**
    * Step 69: declarative relationship edges declared by this technology.

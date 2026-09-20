@@ -288,4 +288,39 @@ describe('PostgresScanResultRepository — snapshot mapper round-trip (no DB)', 
       expect(reconstructed!.resources[0]!.responseHeaders).toBeUndefined();
     });
   });
+
+  // ─── Step 71 — resource-content evidence round-trips through jsonb ────
+  // `snapshots.detections` is stored as `jsonb`; the new `resource_content`
+  // evidence variant (url/resourceType/match/snippet) must persist and
+  // reconstruct losslessly with no schema/migration changes.
+  describe('Step 71 — resource-content evidence round-trip (no DB)', () => {
+    it('round-trips a direct detection carrying ResourceContentEvidence', () => {
+      const detection: Detection = {
+        technology: { id: 'angular' as never, name: 'Angular', category: 'framework' as never },
+        confidence: 95 as never,
+        evidence: [
+          {
+            type: 'resource_content' as const,
+            url: createUrl('https://example.com/main.abcdef.js'),
+            resourceType: 'script',
+            match: '@angular/core',
+            snippet: 'import { Component } from "@angular/core";',
+          },
+        ],
+        version: null,
+      };
+
+      const row = snapshotToRow('scan_rc_evidence' as never, makeSnapshot(), [detection]);
+      const { detections: reconstructed } = rowToSnapshot(row);
+
+      expect(reconstructed).toEqual([detection]);
+      expect(reconstructed[0]!.evidence[0]!).toMatchObject({
+        type: 'resource_content',
+        url: 'https://example.com/main.abcdef.js',
+        resourceType: 'script',
+        match: '@angular/core',
+        snippet: 'import { Component } from "@angular/core";',
+      });
+    });
+  });
 });

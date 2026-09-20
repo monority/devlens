@@ -29,6 +29,7 @@ import type {
   ScriptUrlSignature,
   ContentScriptSignature,
   ResourceSignature,
+  ResourceContentSignature,
   LinkSignature,
   RelationshipDef,
   RelationshipType,
@@ -197,15 +198,18 @@ export function signaturesFor(kind: 'meta'): readonly MetaTagSignature[];
 export function signaturesFor(kind: 'script_url'): readonly ScriptUrlSignature[];
 export function signaturesFor(kind: 'content_script'): readonly ContentScriptSignature[];
 export function signaturesFor(kind: 'resource'): readonly ResourceSignature[];
+export function signaturesFor(kind: 'resource_content'): readonly ResourceContentSignature[];
 export function signaturesFor(kind: 'link'): readonly LinkSignature[];
 export function signaturesFor(
-  kind: 'header' | 'meta' | 'script_url' | 'content_script' | 'resource' | 'link',
+  kind:
+    'header' | 'meta' | 'script_url' | 'content_script' | 'resource' | 'resource_content' | 'link',
 ): readonly (
   | HeaderSignature
   | MetaTagSignature
   | ScriptUrlSignature
   | ContentScriptSignature
   | ResourceSignature
+  | ResourceContentSignature
   | LinkSignature
 )[] {
   switch (kind) {
@@ -219,6 +223,8 @@ export function signaturesFor(
       return TECHNOLOGY_DEFINITIONS.flatMap((d) => d.contentSignatures ?? []);
     case 'resource':
       return TECHNOLOGY_DEFINITIONS.flatMap((d) => d.resourceSignatures ?? []);
+    case 'resource_content':
+      return TECHNOLOGY_DEFINITIONS.flatMap((d) => d.resourceContentSignatures ?? []);
     case 'link':
       return TECHNOLOGY_DEFINITIONS.flatMap((d) => d.linkSignatures ?? []);
     default:
@@ -253,6 +259,7 @@ export function validateDefinition(def: TechnologyDefinition, knownIds?: Set<str
     ...(def.scriptUrlSignatures ?? []),
     ...(def.contentSignatures ?? []),
     ...(def.resourceSignatures ?? []),
+    ...(def.resourceContentSignatures ?? []),
     ...(def.linkSignatures ?? []),
   ];
 

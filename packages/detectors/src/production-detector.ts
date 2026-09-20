@@ -27,6 +27,7 @@ import { MetaTagDetector } from './meta-tag-detector.js';
 import { ScriptUrlDetector } from './script-url-detector.js';
 import { ContentScriptDetector } from './content-script-detector.js';
 import { ResourceDetector } from './resource-detector.js';
+import { ResourceContentDetector } from './resource-content-detector.js';
 import { LinkDetector } from './link-detector.js';
 import { CompositeDetector } from './composite-detector.js';
 import { DeduplicatingDetector } from './deduplicating-detector.js';
@@ -52,7 +53,12 @@ import { RelationshipResolver } from './relationships.js';
  * assertions, while the production factory is the single source of truth for
  * web + worker.
  *
- * @returns A `Detector` that runs all six sub-detectors through
+ * The seven sub-detectors inside `CompositeDetector` are the six Step-68
+ * detectors plus Step-71's `ResourceContentDetector` (which inspects the
+ * bodies of fetched resource bundles the same way `ResourceDetector` inspects
+ * resource URLs).
+ *
+ * @returns A `Detector` that runs all seven sub-detectors through
  *          ``CompositeDetector``, deduplicates by technology ID via
  *          ``DeduplicatingDetector``, applies confidence scoring via
  *          ``ScoringDetector(ConfidenceScorer)``, and finally resolves
@@ -68,6 +74,7 @@ export function createProductionDetector(): Detector {
           new ScriptUrlDetector(),
           new ContentScriptDetector(),
           new ResourceDetector(),
+          new ResourceContentDetector(),
           new LinkDetector(),
         ]),
       ),

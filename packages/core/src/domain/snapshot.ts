@@ -118,7 +118,26 @@ export type ResourceType =
   | 'document'
   | 'robots'
   | 'manifest'
+  | 'favicon'
   | 'other';
+
+/**
+ * The lifecycle stage of a {@link Resource} within the
+ * discover → select → acquire pipeline (Step 70).
+ *
+ * - `discovered` — referenced by the HTML document but not yet selected
+ *   for acquisition (e.g. beyond budget, or external-and-restricted).
+ * - `selected` — chosen for acquisition but not yet fetched (rarely
+ *   observed directly; resources move to `fetched`/`failed`/`skipped`
+ *   once acquisition is attempted).
+ * - `fetched` — successfully acquired within policy limits.
+ * - `failed` — acquisition was attempted but failed (network/timeout/
+ *   non-2xx/oversized/body error).
+ * - `skipped` — never acquired (blocked by SSRF/same-origin, duplicate,
+ *   or excluded by the selection policy).
+ */
+export type ResourceAcquisitionStatus =
+  'discovered' | 'selected' | 'fetched' | 'failed' | 'skipped';
 
 /**
  * A resource observed during a crawl.
@@ -134,6 +153,21 @@ export type ResourceType =
  *
  * `contentType` is the response `Content-Type` header value (without
  * parameters), or `null` when the resource was not fetched.
+ *
+ * Step 70 extends `Resource` with optional provenance fields. These are
+ * optional so that existing `Resource` literals (and persisted rows) remain
+ * valid:
+ *
+ * - `sourcePage` — the page URL that referenced this resource
+ *   (distinguishes a primary-document signal from a secondary-resource
+ *   signal, e.g. `https://example.com/` vs
+ *   `https://example.com/assets/app.js`).
+ * - `acquisitionStatus` — lifecycle stage from the discover→select→acquire
+ *   pipeline.
+ * - `failureReason` — present when `acquisitionStatus` is `failed` or
+ *   `skipped`; never fabricated.
+ * - `responseHeaders` — relevant response headers of the fetched resource
+ *   (omitted for discovered/failed resources).
  */
 export interface Resource {
   readonly url: Url;
@@ -142,6 +176,10 @@ export interface Resource {
   readonly content: string;
   readonly httpStatus: HttpStatus;
   readonly contentType: string | null;
+  readonly sourcePage?: Url;
+  readonly acquisitionStatus?: ResourceAcquisitionStatus;
+  readonly failureReason?: string;
+  readonly responseHeaders?: ReadonlyArray<HttpHeader>;
 }
 
 /**

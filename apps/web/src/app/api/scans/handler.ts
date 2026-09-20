@@ -36,6 +36,12 @@ export interface DetectionResponse {
   };
   confidence: number;
   evidence: ReadonlyArray<Evidence>;
+  /**
+   * Technology version extracted from evidence, when a tech-specific
+   * signature produced one. Omitted from the JSON response when no
+   * version was extracted (never fabricated/null in the API contract).
+   */
+  version?: string;
 }
 
 /**
@@ -224,6 +230,9 @@ function detectionToResponse(detection: Detection): DetectionResponse {
     },
     confidence: detection.confidence,
     evidence: detection.evidence,
+    // Version is omitted from the response when absent (never emitted as
+    // a fabricated value) — see DetectionResponse.version.
+    ...(detection.version ? { version: detection.version } : {}),
   };
 }
 

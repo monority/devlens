@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { handleCreateScan, type HandleCreateScanOptions } from './handler.js';
 import type { ScanResultRepository, ScanResult } from '@devlens/application';
 import type { Crawler } from '@devlens/crawler';
-import type { Detector } from '@devlens/detectors';
+import { createProductionDetector, type Detector } from '@devlens/detectors';
 import { CrawlError } from '@devlens/crawler';
 import {
   createUrl,
@@ -19,14 +19,14 @@ const FIXED_DATE = new Date('2025-06-01T12:00:00.000Z');
 /** A mock Detector that returns an empty array (no detections). */
 const mockDetector: Detector = { detect: () => [] };
 
-function makeSnapshot(): SiteSnapshot {
+function makeSnapshot(headers: Array<{ name: string; value: string }> = []): SiteSnapshot {
   return {
     url: createUrl('https://example.com/'),
     hostname: createHostname('example.com'),
     capturedAt: createTimestampFromString('2025-06-01T12:00:00.000Z'),
     http: {
       statusCode: createHttpStatus(200),
-      headers: [],
+      headers,
       contentType: 'text/html',
       finalUrl: createUrl('https://example.com/'),
     },
@@ -509,5 +509,60 @@ describe('POST /api/scans — infrastructure failure (persistence)', () => {
     expect(result.body).toMatchObject({
       error: { code: 'INTERNAL_ERROR', message: 'An internal error occurred.' },
     });
+  });
+});
+
+describe('POST /api/scans — detection version serialization', () => {
+  function makeRepository(): ScanResultRepository {
+    return {
+      save: vi.fn().mockResolvedValue(undefined),
+      getById: vi.fn(),
+      list: vi.fn(),
+    };
+  }
+
+  async function runWithDetector(snapshot: SiteSnapshot, detector: Detector) {
+    const crawler: Crawler = { crawl: vi.fn().mockResolvedValue(snapshot) };
+    const result = await handleCreateScan(
+      '{"url": "https://example.com"}',
+      makeOptions(crawler, makeRepository(), { detector }),
+    );
+    return result;
+  }
+
+  it('serializes a version extracted by a detector into the response', async () => {
+    // nginx is detected from `Server: nginx/1.21.6` and the HeaderDetector
+    // extracts version "1.21.6" from that same header value.
+    const snapshot = makeSnapshot([{ name: 'Server', value: 'nginx/1.21.6' }]);
+    const result = await runWithDetector(snapshot, createProductionDetector());
+
+    expect(result.status).toBe(200);
+    const body = result.body;
+    if ('scan' in body) {
+      expect(body.detections).toHaveLength(1);
+      const detection = body.detections[0]!;
+      expect(detection.technology.id).toBe('nginx');
+      // Version is present (not omitted, not null) when a signature extracted one.
+      expect(detection.version).toBe('1.21.6');
+      expect(detection).toHaveProperty('version', '1.21.6');
+    }
+  });
+
+  it('omits the version key entirely when no version was extracted', async () => {
+    // Cloudflare has no version-extraction rule → version is absent from the
+    // serialized detection (never emitted as `null`).
+    const snapshot = makeSnapshot([{ name: 'Server', value: 'cloudflare' }]);
+    const result = await runWithDetector(snapshot, createProductionDetector());
+
+    expect(result.status).toBe(200);
+    const body = result.body;
+    if ('scan' in body) {
+      expect(body.detections).toHaveLength(1);
+      const detection = body.detections[0]!;
+      expect(detection.technology.id).toBe('cloudflare');
+      // The omit-when-absent contract: `version` key is absent, not null.
+      expect(detection).not.toHaveProperty('version');
+      expect(detection.version).toBeUndefined();
+    }
   });
 });

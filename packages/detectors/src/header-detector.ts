@@ -33,6 +33,7 @@ import type { Detection, SiteSnapshot } from '@devlens/core';
 import { createConfidence, createDetection } from '@devlens/core';
 import type { Detector } from './detector.js';
 import { getTechnology } from './technology-catalog.js';
+import { extractVersion, type VersionExtraction } from './version.js';
 
 /**
  * A single header-based detection signature.
@@ -46,6 +47,12 @@ interface HeaderSignature {
   readonly technologyId: string;
   /** Confidence score (0–100). */
   readonly confidence: number;
+  /**
+   * Optional, declarative version-extraction rule. When present, the
+   * version is extracted from the matched header value (the same value
+   * that produced this detection's evidence). `null` when absent.
+   */
+  readonly version?: VersionExtraction;
 }
 
 /**
@@ -62,18 +69,30 @@ const SIGNATURES: readonly HeaderSignature[] = [
     matchValue: 'nginx',
     technologyId: 'nginx',
     confidence: 95,
+    version: {
+      source: 'matchedValue',
+      rule: { pattern: /nginx\/(\d+(?:\.\d+){0,2})/ },
+    },
   },
   {
     headerName: 'server',
     matchValue: 'apache',
     technologyId: 'apache',
     confidence: 95,
+    version: {
+      source: 'matchedValue',
+      rule: { pattern: /apache\/(\d+(?:\.\d+){0,2})/i },
+    },
   },
   {
     headerName: 'server',
     matchValue: 'microsoft-iis',
     technologyId: 'iis',
     confidence: 95,
+    version: {
+      source: 'matchedValue',
+      rule: { pattern: /microsoft-iis\/(\d+(?:\.\d+){0,2})/i },
+    },
   },
   // ── X-Powered-By header ────────────────────────────────────
   {
@@ -87,6 +106,10 @@ const SIGNATURES: readonly HeaderSignature[] = [
     matchValue: 'php',
     technologyId: 'php',
     confidence: 90,
+    version: {
+      source: 'matchedValue',
+      rule: { pattern: /php\/(\d+(?:\.\d+){0,2})/i },
+    },
   },
   // ── Cloudflare (CDN) ───────────────────────────────────────
   {
@@ -142,14 +165,20 @@ export class HeaderDetector implements Detector {
 
       if (matchedHeader !== undefined) {
         const technology = getTechnology(sig.technologyId);
+        const version = extractVersion(matchedHeader.value, sig.version);
 
-        const detection = createDetection(technology, createConfidence(sig.confidence), [
-          {
-            type: 'http_header',
-            name: matchedHeader.name,
-            value: matchedHeader.value,
-          },
-        ]);
+        const detection = createDetection(
+          technology,
+          createConfidence(sig.confidence),
+          [
+            {
+              type: 'http_header',
+              name: matchedHeader.name,
+              value: matchedHeader.value,
+            },
+          ],
+          version,
+        );
 
         detections.push(detection);
         seen.add(sig.technologyId);

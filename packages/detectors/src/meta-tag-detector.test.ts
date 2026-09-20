@@ -305,4 +305,37 @@ describe('MetaTagDetector', () => {
       }
     });
   });
+
+  describe('version extraction', () => {
+    it('extracts the WordPress version from the generator meta content', () => {
+      const snapshot = makeSnapshot([{ name: 'generator', content: 'WordPress 6.4.2' }]);
+      const d = detector.detect(snapshot)[0]!;
+      expect(d.version).toBe('6.4.2');
+    });
+
+    it('extracts a short WordPress version', () => {
+      const snapshot = makeSnapshot([{ name: 'generator', content: 'WordPress 6.4' }]);
+      const d = detector.detect(snapshot)[0]!;
+      expect(d.version).toBe('6.4');
+    });
+
+    it('does not extract a version for Hugo (no version rule)', () => {
+      const snapshot = makeSnapshot([{ name: 'generator', content: 'Hugo 0.121.1' }]);
+      const d = detector.detect(snapshot)[0]!;
+      expect(d.version).toBeNull();
+    });
+
+    it('does not extract a version for Next.js when the generator has no version', () => {
+      const snapshot = makeSnapshot([{ name: 'generator', content: 'Next.js' }]);
+      const d = detector.detect(snapshot)[0]!;
+      expect(d.version).toBeNull();
+    });
+
+    it('yields null version when generator content has no version number', () => {
+      const snapshot = makeSnapshot([{ name: 'generator', content: 'WordPress' }]);
+      const d = detector.detect(snapshot)[0]!;
+      expect(d.technology.id).toBe('wordpress');
+      expect(d.version).toBeNull();
+    });
+  });
 });

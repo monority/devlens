@@ -36,6 +36,7 @@ import type { Detection, SiteSnapshot } from '@devlens/core';
 import { createConfidence, createDetection } from '@devlens/core';
 import type { Detector } from './detector.js';
 import { getTechnology } from './technology-catalog.js';
+import { extractVersion, type VersionExtraction } from './version.js';
 
 /**
  * A single meta-tag-based detection signature.
@@ -49,6 +50,12 @@ interface MetaTagSignature {
   readonly technologyId: string;
   /** Confidence score (0–100). */
   readonly confidence: number;
+  /**
+   * Optional, declarative version-extraction rule. When present, the
+   * version is extracted from the matched meta tag content (the same
+   * content that produced this detection's evidence). `null` when absent.
+   */
+  readonly version?: VersionExtraction;
 }
 
 /**
@@ -64,6 +71,10 @@ const SIGNATURES: readonly MetaTagSignature[] = [
     matchContent: 'wordpress',
     technologyId: 'wordpress',
     confidence: 90,
+    version: {
+      source: 'matchedValue',
+      rule: { pattern: /wordpress\s+(\d+(?:\.\d+){0,2})/i },
+    },
   },
   {
     tagName: 'generator',
@@ -155,14 +166,20 @@ export class MetaTagDetector implements Detector {
 
       if (matchedTag !== undefined) {
         const technology = getTechnology(sig.technologyId);
+        const version = extractVersion(matchedTag.content, sig.version);
 
-        const detection = createDetection(technology, createConfidence(sig.confidence), [
-          {
-            type: 'meta_tag',
-            name: matchedTag.name,
-            content: matchedTag.content,
-          },
-        ]);
+        const detection = createDetection(
+          technology,
+          createConfidence(sig.confidence),
+          [
+            {
+              type: 'meta_tag',
+              name: matchedTag.name,
+              content: matchedTag.content,
+            },
+          ],
+          version,
+        );
 
         detections.push(detection);
         seen.add(sig.technologyId);

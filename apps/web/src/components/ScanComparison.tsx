@@ -337,6 +337,11 @@ function TechnologyComparisonItem({
         <span className={styles.score}>Confidence: {detection.leftConfidence}</span>
       )}
 
+      {/* Version (subordinate): only when the source detection carries one */}
+      {fullDetection?.version ? (
+        <span className={styles.version}>Version: {fullDetection.version}</span>
+      ) : null}
+
       {/* Existing: score delta for unchanged technologies with changed confidence */}
       {detection.status === 'unchanged' && detection.scoreChanged && (
         <span className={styles.scoreChange}>

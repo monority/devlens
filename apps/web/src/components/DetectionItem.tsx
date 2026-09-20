@@ -28,7 +28,7 @@ export interface DetectionItemProps {
 }
 
 export function DetectionItem({ detection, index }: DetectionItemProps): React.ReactElement {
-  const { technology, confidence } = detection;
+  const { technology, confidence, version } = detection;
 
   // If the technology is in the catalog, link the name to its detail
   // page. Unknown IDs render as plain text (no broken link).
@@ -52,6 +52,7 @@ export function DetectionItem({ detection, index }: DetectionItemProps): React.R
         <span className={styles.techName}>{techName}</span>
         <span className={styles.category}>{technology.category}</span>
         <span className={styles.score}>Confidence: {confidence}</span>
+        {version ? <span className={styles.version}>Version: {version}</span> : null}
       </header>
 
       {/* Explanation: neutral summary of evidence coverage */}

@@ -40,6 +40,7 @@ import type { Detection, SiteSnapshot } from '@devlens/core';
 import { createConfidence, createDetection, createUrl } from '@devlens/core';
 import type { Detector } from './detector.js';
 import { getTechnology } from './technology-catalog.js';
+import { extractVersion, type VersionExtraction } from './version.js';
 
 /**
  * A single script-URL-based detection signature.
@@ -51,6 +52,12 @@ interface ScriptUrlSignature {
   readonly technologyId: string;
   /** Confidence score (0–100). */
   readonly confidence: number;
+  /**
+   * Optional, declarative version-extraction rule. When present, the
+   * version is extracted from the matched script URL (the same URL that
+   * produced this detection's evidence). `null` when absent.
+   */
+  readonly version?: VersionExtraction;
 }
 
 /**
@@ -94,6 +101,10 @@ const SIGNATURES: readonly ScriptUrlSignature[] = [
     matchUrl: 'jquery',
     technologyId: 'jquery',
     confidence: 85,
+    version: {
+      source: 'matchedValue',
+      rule: { pattern: /jquery-(\d+(?:\.\d+){0,2})/i },
+    },
   },
   {
     matchUrl: 'bootstrap.',
@@ -104,6 +115,10 @@ const SIGNATURES: readonly ScriptUrlSignature[] = [
     matchUrl: 'lodash',
     technologyId: 'lodash',
     confidence: 80,
+    version: {
+      source: 'matchedValue',
+      rule: { pattern: /lodash[-@/](\d+(?:\.\d+){0,2})/ },
+    },
   },
   // ── WooCommerce ───────────────────────────────────────────────
   {
@@ -174,13 +189,19 @@ export class ScriptUrlDetector implements Detector {
 
       if (matchedScript !== undefined && matchedScript.src !== null) {
         const technology = getTechnology(sig.technologyId);
+        const version = extractVersion(matchedScript.src, sig.version);
 
-        const detection = createDetection(technology, createConfidence(sig.confidence), [
-          {
-            type: 'script_url',
-            url: createUrl(matchedScript.src),
-          },
-        ]);
+        const detection = createDetection(
+          technology,
+          createConfidence(sig.confidence),
+          [
+            {
+              type: 'script_url',
+              url: createUrl(matchedScript.src),
+            },
+          ],
+          version,
+        );
 
         detections.push(detection);
         seen.add(sig.technologyId);

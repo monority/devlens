@@ -145,6 +145,30 @@ describe('Step 64 real-world detection audit', () => {
       expect(JSON.stringify(a)).toBe(JSON.stringify(b));
       expect(JSON.stringify(b)).toBe(JSON.stringify(c));
     });
+
+    it('extracts the WordPress version from the generator meta through the full pipeline', () => {
+      const detections = pipeline.detect(snapshot);
+      const wp = detections.find((d) => d.technology.id === 'wordpress')!;
+      expect(wp!.version).toBe('6.4.2');
+    });
+
+    it('extracts the PHP version from X-Powered-By through the full pipeline', () => {
+      const detections = pipeline.detect(snapshot);
+      const php = detections.find((d) => d.technology.id === 'php')!;
+      expect(php!.version).toBe('8.2');
+    });
+
+    it('does not expose a version for Cloudflare (no version rule)', () => {
+      const detections = pipeline.detect(snapshot);
+      const cf = detections.find((d) => d.technology.id === 'cloudflare')!;
+      expect(cf!.version).toBeNull();
+    });
+
+    it('does not expose a version for jQuery from a version-less CDN URL', () => {
+      const detections = pipeline.detect(snapshot);
+      const jq = detections.find((d) => d.technology.id === 'jquery')!;
+      expect(jq!.version).toBeNull();
+    });
   });
 
   describe('R2 — Shopify storefront on Cloudflare + Google Fonts + direct GA', () => {

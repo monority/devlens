@@ -455,6 +455,13 @@
   font-weight: 600;
 }
 
+/* Technology version — visually subordinate to name > confidence > evidence */
+.version {
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-weight: 400;
+}
+
 .detectionMeta {
   margin-bottom: 0.5rem;
 }

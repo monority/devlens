@@ -80,6 +80,12 @@ export interface DetectionResponse {
   technology: TechnologyResponse;
   confidence: number;
   evidence: EvidenceResponse[];
+  /**
+   * Technology version, when extracted from evidence by a tech-specific
+   * signature. Optional (omitted/null when absent) — mirrors the API
+   * contract where `version` is only present when known.
+   */
+  version?: string;
 }
 
 // ─── Full scan result (by ID and by POST) ─────────────────────────────

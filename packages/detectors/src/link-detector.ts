@@ -50,11 +50,19 @@
  * @see {@link Detector}
  */
 
-import type { Detection, SiteSnapshot, Technology, Evidence, LinkTag } from '@devlens/core';
+import type {
+  Detection,
+  SiteSnapshot,
+  Technology,
+  Evidence,
+  LinkTag,
+  TechnologyVersion,
+} from '@devlens/core';
 import { createConfidence, createDetection, createUrl } from '@devlens/core';
 import type { Detector } from './detector.js';
 import { getTechnology } from './technology-catalog.js';
 import { getEvidenceKey } from './evidence-key.js';
+import { extractVersion, type VersionExtraction } from './version.js';
 
 /**
  * The kind of matching a signature performs on the resolved URL.
@@ -80,6 +88,13 @@ interface LinkSignature {
   readonly technologyId: string;
   /** Confidence score (0–100). */
   readonly confidence: number;
+  /**
+   * Optional, declarative version-extraction rule. When present, the
+   * version is extracted from the resolved link URL (the same URL that
+   * produced this detection's evidence). `null` when absent (the
+   * signature declares no version extraction).
+   */
+  readonly version?: VersionExtraction;
 }
 
 /**
@@ -89,6 +104,7 @@ interface Match {
   readonly technology: Technology;
   readonly confidence: number;
   readonly evidence: Evidence;
+  readonly version: TechnologyVersion | null;
 }
 
 /**
@@ -300,6 +316,7 @@ export class LinkDetector implements Detector {
           type: 'link',
           url: createUrl(resolvedUrl),
         },
+        version: extractVersion(resolvedUrl, sig.version),
       };
 
       if (!groups.has(sig.technologyId)) {
@@ -314,8 +331,8 @@ export class LinkDetector implements Detector {
 
     for (const techId of order) {
       const group = groups.get(techId)!;
-      const { technology, confidence, evidence } = this.selectBestAndMerge(group.matches);
-      detections.push(createDetection(technology, createConfidence(confidence), evidence));
+      const { technology, confidence, evidence, version } = this.selectBestAndMerge(group.matches);
+      detections.push(createDetection(technology, createConfidence(confidence), evidence, version));
     }
 
     return detections;
@@ -331,6 +348,7 @@ export class LinkDetector implements Detector {
     technology: Technology;
     confidence: number;
     evidence: Evidence[];
+    version: TechnologyVersion | null;
   } {
     let best = matches[0]!;
 
@@ -357,6 +375,7 @@ export class LinkDetector implements Detector {
       technology: best.technology,
       confidence: best.confidence,
       evidence: merged,
+      version: best.version,
     };
   }
 }

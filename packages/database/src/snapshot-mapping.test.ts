@@ -216,4 +216,76 @@ describe('PostgresScanResultRepository — snapshot mapper round-trip (no DB)', 
       expect(reconstructed).toEqual([direct, derived]);
     });
   });
+
+  // ─── Step 70 — enriched Resource fields survive the jsonb round-trip ──
+  // The new optional Step-70 fields (sourcePage, acquisitionStatus,
+  // failureReason, responseHeaders, favicon type) must persist transparently
+  // through the jsonb `snapshot` column with no mapper changes. Existing
+  // resources (no new fields) must still be valid.
+  describe('Step 70 — resource intelligence fields round-trip (no DB)', () => {
+    it('round-trips an enriched Resource (favicon + provenance) losslessly', () => {
+      const enrichedSnapshot: SiteSnapshot = {
+        ...makeSnapshot(),
+        resources: [
+          {
+            url: createUrl('https://example.com/style.css'),
+            type: 'css',
+            size: 42,
+            content: '.x { color: red }',
+            httpStatus: createHttpStatus(200),
+            contentType: 'text/css',
+            sourcePage: createUrl('https://example.com/'),
+            acquisitionStatus: 'fetched',
+            responseHeaders: [
+              { name: 'content-type', value: 'text/css; charset=utf-8' },
+              { name: 'etag', value: 'abc' },
+            ],
+          },
+          {
+            url: createUrl('https://example.com/favicon.ico'),
+            type: 'favicon',
+            size: null,
+            content: '',
+            httpStatus: createHttpStatus(200),
+            contentType: null,
+            sourcePage: createUrl('https://example.com/'),
+            acquisitionStatus: 'skipped',
+            failureReason: 'skipped: beyond selection budget',
+          },
+        ],
+      };
+
+      const row = snapshotToRow('scan_resource_enriched' as never, enrichedSnapshot, []);
+      const { snapshot: reconstructed } = rowToSnapshot(row);
+
+      expect(reconstructed).not.toBeNull();
+      expect(reconstructed!.resources).toEqual(enrichedSnapshot.resources);
+      // The new fields are present, not dropped or normalized away.
+      expect(reconstructed!.resources[0]!.acquisitionStatus).toBe('fetched');
+      expect(reconstructed!.resources[0]!.sourcePage).toBe('https://example.com/');
+      expect(reconstructed!.resources[0]!.responseHeaders).toHaveLength(2);
+      expect(reconstructed!.resources[1]!.type).toBe('favicon');
+      expect(reconstructed!.resources[1]!.failureReason).toBe('skipped: beyond selection budget');
+    });
+
+    it('round-trips a legacy Resource (no new fields) unchanged', () => {
+      const legacyResource = {
+        url: createUrl('https://example.com/style.css'),
+        type: 'css' as const,
+        size: 1234,
+        content: 'body { color: red; }',
+        httpStatus: createHttpStatus(200),
+        contentType: 'text/css',
+      };
+      const snapshot: SiteSnapshot = { ...makeSnapshot(), resources: [legacyResource] };
+
+      const row = snapshotToRow('scan_resource_legacy' as never, snapshot, []);
+      const { snapshot: reconstructed } = rowToSnapshot(row);
+
+      expect(reconstructed).not.toBeNull();
+      expect(reconstructed!.resources[0]!).toEqual(legacyResource);
+      expect(reconstructed!.resources[0]!.acquisitionStatus).toBeUndefined();
+      expect(reconstructed!.resources[0]!.responseHeaders).toBeUndefined();
+    });
+  });
 });

@@ -39,8 +39,15 @@ import type { Crawler } from './crawler.js';
 import type { HttpHeader, Resource, ResourceType, ScanTarget, SiteSnapshot } from '@devlens/core';
 import { createUrl, createHostname, createTimestamp, createHttpStatus } from '@devlens/core';
 import { CrawlError } from './crawl-error.js';
-import { isBlockedHostname, isResourceUrlAllowed } from './ssrf-guard.js';
+import { isBlockedHostname, isResourceUrlAllowed, isResourceFetchable } from './ssrf-guard.js';
 import { extractHtml, type HtmlExtract } from './html-parser.js';
+import {
+  discoverResources,
+  selectResources,
+  classifyResource,
+  compareResources,
+} from './resource-intelligence.js';
+import type { ResourcePolicy } from './resource-intelligence.js';
 
 // ─── Configuration ─────────────────────────────────────────────────
 
@@ -66,6 +73,22 @@ export interface HttpCrawlerOptions {
   readonly maxCssResources?: number;
   /** Maximum body size in bytes for observed resources. Default: 524288 (512 KiB). */
   readonly maxResourceBytes?: number;
+  /**
+   * Optional HTTP Resource Intelligence policy (Step 70).
+   *
+   * When **absent** (the default) the crawler uses the original controlled
+   * resource observation path (robots.txt, manifest, same-origin CSS only)
+   * — behavior is byte-identical to a crawler built without this option, so
+   * existing tests and fixtures are unaffected.
+   *
+   * When present, the crawler instead runs the full
+   * discover → select → acquire pipeline over scripts, stylesheets,
+   * favicons, manifest, and robots, bounded by the policy. Every secondary
+   * request reuses the existing SSRF/same-origin security boundary
+   * (`isResourceFetchable`), so the option can only *narrow* what is fetched,
+   * never broaden the security boundary.
+   */
+  readonly resourceIntelligence?: ResourcePolicy;
 }
 
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -266,6 +289,56 @@ async function readBodyWithLimit(
   return { text: decoder.decode(combined), bytes: totalLength };
 }
 
+/**
+ * Builds a `Resource` observation for a resource that was never acquired
+ * (blocked by the security gate or excluded by the selection budget).
+ * Never fabricates content — the body is empty and size is unknown.
+ */
+function skippedResource(
+  url: string,
+  type: ResourceType,
+  sourcePage: string,
+  failureReason: string,
+): Resource {
+  return {
+    url: createUrl(url),
+    type,
+    size: null,
+    content: '',
+    httpStatus: createHttpStatus(200),
+    contentType: null,
+    sourcePage: createUrl(sourcePage),
+    acquisitionStatus: 'skipped',
+    failureReason,
+  };
+}
+
+/**
+ * Builds a `Resource` observation for a resource that was acquired but
+ * failed (non-2xx, timeout, network error, body too large, etc.).
+ * `httpStatus` defaults to 200 (the "discovered from markup" convention)
+ * when no HTTP response is available.
+ */
+function failedResource(
+  url: string,
+  type: ResourceType,
+  sourcePage: string,
+  failureReason: string,
+  httpStatus: number = 200,
+): Resource {
+  return {
+    url: createUrl(url),
+    type,
+    size: null,
+    content: '',
+    httpStatus: createHttpStatus(httpStatus),
+    contentType: null,
+    sourcePage: createUrl(sourcePage),
+    acquisitionStatus: 'failed',
+    failureReason,
+  };
+}
+
 // ─── HttpCrawler ────────────────────────────────────────────────────
 
 /**
@@ -287,6 +360,7 @@ export class HttpCrawler implements Crawler {
   private readonly fetchFn: typeof fetch;
   private readonly maxCssResources: number;
   private readonly maxResourceBytes: number;
+  private readonly resourcePolicy: ResourcePolicy | undefined;
 
   constructor(options?: HttpCrawlerOptions) {
     this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -296,6 +370,7 @@ export class HttpCrawler implements Crawler {
     this.fetchFn = options?.fetch ?? globalThis.fetch;
     this.maxCssResources = options?.maxCssResources ?? DEFAULT_MAX_CSS_RESOURCES;
     this.maxResourceBytes = options?.maxResourceBytes ?? DEFAULT_MAX_RESOURCE_BYTES;
+    this.resourcePolicy = options?.resourceIntelligence;
   }
 
   /**
@@ -408,10 +483,21 @@ export class HttpCrawler implements Crawler {
 
       // ── 6. Observe controlled resources ───────────────────────────────
       // Resource observation errors never fail the crawl — only the
-      // resources that were successfully fetched are included.
+      // resources that were successfully fetched are included. When the
+      // Step-70 resource-intelligence policy is absent, the original
+      // observeResources path runs (byte-identical prior behavior). When it
+      // is present, the deterministic discover → select → acquire pipeline
+      // runs instead.
       const resources =
         extract !== null
-          ? await this.observeResources(finalUrl, finalHostname, extract, abortController.signal)
+          ? this.resourcePolicy !== undefined
+            ? await this.intelligentResources(
+                finalUrl,
+                finalHostname,
+                extract,
+                abortController.signal,
+              )
+            : await this.observeResources(finalUrl, finalHostname, extract, abortController.signal)
           : [];
 
       // ── 7. Build domain structures ──────────────────────────────────
@@ -537,6 +623,246 @@ export class HttpCrawler implements Crawler {
     }
 
     return resources;
+  }
+
+  // ─── Step 70: resource intelligence (discover → select → acquire) ───
+
+  /**
+   * Runs the deterministic resource-intelligence pipeline when a
+   * `resourceIntelligence` policy is configured.
+   *
+   * Discovers secondary resources from the HTML extract, selects a
+   * deterministic budget-bounded subset (per §4/§6), acquires the selected
+   * ones, and emits an observation for every discovered resource — fetched,
+   * failed, or skipped — so the rationale ("why was this downloaded while
+   * another was skipped?") is always reconstructible.
+   *
+   * Output is sorted by `(priority, url)` so the snapshot is independent of
+   * fetch completion order (§14). A per-scan canonical-URL cache guarantees
+   * no URL is fetched or observed twice (§15).
+   */
+  private async intelligentResources(
+    pageUrl: string,
+    targetHostname: string,
+    extract: HtmlExtract,
+    signal: AbortSignal,
+  ): Promise<Resource[]> {
+    const policy = this.resourcePolicy!; // guarded by caller (option-present)
+    const discovered = discoverResources(extract, pageUrl, policy);
+    const { selected, skipped } = selectResources(discovered, policy);
+
+    const resources: Resource[] = [];
+    // Bounded per-scan dedup cache: one canonical URL → one observation.
+    const observedUrls = new Set<string>();
+
+    // Resources excluded by the selection policy are still observable —
+    // with a reason — so the budget decision is auditable.
+    for (const r of skipped) {
+      if (observedUrls.has(r.url)) {
+        continue;
+      }
+      observedUrls.add(r.url);
+      resources.push(skippedResource(r.url, r.kind, pageUrl, 'skipped: beyond selection budget'));
+    }
+
+    // Acquire the selected resources. Each is independently guarded: a
+    // failure never fails the crawl, and never fabricates content.
+    for (const r of selected) {
+      if (observedUrls.has(r.url)) {
+        continue;
+      }
+      observedUrls.add(r.url);
+      try {
+        resources.push(
+          await this.acquireResource(r.url, r.kind, pageUrl, targetHostname, signal, policy),
+        );
+      } catch (error) {
+        const reason =
+          error instanceof CrawlError ? `acquisition_${error.code}` : 'acquisition_error';
+        resources.push(failedResource(r.url, r.kind, pageUrl, reason));
+      }
+    }
+
+    // Deterministic ordering independent of network completion order (§14).
+    return resources.sort((a, b) => compareResources(a, b, policy));
+  }
+
+  /**
+   * Acquires a single selected resource, reusing the existing HTTP/fetch
+   * primitives (`fetchFn`, `readBodyWithLimit`, redirect handling, SSRF guard)
+   * — no second HTTP client stack (§7).
+   *
+   * Always returns a `Resource` observation: `fetched` on success, `failed`
+   * on a recoverable error (non-2xx, timeout, oversized, network), or
+   * `skipped` when the SSRF/same-origin gate rejects the URL. Never throws
+   * to the caller — acquisition errors are modeled as observations.
+   */
+  private async acquireResource(
+    resourceUrl: string,
+    kind: ResourceType,
+    sourcePage: string,
+    targetHostname: string,
+    crawlSignal: AbortSignal,
+    policy: ResourcePolicy,
+  ): Promise<Resource> {
+    // 1. Security gate — reuses the existing SSRF / same-origin boundary.
+    //    `allowExternal` only controls cross-origin (public) hosts; the
+    //    private-IP / scheme blocklist is always enforced.
+    if (!isResourceFetchable(resourceUrl, targetHostname, policy.allowExternal)) {
+      return skippedResource(
+        resourceUrl,
+        kind,
+        sourcePage,
+        'skipped: blocked by SSRF/same-origin policy',
+      );
+    }
+
+    // Per-resource abort: bounded by policy.timeoutMs, and forwarded from
+    // the crawl-level signal so a scan cancellation / crawl-wide timeout
+    // still aborts in-flight acquisitions. The timer is cleared in `finally`
+    // so test processes are never kept alive by pending timers.
+    const resourceSignal = new AbortController();
+    const timeoutId = setTimeout(() => resourceSignal.abort(), policy.timeoutMs);
+    const forwardCrawlAbort = (): void => resourceSignal.abort();
+    if (crawlSignal.aborted) {
+      resourceSignal.abort();
+    }
+    crawlSignal.addEventListener('abort', forwardCrawlAbort, { once: true });
+
+    try {
+      return await this.runAcquisition(
+        resourceUrl,
+        kind,
+        sourcePage,
+        targetHostname,
+        resourceSignal.signal,
+        policy,
+      );
+    } finally {
+      clearTimeout(timeoutId);
+      crawlSignal.removeEventListener('abort', forwardCrawlAbort);
+    }
+  }
+
+  /**
+   * Inner acquisition routine. Given a signal that already carries the
+   * per-resource timeout and crawl cancellation, performs the bounded fetch
+   * and always returns an observable `Resource` (never throws).
+   */
+  private async runAcquisition(
+    resourceUrl: string,
+    kind: ResourceType,
+    sourcePage: string,
+    targetHostname: string,
+    signal: AbortSignal,
+    policy: ResourcePolicy,
+  ): Promise<Resource> {
+    let currentUrl = new URL(resourceUrl).href;
+    let redirectCount = 0;
+    let response: Response;
+
+    // 2. Fetch with manual redirect following (no `redirect: 'follow'`).
+    while (true) {
+      try {
+        response = await this.fetchFn(currentUrl, {
+          method: 'GET',
+          headers: { 'User-Agent': this.userAgent, Accept: '*/*' },
+          redirect: 'manual',
+          signal,
+        });
+      } catch {
+        if (signal.aborted) {
+          return failedResource(resourceUrl, kind, sourcePage, 'timeout');
+        }
+        return failedResource(resourceUrl, kind, sourcePage, 'network_error');
+      }
+
+      if (isRedirect(response.status)) {
+        redirectCount++;
+        if (redirectCount > policy.maxRedirects) {
+          return failedResource(
+            resourceUrl,
+            kind,
+            sourcePage,
+            `redirect_chain_exceeded (${policy.maxRedirects})`,
+            response.status,
+          );
+        }
+        const location = response.headers.get('location');
+        if (!location) {
+          return failedResource(
+            resourceUrl,
+            kind,
+            sourcePage,
+            'redirect_missing_location',
+            response.status,
+          );
+        }
+        const nextUrl = new URL(location, currentUrl).href;
+        // Re-validate the redirect destination (§5): a redirect must not
+        // bypass the SSRF/same-origin gate.
+        if (!isResourceFetchable(nextUrl, targetHostname, policy.allowExternal)) {
+          return failedResource(
+            resourceUrl,
+            kind,
+            sourcePage,
+            'failed: blocked redirect destination',
+            response.status,
+          );
+        }
+        currentUrl = nextUrl;
+        continue;
+      }
+
+      // Not a redirect: stop following and process the response.
+      break;
+    }
+
+    // 3. Non-2xx is a valid, observable outcome — never a thrown error here.
+    if (response.status < 200 || response.status >= 300) {
+      return failedResource(
+        resourceUrl,
+        kind,
+        sourcePage,
+        `http_${response.status}`,
+        response.status,
+      );
+    }
+
+    // 4. Read body with size limit (bounded; textual bodies only).
+    let body: string;
+    let bodyBytes: number;
+    try {
+      const result = await readBodyWithLimit(response, policy.maxBodyBytes);
+      body = result.text;
+      bodyBytes = result.bytes;
+    } catch (error: unknown) {
+      const code = error instanceof CrawlError ? error.code : undefined;
+      return failedResource(
+        resourceUrl,
+        kind,
+        sourcePage,
+        code === 'too_large' ? 'body_too_large' : 'body_read_error',
+        response.status,
+      );
+    }
+
+    // 5. Classify by response Content-Type (MIME may override the discovery
+    //    context — §3). Favicon declared by HTML context is preserved.
+    const contentType = response.headers.get('content-type');
+    const resolvedKind = classifyResource(currentUrl, kind, contentType);
+
+    return {
+      url: createUrl(currentUrl),
+      type: resolvedKind,
+      size: bodyBytes,
+      content: body,
+      httpStatus: createHttpStatus(response.status),
+      contentType: contentType ? mediaTypeOf(contentType) : null,
+      sourcePage: createUrl(sourcePage),
+      acquisitionStatus: 'fetched',
+      responseHeaders: convertHeaders(response.headers),
+    };
   }
 
   /**

@@ -12,4 +12,17 @@ export { HttpCrawler } from './http-crawler.js';
 export type { HttpCrawlerOptions } from './http-crawler.js';
 export { CrawlError } from './crawl-error.js';
 export type { CrawlErrorCode } from './crawl-error.js';
-export { isResourceUrlAllowed } from './ssrf-guard.js';
+export { isResourceUrlAllowed, isResourceFetchable } from './ssrf-guard.js';
+export {
+  discoverResources,
+  selectResources,
+  classifyResource,
+  compareResources,
+  DEFAULT_RESOURCE_POLICY,
+} from './resource-intelligence.js';
+export type {
+  ResourcePolicy,
+  DiscoveredResource,
+  SelectedResource,
+  SelectionResult,
+} from './resource-intelligence.js';

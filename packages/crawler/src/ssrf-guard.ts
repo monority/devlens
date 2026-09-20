@@ -208,3 +208,49 @@ export function isResourceUrlAllowed(url: string, targetHostname: string): boole
 
   return true;
 }
+
+/**
+ * Checks if a URL is safe to fetch as an observed resource, generalizing
+ * {@link isResourceUrlAllowed} to optionally permit cross-origin fetches.
+ *
+ * The SSRF protection (scheme validation + private/internal blocklist via
+ * {@link isBlockedHostname}) is ALWAYS enforced — `allowExternal` does NOT
+ * relax the SSRF boundary; it only controls whether a different (public)
+ * origin is permitted.
+ *
+ * @param url             The URL to validate (may be relative).
+ * @param targetHostname  The hostname of the crawl target (primary document).
+ * @param allowExternal   When `false` (default) the URL must be same-origin
+ *                        with `targetHostname` — identical to
+ *                        {@link isResourceUrlAllowed}. When `true`, public
+ *                        cross-origin URLs are permitted.
+ */
+export function isResourceFetchable(
+  url: string,
+  targetHostname: string,
+  allowExternal: boolean = false,
+): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url, 'http://placeholder.example');
+  } catch {
+    return false; // malformed URL
+  }
+
+  // 1. Only allow http: and https: schemes (blocks data:, javascript:, …).
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return false;
+  }
+
+  // 2. SSRF protection (always enforced — private/loopback/link-local/…).
+  if (isBlockedHostname(parsed.hostname)) {
+    return false;
+  }
+
+  // 3. Same-origin policy: cross-origin allowed only when explicitly enabled.
+  if (!allowExternal && parsed.hostname !== targetHostname) {
+    return false;
+  }
+
+  return true;
+}

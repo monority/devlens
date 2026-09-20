@@ -15,4 +15,10 @@ export const nextjs: TechnologyDefinition = {
     { matchContent: 'next/router', technologyId: 'nextjs', confidence: 90 },
     { matchContent: 'next/navigation', technologyId: 'nextjs', confidence: 90 },
   ],
+  // Step 69: Next.js is built on React. Observing Next.js *implies* React,
+  // so React is derived (as a relationship-derived Detection) when Next.js
+  // is detected and React is not already directly observed. When React IS
+  // directly observed (e.g. its runtime bundle is present), no derivation
+  // occurs — the `implies` is simply redundant.
+  relationships: [{ type: 'implies', target: 'react' }],
 };

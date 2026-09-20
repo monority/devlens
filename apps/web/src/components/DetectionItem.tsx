@@ -28,7 +28,12 @@ export interface DetectionItemProps {
 }
 
 export function DetectionItem({ detection, index }: DetectionItemProps): React.ReactElement {
-  const { technology, confidence, version } = detection;
+  const { technology, confidence, version, source, derivedFrom, relationshipConflicts } = detection;
+  const isDerived = source === 'relationship';
+  const derivedSource = derivedFrom?.[0];
+  const derivedLabel = derivedSource
+    ? `${derivedSource.sourceName ?? derivedSource.source} (implies)`
+    : 'relationship';
 
   // If the technology is in the catalog, link the name to its detail
   // page. Unknown IDs render as plain text (no broken link).
@@ -53,6 +58,14 @@ export function DetectionItem({ detection, index }: DetectionItemProps): React.R
         <span className={styles.category}>{technology.category}</span>
         <span className={styles.score}>Confidence: {confidence}</span>
         {version ? <span className={styles.version}>Version: {version}</span> : null}
+
+        {/* Step 69: distinguisher for inferred detections and conflicts */}
+        {isDerived ? <span className={styles.derived}>Derived from {derivedLabel}</span> : null}
+        {relationshipConflicts && relationshipConflicts.length > 0 ? (
+          <span className={styles.relationshipConflict}>
+            Conflict: {relationshipConflicts.map((c) => `${c.type} (${c.other})`).join(', ')}
+          </span>
+        ) : null}
       </header>
 
       {/* Explanation: neutral summary of evidence coverage */}

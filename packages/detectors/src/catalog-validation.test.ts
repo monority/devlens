@@ -244,3 +244,122 @@ describe('validateDefinitions — cross-definition integrity', () => {
     expect(validateDefinitions(TECHNOLOGY_DEFINITIONS)).toEqual([]);
   });
 });
+
+// ─── Step 69: relationship validation (Phase 18) ────────────────────────
+
+describe('validateDefinition — relationship rules', () => {
+  // A well-formed definition (valid signature) used as a template; only the
+  // `relationships` array varies per test.
+  const baseRelDef: TechnologyDefinition = {
+    id: 'src-tech',
+    name: 'Src',
+    category: 'server',
+    headerSignatures: [
+      { headerName: 'server', matchValue: 'x', technologyId: 'src-tech', confidence: 90 },
+    ],
+  };
+
+  it('flags a self-referential relationship', () => {
+    const def = {
+      ...baseRelDef,
+      relationships: [{ type: 'implies', target: 'src-tech' }],
+    } as unknown as TechnologyDefinition;
+    expect(validateDefinition(def).some((e) => /self-referential/.test(e))).toBe(true);
+  });
+
+  it('flags a duplicate relationship (same type + target)', () => {
+    const rel = { type: 'implies', target: 'other' } as const;
+    const def = {
+      ...baseRelDef,
+      relationships: [rel, rel],
+    } as unknown as TechnologyDefinition;
+    expect(validateDefinition(def).some((e) => /duplicate relationship/.test(e))).toBe(true);
+  });
+
+  it('flags an invalid relationship type', () => {
+    const def = {
+      ...baseRelDef,
+      relationships: [{ type: 'depends-on', target: 'other' }],
+    } as unknown as TechnologyDefinition;
+    expect(validateDefinition(def).some((e) => /invalid type/.test(e))).toBe(true);
+  });
+
+  it('flags a relationship with an empty target', () => {
+    const def = {
+      ...baseRelDef,
+      relationships: [{ type: 'implies', target: '   ' }],
+    } as unknown as TechnologyDefinition;
+    expect(validateDefinition(def).some((e) => /empty target/.test(e))).toBe(true);
+  });
+
+  it('flags an unknown referenced id when the known-id set is provided', () => {
+    const def = {
+      ...baseRelDef,
+      relationships: [{ type: 'implies', target: 'ghost' }],
+    } as unknown as TechnologyDefinition;
+    // knownIds contains only the source itself → 'ghost' is unknown.
+    expect(
+      validateDefinition(def, new Set(['src-tech'])).some((e) => /unknown technology/.test(e)),
+    ).toBe(true);
+  });
+
+  it('accepts valid relationships when all targets are known', () => {
+    const def = {
+      ...baseRelDef,
+      relationships: [{ type: 'implies', target: 'other' }],
+    } as unknown as TechnologyDefinition;
+    expect(validateDefinition(def, new Set(['src-tech', 'other']))).toEqual([]);
+  });
+});
+
+describe('validateDefinitions — relationship graph (unknown refs + cycles)', () => {
+  // Builds a minimal valid definition (signature technologyId matches id)
+  // with an optional relationship list.
+  const techDef = (
+    id: string,
+    relationships?: { type: 'implies' | 'requires' | 'excludes'; target: string }[],
+  ): TechnologyDefinition => ({
+    id,
+    name: id.toUpperCase(),
+    category: 'server',
+    headerSignatures: [{ headerName: 'server', matchValue: id, technologyId: id, confidence: 90 }],
+    relationships,
+  });
+
+  it('rejects a relationship referencing an unknown technology id', () => {
+    const defs = [
+      techDef('alpha', [{ type: 'implies', target: 'nonexistent' }]),
+    ] as unknown as TechnologyDefinition[];
+    expect(validateDefinitions(defs).some((e) => /unknown technology/.test(e))).toBe(true);
+  });
+
+  it('detects a direct two-step cycle (A implies B, B implies A)', () => {
+    const defs = [
+      techDef('alpha', [{ type: 'implies', target: 'beta' }]),
+      techDef('beta', [{ type: 'implies', target: 'alpha' }]),
+    ] as unknown as TechnologyDefinition[];
+    expect(validateDefinitions(defs).some((e) => /cycle/.test(e))).toBe(true);
+  });
+
+  it('detects a transitive cycle (A→B→C→A)', () => {
+    const defs = [
+      techDef('alpha', [{ type: 'implies', target: 'beta' }]),
+      techDef('beta', [{ type: 'implies', target: 'gamma' }]),
+      techDef('gamma', [{ type: 'implies', target: 'alpha' }]),
+    ] as unknown as TechnologyDefinition[];
+    expect(validateDefinitions(defs).some((e) => /cycle/.test(e))).toBe(true);
+  });
+
+  it('accepts a longer transitive implies chain with no cycle', () => {
+    const defs = [
+      techDef('alpha', [{ type: 'implies', target: 'beta' }]),
+      techDef('beta', [{ type: 'implies', target: 'gamma' }]),
+      techDef('gamma'),
+    ] as unknown as TechnologyDefinition[];
+    expect(validateDefinitions(defs)).toEqual([]);
+  });
+
+  it('reports the real catalog as cycle-free and fully referenced', () => {
+    expect(validateDefinitions(TECHNOLOGY_DEFINITIONS)).toEqual([]);
+  });
+});

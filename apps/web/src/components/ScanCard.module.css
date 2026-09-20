@@ -1496,3 +1496,29 @@
   padding: 0.1rem 0.35rem;
   border-radius: 0.2rem;
 }
+
+/* Step 69: Technology Relationship Semantics — distinguisher badges */
+
+/* A relationship-derived detection (implies) */
+.derived {
+  margin-left: auto;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #f59e0b;
+  border-radius: 0.25rem;
+  padding: 0.1rem 0.4rem;
+}
+
+/* A conflict surfaced on a direct detection (excludes/requires) */
+.relationshipConflict {
+  margin-left: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #991b1b;
+  background: #fee2e2;
+  border: 1px solid #ef4444;
+  border-radius: 0.25rem;
+  padding: 0.1rem 0.4rem;
+}

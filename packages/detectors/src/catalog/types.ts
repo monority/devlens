@@ -124,6 +124,42 @@ export interface LinkSignature {
 }
 
 /**
+ * The kind of declarative relationship one technology has with another.
+ *
+ * Step 69 — Technology Relationship Semantics. Relationships are **data**,
+ * not engine logic: they are declared per-technology in the catalog and
+ * interpreted by the post-scoring relationship-resolution layer.
+ *
+ * - `implies` — observing A *implies* B (e.g. Next.js is built on React).
+ *   B is **derived** (a relationship-derived `Detection`) when A is detected
+ *   and B is not already directly observed. A derived detection is never
+ *   auto-derived if the target is already direct.
+ * - `requires` — A *requires* B as a prerequisite. This is a **validation
+ *   constraint**, never a derivation: if A is detected and B is not
+ *   directly observed, a `requires` conflict is surfaced on A. B is never
+ *   auto-derived from a `requires` edge.
+ * - `excludes` — A and B are mutually exclusive. If both are directly
+ *   observed, an `excludes` conflict is surfaced on A (and B). Detections
+ *   are **never deleted** — evidence is always preserved.
+ */
+export type RelationshipType = 'implies' | 'requires' | 'excludes';
+
+/**
+ * A single declarative relationship edge declared by a technology.
+ *
+ * `target` is a technology **id** (the `id` field of a
+ * {@link TechnologyDefinition}), NOT a technology name — this matches the
+ * catalog keying used by {@link TECHNOLOGY_CATALOG}. The catalog validator
+ * rejects edges whose target id does not resolve to a known technology.
+ */
+export interface RelationshipDef {
+  /** The relationship edge type. */
+  readonly type: RelationshipType;
+  /** The target technology id this edge points at. */
+  readonly target: string;
+}
+
+/**
  * A declarative, self-describing definition of a single technology.
  *
  * One file (`catalog/technologies/<id>.ts`) exports one
@@ -137,6 +173,10 @@ export interface LinkSignature {
  * Only the sources a technology actually has are populated; every signature
  * declares its own `technologyId` (which MUST equal `id` — see
  * {@link validateCatalog}).
+ *
+ * `relationships` (Step 69) declares the `implies`/`requires`/`excludes`
+ * edges this technology carries. It is optional so the Step-68 catalog
+ * remains valid; the validator only inspects it when present.
  */
 export interface TechnologyDefinition {
   readonly id: string;
@@ -148,4 +188,13 @@ export interface TechnologyDefinition {
   readonly contentSignatures?: readonly ContentScriptSignature[];
   readonly resourceSignatures?: readonly ResourceSignature[];
   readonly linkSignatures?: readonly LinkSignature[];
+  /**
+   * Step 69: declarative relationship edges declared by this technology.
+   * A technology implies/requires/excludes one or more *other*
+   * technologies in the catalog. See {@link RelationshipDef} and
+   * {@link RelationshipType} for semantics. Validated by
+   * {@link validateDefinition} (self-reference, duplicates, unknown ids,
+   * invalid type) and {@link validateDefinitions} (cross-definition cycles).
+   */
+  readonly relationships?: readonly RelationshipDef[];
 }

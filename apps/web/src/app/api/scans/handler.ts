@@ -42,6 +42,34 @@ export interface DetectionResponse {
    * version was extracted (never fabricated/null in the API contract).
    */
   version?: string;
+  /**
+   * Step 69 — How this detection entered the result set.
+   *
+   * Omitted when the detection is a **direct** observation (evidence was
+   * actually found). `'relationship'` means the detection was DERIVED from
+   * an `implies` edge in the technology catalog — it carries no direct
+   * evidence or version; see `derivedFrom`.
+   */
+  source?: 'direct' | 'relationship';
+  /**
+   * Provenance for a relationship-derived detection (present only when
+   * `source === 'relationship'`). Each entry records the technology that
+   * implied this one. Never fabricated — always an actual catalog edge.
+   */
+  derivedFrom?: ReadonlyArray<{ source: string; sourceName: string; type: 'implies' }>;
+  /**
+   * Relationship conflicts surfaced on a direct detection, never acted
+   * upon destructively:
+   * - `excludes` — both technologies are directly observed (both are
+   *   preserved with their evidence intact).
+   * - `requires` — the required target is not directly observed
+   *   (missing-requirement signal; the target is NOT auto-derived).
+   */
+  relationshipConflicts?: ReadonlyArray<{
+    type: 'excludes' | 'requires';
+    other: string;
+    reason: 'both_directly_observed' | 'missing_requirement';
+  }>;
 }
 
 /**
@@ -233,6 +261,15 @@ function detectionToResponse(detection: Detection): DetectionResponse {
     // Version is omitted from the response when absent (never emitted as
     // a fabricated value) — see DetectionResponse.version.
     ...(detection.version ? { version: detection.version } : {}),
+    // Step 69: propagate relationship metadata, omitting absent fields so
+    // a direct observation (no `source`) is indistinguishable from an
+    // omitted optional field. Derived/conflicted detections carry the
+    // extra shape; direct detections do not.
+    ...(detection.source ? { source: detection.source } : {}),
+    ...(detection.derivedFrom ? { derivedFrom: detection.derivedFrom } : {}),
+    ...(detection.relationshipConflicts
+      ? { relationshipConflicts: detection.relationshipConflicts }
+      : {}),
   };
 }
 

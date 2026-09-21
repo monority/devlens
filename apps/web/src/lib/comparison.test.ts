@@ -38,11 +38,13 @@ function makeDetection(
   category: string,
   confidence: number,
   evidence: DetectionResponse['evidence'] = [],
+  overrides: Partial<DetectionResponse> = {},
 ): DetectionResponse {
   return {
     technology: { id, name, category },
     confidence,
     evidence,
+    ...overrides,
   };
 }
 
@@ -350,5 +352,352 @@ describe('evidenceKey backward compatibility (compareScans integration)', () => 
     // Both evidence items now have distinct canonical identities
     // ('http_header:Server|nginx' vs 'http_header:Server|Apache') → 2 unchanged
     expect(unchangedTech.evidenceChanges).toHaveLength(2);
+  });
+});
+
+// ─── Step 74: change intelligence ─────────────────────────────────────
+
+describe('compareScans — Step 74 change intelligence', () => {
+  // Helper: a React detection with overrideable version/provenance fields.
+  const react = (overrides: Partial<DetectionResponse> = {}) =>
+    makeDetection('react', 'React', 'frontend', 95, [], overrides);
+  const versioned = (version: string | null, conflict = false) =>
+    react({ version, ...(conflict ? { versionConflict: true } : {}) });
+
+  describe('version change matrix', () => {
+    it('transition 6.4.2 → 6.5.1 is version_changed', () => {
+      const result = compareScans(
+        makeScanWithDetections([versioned('6.4.2')]),
+        makeScanWithDetections([versioned('6.5.1')]),
+      );
+      const change = result.changes[0]!;
+
+      expect(result.versionChanges).toHaveLength(1);
+      expect(change.kind).toBe('version_changed');
+      expect(change.version.changed).toBe(true);
+      expect(change.version.before).toBe('6.4.2');
+      expect(change.version.after).toBe('6.5.1');
+      expect(change.version.beforeConflict).toBe(false);
+      expect(change.version.afterConflict).toBe(false);
+      expect(change.versionSource).toBeUndefined();
+      expect(result.changeCount).toBe(1);
+      expect(result.hasChanges).toBe(true);
+    });
+
+    it('drop 6.4.2 → null is version_changed', () => {
+      const result = compareScans(
+        makeScanWithDetections([versioned('6.4.2')]),
+        makeScanWithDetections([versioned(null)]),
+      );
+      const change = result.changes[0]!;
+
+      expect(change.kind).toBe('version_changed');
+      expect(change.version.changed).toBe(true);
+      expect(change.version.before).toBe('6.4.2');
+      expect(change.version.after).toBeNull();
+      expect(result.versionChanges).toHaveLength(1);
+    });
+
+    it('gain null → 6.5.1 is version_changed', () => {
+      const result = compareScans(
+        makeScanWithDetections([versioned(null)]),
+        makeScanWithDetections([versioned('6.5.1')]),
+      );
+      const change = result.changes[0]!;
+
+      expect(change.kind).toBe('version_changed');
+      expect(change.version.changed).toBe(true);
+      expect(change.version.before).toBeNull();
+      expect(change.version.after).toBe('6.5.1');
+    });
+
+    it.each([
+      ['conflict → 6.5.1', versioned('6.4.2', true), versioned('6.5.1')],
+      ['6.4.2 → conflict', versioned('6.4.2'), versioned('6.5.1', true)],
+      ['conflict → conflict', versioned('6.4.2', true), versioned('6.5.1', true)],
+    ])(
+      'conflict on either side forbids a version transition (%s)',
+      (_name, leftReact, rightReact) => {
+        const result = compareScans(
+          makeScanWithDetections([leftReact]),
+          makeScanWithDetections([rightReact]),
+        );
+        const change = result.changes[0]!;
+
+        // No version_changed kind: a conflict forbids fabricating a transition.
+        expect(change.kind).toBe('unchanged');
+        expect(change.version.changed).toBe(false);
+        expect(result.versionChanges).toHaveLength(0);
+        expect(change.version.beforeConflict || change.version.afterConflict).toBe(true);
+        // Raw version values are still surfaced honestly.
+        expect(change.version.before).toBe('6.4.2');
+        expect(change.version.after).toBe('6.5.1');
+        expect(result.hasChanges).toBe(false);
+      },
+    );
+
+    it('a versionSource-only difference is not a version change', () => {
+      const leftReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        version: '6.5.1',
+        versionSource: 'meta_tag',
+      });
+      const rightReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        version: '6.5.1',
+        versionSource: 'http_header',
+      });
+      const result = compareScans(
+        makeScanWithDetections([leftReact]),
+        makeScanWithDetections([rightReact]),
+      );
+      const change = result.changes[0]!;
+
+      expect(change.kind).toBe('unchanged');
+      expect(change.version.changed).toBe(false);
+      expect(result.versionChanges).toHaveLength(0);
+      // versionSource is only populated when a real version changed.
+      expect(change.versionSource).toBeUndefined();
+    });
+  });
+
+  describe('provenance change', () => {
+    it('direct → direct (same) is unchanged', () => {
+      const leftReact = makeDetection('react', 'React', 'frontend', 95);
+      const rightReact = makeDetection('react', 'React', 'frontend', 95);
+      const result = compareScans(
+        makeScanWithDetections([leftReact]),
+        makeScanWithDetections([rightReact]),
+      );
+      const change = result.changes[0]!;
+
+      expect(change.provenanceChanged).toBe(false);
+      expect(change.kind).toBe('unchanged');
+    });
+
+    it('direct → derived (implies) is provenance_changed', () => {
+      const leftReact = makeDetection('react', 'React', 'frontend', 95);
+      const rightReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        source: 'relationship',
+        derivedFrom: [{ source: 'next', sourceName: 'Next.js', type: 'implies' }],
+      });
+      const result = compareScans(
+        makeScanWithDetections([leftReact]),
+        makeScanWithDetections([rightReact]),
+      );
+      const change = result.changes[0]!;
+
+      expect(change.provenanceChanged).toBe(true);
+      expect(change.kind).toBe('provenance_changed');
+      expect(result.changeCount).toBe(1);
+    });
+
+    it('derived → derived with the same sources is unchanged', () => {
+      const leftReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        source: 'relationship',
+        derivedFrom: [{ source: 'next', sourceName: 'Next.js', type: 'implies' }],
+      });
+      const rightReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        source: 'relationship',
+        derivedFrom: [{ source: 'next', sourceName: 'Next.js', type: 'implies' }],
+      });
+      const result = compareScans(
+        makeScanWithDetections([leftReact]),
+        makeScanWithDetections([rightReact]),
+      );
+      const change = result.changes[0]!;
+
+      expect(change.provenanceChanged).toBe(false);
+      expect(change.kind).toBe('unchanged');
+    });
+
+    it('derived → derived with different sources is provenance_changed', () => {
+      const leftReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        source: 'relationship',
+        derivedFrom: [{ source: 'next', sourceName: 'Next.js', type: 'implies' }],
+      });
+      const rightReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        source: 'relationship',
+        derivedFrom: [{ source: 'webpack', sourceName: 'Webpack', type: 'implies' }],
+      });
+      const result = compareScans(
+        makeScanWithDetections([leftReact]),
+        makeScanWithDetections([rightReact]),
+      );
+      const change = result.changes[0]!;
+
+      expect(change.provenanceChanged).toBe(true);
+      expect(change.kind).toBe('provenance_changed');
+    });
+
+    it('derived → direct is provenance_changed', () => {
+      const leftReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        source: 'relationship',
+        derivedFrom: [{ source: 'next', sourceName: 'Next.js', type: 'implies' }],
+      });
+      const rightReact = makeDetection('react', 'React', 'frontend', 95);
+      const result = compareScans(
+        makeScanWithDetections([leftReact]),
+        makeScanWithDetections([rightReact]),
+      );
+      const change = result.changes[0]!;
+
+      expect(change.provenanceChanged).toBe(true);
+      expect(change.kind).toBe('provenance_changed');
+    });
+  });
+
+  describe('evidence change', () => {
+    it('identical evidence → evidenceChanged=false, kind=unchanged', () => {
+      const leftReact = makeDetection('react', 'React', 'frontend', 95, [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+      ]);
+      const rightReact = makeDetection('react', 'React', 'frontend', 95, [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+      ]);
+      const result = compareScans(
+        makeScanWithDetections([leftReact]),
+        makeScanWithDetections([rightReact]),
+      );
+      const change = result.changes[0]!;
+
+      expect(change.evidenceChanged).toBe(false);
+      expect(change.kind).toBe('unchanged');
+      expect(change.evidenceChanges).toHaveLength(1);
+      expect(change.evidenceChanges[0]!.status).toBe('unchanged');
+    });
+
+    it('swapped evidence (nginx → apache) → evidenceChanged=true, unchanged kind', () => {
+      const leftReact = makeDetection('react', 'React', 'frontend', 95, [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+      ]);
+      const rightReact = makeDetection('react', 'React', 'frontend', 95, [
+        { type: 'http_header', name: 'Server', value: 'apache' },
+      ]);
+      const result = compareScans(
+        makeScanWithDetections([leftReact]),
+        makeScanWithDetections([rightReact]),
+      );
+      const change = result.changes[0]!;
+
+      expect(change.evidenceChanged).toBe(true);
+      // Evidence-only diffs do not elevate the kind above 'unchanged'.
+      expect(change.kind).toBe('unchanged');
+      expect(result.hasChanges).toBe(true);
+      expect(result.unchanged).toContainEqual(expect.objectContaining({ id: 'react' }));
+    });
+  });
+
+  describe('confidence change', () => {
+    it('confidence 90 → 95 is confidence_changed', () => {
+      const leftReact = makeDetection('react', 'React', 'frontend', 90);
+      const rightReact = makeDetection('react', 'React', 'frontend', 95);
+      const result = compareScans(
+        makeScanWithDetections([leftReact]),
+        makeScanWithDetections([rightReact]),
+      );
+      const change = result.changes[0]!;
+
+      expect(change.kind).toBe('confidence_changed');
+      expect(change.scoreChanged).toBe(true);
+      expect(change.confidenceDelta).toBe(5);
+      expect(change.scoreDelta).toBe(5);
+      expect(change.leftConfidence).toBe(90);
+      expect(change.rightConfidence).toBe(95);
+      expect(result.scoreChanges).toContainEqual(expect.objectContaining({ id: 'react' }));
+      expect(result.unchanged).not.toContainEqual(expect.objectContaining({ id: 'react' }));
+    });
+
+    it('identical confidence → unchanged', () => {
+      const leftReact = makeDetection('react', 'React', 'frontend', 95);
+      const rightReact = makeDetection('react', 'React', 'frontend', 95);
+      const result = compareScans(
+        makeScanWithDetections([leftReact]),
+        makeScanWithDetections([rightReact]),
+      );
+      const change = result.changes[0]!;
+
+      expect(change.kind).toBe('unchanged');
+      expect(change.scoreChanged).toBe(false);
+      expect(change.confidenceDelta).toBe(0);
+    });
+  });
+
+  describe('determinism & ordering', () => {
+    it('is stable across repeated calls (JSON-serializable)', () => {
+      const left = makeScanWithDetections([
+        makeDetection('react', 'React', 'frontend', 95, [], { version: '6.4.2' }),
+        makeDetection('svelte', 'Svelte', 'frontend', 80),
+      ]);
+      const right = makeScanWithDetections([
+        makeDetection('react', 'React', 'frontend', 95, [], { version: '6.5.1' }),
+        makeDetection('angular', 'Angular', 'framework', 70),
+      ]);
+      const a = compareScans(left, right);
+      const b = compareScans(left, right);
+
+      expect(() => JSON.stringify(a)).not.toThrow();
+      expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+    });
+
+    it('changes are ordered by (kind priority ASC, technology.id ASC)', () => {
+      // svelte: added (right-only); angular: removed (left-only);
+      // react: version_changed; vue: unchanged.
+      const left = makeScanWithDetections([
+        makeDetection('angular', 'Angular', 'framework', 70),
+        makeDetection('react', 'React', 'frontend', 95, [], { version: '6.4.2' }),
+        makeDetection('vue', 'Vue', 'frontend', 80),
+      ]);
+      const right = makeScanWithDetections([
+        makeDetection('react', 'React', 'frontend', 95, [], { version: '6.5.1' }),
+        makeDetection('svelte', 'Svelte', 'frontend', 80),
+        makeDetection('vue', 'Vue', 'frontend', 80),
+      ]);
+      const result = compareScans(left, right);
+
+      expect(result.changes.map((c) => c.kind)).toEqual([
+        'added',
+        'removed',
+        'version_changed',
+        'unchanged',
+      ]);
+      expect(result.changes.map((c) => c.id)).toEqual(['svelte', 'angular', 'react', 'vue']);
+    });
+
+    it('swap invariance: added ⇄ removed, hasChanges & changeCount preserved', () => {
+      const left = makeScanWithDetections([
+        makeDetection('angular', 'Angular', 'framework', 70),
+        makeDetection('react', 'React', 'frontend', 95, [], { version: '6.4.2' }),
+      ]);
+      const right = makeScanWithDetections([
+        makeDetection('react', 'React', 'frontend', 95, [], { version: '6.5.1' }),
+        makeDetection('svelte', 'Svelte', 'frontend', 80),
+      ]);
+      const fwd = compareScans(left, right);
+      const rev = compareScans(right, left);
+
+      expect(fwd.hasChanges).toBe(rev.hasChanges);
+      expect(fwd.changeCount).toBe(rev.changeCount);
+      expect(fwd.added.map((c) => c.id)).toEqual(rev.removed.map((c) => c.id));
+      expect(fwd.removed.map((c) => c.id)).toEqual(rev.added.map((c) => c.id));
+      expect(fwd.changes.map((c) => c.id).sort()).toEqual(rev.changes.map((c) => c.id).sort());
+    });
+  });
+
+  describe('full detection & change record shape', () => {
+    it('carries before/after detections for explainability linking', () => {
+      const leftReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        version: '6.4.2',
+      });
+      const rightReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        version: '6.5.1',
+      });
+      const result = compareScans(
+        makeScanWithDetections([leftReact]),
+        makeScanWithDetections([rightReact]),
+      );
+      const change = result.changes[0]!;
+
+      expect(change.before?.version).toBe('6.4.2');
+      expect(change.after?.version).toBe('6.5.1');
+    });
   });
 });

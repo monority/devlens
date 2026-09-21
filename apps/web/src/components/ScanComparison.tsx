@@ -167,6 +167,10 @@ function ComparisonSummary({ result }: { result: ComparisonResult }): React.Reac
           <dd>{result.removed.length}</dd>
         </div>
         <div>
+          <dt>Version changes</dt>
+          <dd>{result.versionChanges.length}</dd>
+        </div>
+        <div>
           <dt>Score changes</dt>
           <dd>{result.scoreChanges.length}</dd>
         </div>
@@ -187,12 +191,14 @@ function ComparisonSummary({ result }: { result: ComparisonResult }): React.Reac
 
 /**
  * Looks up the full `DetectionResponse` for a technology by its canonical
- * `technology.id` from the scan's detections array.
+ * `technology.id` from a scan's detections array.
  *
- * Pure helper — no comparison semantics, no mutation.
+ * Re-resolved at render time (not cached on the comparison) so the item
+ * degrades safely when the source detection has been filtered/omitted
+ * post-comparison.
  */
 function findDetectionById(
-  detections: DetectionResponse[],
+  detections: ReadonlyArray<DetectionResponse>,
   techId: string,
 ): DetectionResponse | null {
   return detections.find((d) => d.technology.id === techId) ?? null;
@@ -237,6 +243,19 @@ function TechnologyChanges({ result }: { result: ComparisonResult }): React.Reac
                 detection={d}
                 fullDetection={findDetectionById(result.left!.detections, d.id)}
               />
+            ))}
+          </ul>
+        </>
+      )}
+
+      {/* Step 74 — version transitions (respects Step 72 conflict rules:
+          no fabricated transition when either side is in conflict). */}
+      {result.versionChanges.length > 0 && (
+        <>
+          <h3>Version changes ({result.versionChanges.length})</h3>
+          <ul className={styles.changeList}>
+            {result.versionChanges.map((d) => (
+              <VersionChangeItem key={d.id} detection={d} />
             ))}
           </ul>
         </>
@@ -293,10 +312,8 @@ function TechnologyComparisonItem({
   fullDetection,
 }: {
   detection: TechnologyComparison;
-  /** Full detection from the source scan, looked up by technology.id.
-   *  Present for added/removed technologies; null when the detection
-   *  is missing from the source scan or for unchanged techs (which
-   *  keep their existing evidence-change rendering). */
+  /** Full detection from the source scan (re-resolved by id at render time).
+   *  Present for added/removed technologies; undefined for unchanged. */
   fullDetection?: DetectionResponse | null;
 }): React.ReactElement {
   const badgeClass =
@@ -338,12 +355,14 @@ function TechnologyComparisonItem({
       )}
 
       {/* Version (subordinate): resolved version, or a conflict notice.
-          When evidence sources disagreed the version is null and we surface
-          the conflict rather than a fabricated placeholder. */}
-      {fullDetection?.version ? (
-        <span className={styles.version}>Version: {fullDetection.version}</span>
-      ) : fullDetection?.versionConflict ? (
+          Surfaced from the Step 74 version comparison so a conflict side
+          never shows a fabricated value (Step 72 §5). */}
+      {detection.version.beforeConflict || detection.version.afterConflict ? (
         <span className={styles.versionConflict}>Version: unavailable — conflict detected</span>
+      ) : typeof detection.version.after === 'string' ? (
+        <span className={styles.version}>Version: {detection.version.after}</span>
+      ) : typeof detection.version.before === 'string' ? (
+        <span className={styles.version}>Version: {detection.version.before}</span>
       ) : null}
 
       {/* Existing: score delta for unchanged technologies with changed confidence */}
@@ -365,6 +384,34 @@ function TechnologyComparisonItem({
       {/* Existing: evidence changes for unchanged technologies */}
       {detection.evidenceChanges.some((e) => e.status !== 'unchanged') && (
         <EvidenceChangeList changes={detection.evidenceChanges} />
+      )}
+    </li>
+  );
+}
+
+// ─── Version change row (Step 74) ────────────────────────────────────
+
+/** Renders a `version_changed` technology: "before → after".
+ *  Conflict sides (Step 72) are surfaced honestly — never a fabricated
+ *  transition — via the existing `versionConflict` notice. */
+function VersionChangeItem({ detection }: { detection: TechnologyComparison }): React.ReactElement {
+  const vc = detection.version;
+  const from = typeof vc.before === 'string' ? vc.before : '—';
+  const to = typeof vc.after === 'string' ? vc.after : '—';
+
+  return (
+    <li className={styles.changeItem}>
+      <span className={styles.changeBadge}>version changed</span>
+      {detection.name}
+      <span className={styles.category}>{detection.category}</span>
+      {vc.beforeConflict || vc.afterConflict ? (
+        <span className={styles.versionConflict}>Version: unavailable — conflict detected</span>
+      ) : (
+        <span className={styles.versionChange}>
+          <span className={styles.version}>{from}</span>
+          <span className={styles.versionChangeArrow}>→</span>
+          <span className={styles.version}>{to}</span>
+        </span>
       )}
     </li>
   );

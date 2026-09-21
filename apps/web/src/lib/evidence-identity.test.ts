@@ -248,7 +248,7 @@ describe('deduplicateEvidence', () => {
     expect(deduplicateEvidence([])).toEqual([]);
   });
 
-  it('handles all 8 evidence types without collision', () => {
+  it('handles all 9 evidence types without collision', () => {
     const evidence: EvidenceResponse[] = [
       { type: 'html', selector: '#a', snippet: 's' },
       { type: 'http_header', name: '#a', value: 's' },
@@ -258,8 +258,15 @@ describe('deduplicateEvidence', () => {
       { type: 'javascript_global', globalName: '#a' },
       { type: 'resource', url: '#a' },
       { type: 'link', url: '#a' },
+      {
+        type: 'resource_content',
+        url: '#a',
+        resourceType: 'script',
+        match: '#a',
+        snippet: '#a',
+      },
     ];
-    expect(deduplicateEvidence(evidence)).toHaveLength(8);
+    expect(deduplicateEvidence(evidence)).toHaveLength(9);
   });
 
   it('does not mutate the input array', () => {
@@ -270,5 +277,44 @@ describe('deduplicateEvidence', () => {
     const originalLength = evidence.length;
     deduplicateEvidence(evidence);
     expect(evidence.length).toBe(originalLength);
+  });
+});
+
+describe('getEvidenceIdentity — resource_content (Step 63)', () => {
+  it('uses "resource_content:{url}|{match}|{snippet}" format (URL lowercased)', () => {
+    expect(
+      getEvidenceIdentity({
+        type: 'resource_content',
+        url: 'https://CDN.Example.COM/Main.JS',
+        resourceType: 'script',
+        match: 'ng.version',
+        snippet: '<script>',
+      }),
+    ).toBe('resource_content:https://cdn.example.com/main.js|ng.version|<script>');
+  });
+
+  it('distinguishes resource_content by url, match, and snippet', () => {
+    const a = {
+      type: 'resource_content' as const,
+      url: 'https://cdn.example.com/main.js',
+      resourceType: 'script',
+      match: 'ng.version',
+      snippet: 'a',
+    };
+    const b = { ...a, match: 'vue.version' };
+    const c = { ...a, snippet: 'b' };
+    expect(getEvidenceIdentity(a)).not.toBe(getEvidenceIdentity(b));
+    expect(getEvidenceIdentity(a)).not.toBe(getEvidenceIdentity(c));
+  });
+
+  it('is deterministic for the same resource_content input', () => {
+    const item = {
+      type: 'resource_content' as const,
+      url: 'https://cdn.example.com/main.js',
+      resourceType: 'script',
+      match: 'ng.version',
+      snippet: 'ng',
+    };
+    expect(getEvidenceIdentity(item)).toBe(getEvidenceIdentity({ ...item }));
   });
 });

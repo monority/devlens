@@ -19,74 +19,12 @@ import {
 import type { ScanResult } from '@devlens/application';
 import type { Crawler } from '@devlens/crawler';
 import type { ScanResultRepository } from '@devlens/application';
-import type { Scan, Detection, VersionSource } from '@devlens/core';
-import type { Evidence } from '@devlens/core';
+import type { Scan } from '@devlens/core';
 import type { Detector } from '@devlens/detectors';
+import type { DetectionResponse } from '../../../lib/types.js';
+import { detectionToResponse } from '../../../lib/detection-to-response';
 
 // ─── Response types ──────────────────────────────────────────────────
-
-/**
- * JSON response body for a single technology detection.
- */
-export interface DetectionResponse {
-  technology: {
-    id: string;
-    name: string;
-    category: string;
-  };
-  confidence: number;
-  evidence: ReadonlyArray<Evidence>;
-  /**
-   * Technology version extracted from evidence, when a tech-specific
-   * signature produced one. Present (non-null) when a version is resolved;
-   * `null` when version sources disagreed (conflict — see `versionConflict`);
-   * omitted entirely when no version signal was observed (Step 72 §13 —
-   * never a fabricated placeholder).
-   */
-  version?: string | null;
-  /**
-   * Step 72 — `true` when multiple evidence sources extracted disagreeing
-   * versions and the consensus layer refused to pick one. The `version` is
-   * then `null` and the UI renders "version conflict detected" rather than
-   * an arbitrary version (§11/§19/§20). Absent when there is no conflict.
-   */
-  versionConflict?: boolean;
-  /**
-   * The evidence-source modality the resolved `version` came from
-   * (`'header' | 'meta' | 'script_url' | 'resource_url' | 'resource_content'
-   * | 'content' | 'link`), when unambiguous. Absent when there is no
-   * version or when sources disagree / are mixed (Step 72 §4/§10).
-   */
-  versionSource?: VersionSource;
-  /**
-   * Step 69 — How this detection entered the result set.
-   *
-   * Omitted when the detection is a **direct** observation (evidence was
-   * actually found). `'relationship'` means the detection was DERIVED from
-   * an `implies` edge in the technology catalog — it carries no direct
-   * evidence or version; see `derivedFrom`.
-   */
-  source?: 'direct' | 'relationship';
-  /**
-   * Provenance for a relationship-derived detection (present only when
-   * `source === 'relationship'`). Each entry records the technology that
-   * implied this one. Never fabricated — always an actual catalog edge.
-   */
-  derivedFrom?: ReadonlyArray<{ source: string; sourceName: string; type: 'implies' }>;
-  /**
-   * Relationship conflicts surfaced on a direct detection, never acted
-   * upon destructively:
-   * - `excludes` — both technologies are directly observed (both are
-   *   preserved with their evidence intact).
-   * - `requires` — the required target is not directly observed
-   *   (missing-requirement signal; the target is NOT auto-derived).
-   */
-  relationshipConflicts?: ReadonlyArray<{
-    type: 'excludes' | 'requires';
-    other: string;
-    reason: 'both_directly_observed' | 'missing_requirement';
-  }>;
-}
 
 /**
  * JSON response body for a successful scan execution.
@@ -262,33 +200,6 @@ function resultToResponse(result: ScanResult): CreateScanResponse {
         }
       : null,
     detections: detections.map((d) => detectionToResponse(d)),
-  };
-}
-
-function detectionToResponse(detection: Detection): DetectionResponse {
-  return {
-    technology: {
-      id: detection.technology.id,
-      name: detection.technology.name,
-      category: detection.technology.category,
-    },
-    confidence: detection.confidence,
-    evidence: detection.evidence,
-    // Version intelligence (Step 72). `version` is emitted when resolved;
-    // `null` + `versionConflict: true` when sources disagree (§19); omitted
-    // entirely when no version signal was observed (§13 — no placeholder).
-    ...(detection.version ? { version: detection.version } : {}),
-    ...(detection.versionConflict ? { version: null as string | null, versionConflict: true } : {}),
-    ...(detection.versionSource ? { versionSource: detection.versionSource } : {}),
-    // Step 69: propagate relationship metadata, omitting absent fields so
-    // a direct observation (no `source`) is indistinguishable from an
-    // omitted optional field. Derived/conflicted detections carry the
-    // extra shape; direct detections do not.
-    ...(detection.source ? { source: detection.source } : {}),
-    ...(detection.derivedFrom ? { derivedFrom: detection.derivedFrom } : {}),
-    ...(detection.relationshipConflicts
-      ? { relationshipConflicts: detection.relationshipConflicts }
-      : {}),
   };
 }
 

@@ -396,8 +396,10 @@ describe('POST /api/scans — successful execution', () => {
           technology: { id: 'nginx', name: 'nginx', category: 'server' },
           confidence: 80,
           evidence: [{ type: 'http_header', name: 'Server', value: 'nginx' }],
+          explanation: expect.any(Object),
         },
       ]);
+      expect(body.detections[0]!).toHaveProperty('explanation');
     }
   });
 });

@@ -120,7 +120,7 @@ describe('DetectionItem — Step 33 explanation', () => {
     ...overrides,
   });
 
-  it('renders the evidence explanation summary', () => {
+  it('renders the detected-because reasons list', () => {
     const detection = makeDetection({
       evidence: [
         { type: 'http_header', name: 'Server', value: 'nginx' },
@@ -128,9 +128,13 @@ describe('DetectionItem — Step 33 explanation', () => {
       ],
     });
     const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const decoded = html.replace(/&#x27;/g, "'");
 
-    expect(html).toContain('Detected from');
-    expect(html).toContain('evidence');
+    expect(decoded).toContain('Detected because');
+    // Each evidence item is rendered as a reason line with its matched value.
+    expect(decoded).toContain("HTTP header 'Server' — matched 'nginx'");
+    expect(decoded).toContain("Meta tag 'generator' — matched 'WordPress'");
+    expect(decoded).toContain('matched');
   });
 
   it('preserves exact confidence value in the explanation', () => {
@@ -156,11 +160,11 @@ describe('DetectionItem — Step 33 explanation', () => {
     expect(html).toContain('Script URL');
   });
 
-  it('renders "No evidence details are available." for zero evidence', () => {
+  it('renders "No direct evidence available." for zero evidence', () => {
     const detection = makeDetection({ evidence: [] });
     const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
 
-    expect(html).toContain('No evidence details are available.');
+    expect(html).toContain('No direct evidence available.');
   });
 
   it('preserves known technology link to catalog', () => {
@@ -345,7 +349,7 @@ describe('DetectionItem — Step 39 explainability', () => {
 
     // Should not contain evidence source items
     expect(html).not.toContain("HTTP header '");
-    expect(html).toContain('No evidence details are available.');
+    expect(html).toContain('No direct evidence available.');
   });
 
   it('deduplicates evidence in the rendered output', () => {
@@ -538,7 +542,7 @@ describe('DetectionItem — Step 69 derived & conflict rendering', () => {
       }),
     );
 
-    expect(html).toContain('No evidence details are available.');
+    expect(html).toContain('No direct evidence available.');
     // And the derived banner, so it is never mistaken for a direct detection.
     expect(html).toContain('Derived from');
   });
@@ -564,5 +568,95 @@ describe('DetectionItem — Step 69 derived & conflict rendering', () => {
     expect(html).not.toContain('Derived from');
     const cleaned = html.replace(/<!-- -->/g, '');
     expect(cleaned).toContain('Conflict: requires (wordpress)');
+  });
+});
+
+describe('DetectionItem — Step 73 explainability rendering', () => {
+  // Local helper (mirrors the parent describe's makeDetection) so this block
+  // is self-contained and does not depend on the enclosing describe's scope.
+  const makeDetection = (overrides: Partial<DetectionResponse> = {}): DetectionResponse => ({
+    technology: { id: 'nginx', name: 'nginx', category: 'server' },
+    confidence: 80,
+    evidence: [{ type: 'http_header', name: 'Server', value: 'nginx' }],
+    ...overrides,
+  });
+
+  it('renders a relationship-derived reason in the "Detected because" list', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, {
+        detection: makeDetection({
+          evidence: [],
+          source: 'relationship',
+          derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
+        }),
+        index: 0,
+      }),
+    );
+    const cleaned = html.replace(/<!-- -->/g, '').replace(/&#x27;/g, "'");
+
+    expect(cleaned).toContain('Detected because');
+    expect(cleaned).toContain('Derived from Next.js');
+    expect(cleaned).toContain('(implies)');
+  });
+
+  it('renders version-conflict detail from disagreeing evidence', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, {
+        detection: makeDetection({
+          evidence: [{ type: 'http_header', name: 'Server', value: '18.2.0' }],
+          version: null,
+          versionConflict: true,
+          versionEvidence: [
+            { type: 'http_header', name: 'Server', value: '18.2.0' },
+            { type: 'http_header', name: 'Server', value: '18.3.1' },
+          ],
+        }),
+        index: 0,
+      }),
+    );
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('Version evidence is inconsistent');
+    expect(cleaned).toContain('HTTP Header');
+    // Per-observation extracted versions are NOT persisted → the disagreeing
+    // evidence values are shown instead (never a fabricated version string).
+    expect(cleaned).toContain('18.2.0');
+    expect(cleaned).toContain('18.3.1');
+  });
+
+  it('renders resource_content evidence in the reasons list', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, {
+        detection: makeDetection({
+          evidence: [
+            {
+              type: 'resource_content',
+              url: 'https://cdn.example.com/main.js',
+              resourceType: 'script',
+              match: 'ng.version',
+              snippet: 'ng',
+            },
+          ],
+        }),
+        index: 0,
+      }),
+    );
+    const decoded = html.replace(/&#x27;/g, "'");
+
+    expect(decoded).toContain('Detected because');
+    expect(decoded).toContain('Resource Content');
+    expect(decoded).toContain("Resource content at 'https://cdn.example.com/main.js'");
+    expect(decoded).toContain("matched 'ng.version'");
+  });
+
+  it('renders "No direct evidence available." for a direct detection with no evidence', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, {
+        detection: makeDetection({ evidence: [] }),
+        index: 0,
+      }),
+    );
+
+    expect(html).toContain('No direct evidence available.');
   });
 });

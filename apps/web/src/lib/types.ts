@@ -66,7 +66,201 @@ export type EvidenceResponse =
   | { type: 'meta_tag'; name: string; content: string }
   | { type: 'javascript_global'; globalName: string }
   | { type: 'resource'; url: string }
-  | { type: 'link'; url: string };
+  | { type: 'link'; url: string }
+  | {
+      /** Step 63/70 — a signature matched inside a fetched resource body. */
+      type: 'resource_content';
+      /** URL of the fetched resource whose body contained the signature. */
+      url: string;
+      /** The resource type inspected (e.g. 'script' for a JS bundle body). */
+      resourceType: string;
+      /** The signature substring that matched — the discriminating signal. */
+      match: string;
+      /** Bounded context around the match (never the full resource body). */
+      snippet: string;
+    };
+
+// ─── Explainability model (Step 73) ────────────────────────────────
+//
+// A structured, deterministic, serializable explanation of WHY a detection is
+// considered present, derived purely from the detection's own evidence and
+// relationship metadata (never invented). These interfaces live here — the web
+// contract module — so the API response (`DetectionResponse.explanation`) and
+// the pure `getDetectionExplainability` builder share one source of truth
+// with no circular dependency (`detection-explainability.ts` imports from
+// here, never the reverse).
+
+/**
+ * Whether a detection was directly observed or relationship-derived.
+ *
+ * - `'direct'`   — a detector produced the evidence that was scored.
+ * - `'derived'` — inferred from an `implies` edge; carries provenance and
+ *   NO direct evidence.
+ */
+export type DetectionKind = 'direct' | 'derived';
+
+/**
+ * Edge type of the normalized explanation graph.
+ * - `supported_by`   — detection → evidence (evidence that supports a detection).
+ * - `derived_from`   — derived detection → source detection.
+ * - `conflicts_with` — direct detection → technology it conflicts with.
+ */
+export type ExplanationEdgeType = 'supported_by' | 'derived_from' | 'conflicts_with';
+
+/**
+ * Canonical, human-readable description of a single evidence item's origin.
+ * Shared by the per-evidence reason, version-conflict detail, and version
+ * explanation so there is a single source of truth for provenance.
+ */
+export interface EvidenceSource {
+  /** Human-readable evidence type label (e.g. "HTTP Header"). */
+  type: string;
+  /** Short description of where this evidence originated. */
+  source: string;
+  /** The primary identifying value (e.g. "Server: nginx"). */
+  value: string;
+  /** Canonical evidence identity key (e.g. "http_header:Server"). */
+  identity: string;
+}
+
+/** A reason line backing a direct observation — one per deduplicated evidence. */
+export interface EvidenceReason {
+  /** Discriminator: always `'evidence'` for a direct observation. */
+  kind: 'evidence';
+  /** Human-readable evidence type label (e.g. "Meta Tag"). */
+  evidenceType: string;
+  /** Deterministic human-readable summary of what matched. */
+  summary: string;
+  /** The evidence item that supports this reason. */
+  evidence: EvidenceResponse;
+}
+
+/** A reason line backing a relationship-derived detection. */
+export interface RelationshipReason {
+  /** Discriminator: always `'relationship'` for a derivation. */
+  kind: 'relationship';
+  /** The catalog edge type. Always `'implies'` for a derivation. */
+  relationshipType: 'implies';
+  /** The technology ID that implies this one. */
+  sourceTechnology: string;
+  /** Display name of the source technology (when available). */
+  sourceName?: string;
+  /** The derived technology ID. */
+  targetTechnology: string;
+}
+
+/** A reason is either an evidence observation or a relationship derivation. */
+export type ExplanationReason = EvidenceReason | RelationshipReason;
+
+/**
+ * A resolved version + its provenance (Step 73 §C). The resolved version is
+ * kept separate from the proof of presence — a version is never an
+ * independent reason for a detection if already borne by the same evidence.
+ */
+export interface VersionExplanation {
+  /** The resolved version string. */
+  version: string;
+  /** Evidence-source modality the version came from (when unambiguous). */
+  source?: string;
+  /** The evidence that yielded the resolved version (when available). */
+  evidence?: EvidenceSource[];
+}
+
+/**
+ * A disagreeing version observation surfaced on a `versionConflict` (§D).
+ *
+ * Step 72 limitation: per-observation *extracted* versions are not persisted
+ * on the domain `Detection` — only the disagreeing evidence items are. So a
+ * conflict is described by the disagreeing evidence's source modality +
+ * matched value; a fabricated version is never invented.
+ */
+export interface VersionConflictDetail {
+  /** The evidence-source modality of this disagreeing observation. */
+  source: string;
+  /** The disagreeing evidence (with its matched value). */
+  evidence: EvidenceSource[];
+}
+
+/** A node in the normalized explanation graph (§2 "structure normalisée"). */
+export interface ExplanationNode {
+  /** Stable, deterministic node identifier. */
+  id: string;
+  /** What this node represents. */
+  kind: 'detection' | 'evidence' | 'technology';
+  /** Label for display / tracing. */
+  label: string;
+  /** Technology id for `detection`/`technology` nodes. */
+  techId?: string;
+}
+
+/** A directed edge in the normalized explanation graph. */
+export interface ExplanationEdge {
+  /** Source node id. */
+  from: string;
+  /** Target node id. */
+  to: string;
+  /** Semantic relationship: supported_by / derived_from / conflicts_with. */
+  type: ExplanationEdgeType;
+}
+
+/**
+ * A normalized, deterministic explanation graph for a single detection.
+ * NOT a graph database or generic relationship engine (§2) — a flat,
+ * serializable view derived deterministically from the detection's own data.
+ */
+export interface ExplanationGraph {
+  nodes: ExplanationNode[];
+  edges: ExplanationEdge[];
+}
+
+/**
+ * Structured, deterministic explanation of a single technology detection.
+ * Extends the neutral summary with renderable reasons, version provenance,
+ * conflict detail, and a normalized evidence graph — from existing data only.
+ */
+export interface DetectionExplainability {
+  technology: { name: string; category: string };
+  /** `'direct'` (directly observed) or `'derived'` (relationship-implied). */
+  kind: DetectionKind;
+  /** The existing confidence value — never recalculated. */
+  confidence: number;
+  /** Neutral summary string (reused from getDetectionExplanation). */
+  summary: string;
+  /** Ordered, deduplicated reason lines. */
+  reasons: ExplanationReason[];
+  /** Total evidence count (after deduplication). */
+  evidenceCount: number;
+  /** Unique evidence type labels, sorted alphabetically. */
+  evidenceTypes: string[];
+  /** Per-evidence origin descriptions, deduplicated + deterministically ordered. */
+  evidenceSources: EvidenceSource[];
+  /** Deduplicated, sorted evidence items — for reuse with EvidenceList. */
+  evidence: EvidenceResponse[];
+  /** Resolved version provenance (absent when there is no version). */
+  version?: VersionExplanation;
+  /** True when disagreeing versions were merged (see versionConflictDetail). */
+  versionConflict?: boolean;
+  /** Disagreeing version observations, when `versionConflict` is true. */
+  versionConflictDetail?: VersionConflictDetail[];
+  /** The evidence that yielded the resolved version (when available). */
+  versionEvidence?: EvidenceSource[];
+  /** Provenance for a derived detection (present iff kind === 'derived'). */
+  derivedFrom?: ReadonlyArray<{
+    source: string;
+    sourceName?: string;
+    relationshipType: 'implies';
+  }>;
+  /** Conflicts surfaced on a direct detection (never acted upon destructively). */
+  relationshipConflicts?: ReadonlyArray<{
+    type: 'excludes' | 'requires';
+    other: string;
+    reason: 'both_directly_observed' | 'missing_requirement';
+  }>;
+  /** True when the detection carries no direct evidence (e.g. derived or absent). */
+  noDirectEvidence: boolean;
+  /** Normalized evidence graph (Step 73 §2). */
+  graph?: ExplanationGraph;
+}
 
 // ─── Detection ───────────────────────────────────────────────────────
 
@@ -113,6 +307,22 @@ export interface DetectionResponse {
     other: string;
     reason: 'both_directly_observed' | 'missing_requirement';
   }>;
+  /**
+   * Step 72/73 — the evidence item(s) whose matched value yielded the
+   * resolved `version` (when `version` is non-null and explainable). On a
+   * `versionConflict`, this carries the disagreeing observations' evidence
+   * so the conflict is inspectable rather than silent. Absent when there is
+   * no version. Never fabricated.
+   */
+  versionEvidence?: EvidenceResponse[];
+  /**
+   * Step 73 — a structured, deterministic explanation of why this detection
+   * is considered present (evidence reasons, relationship provenance,
+   * version/conflict detail, evidence graph). Derived from existing data;
+   * omitted when not yet computed (e.g. by an older API). The UI may compute
+   * the same model client-side via `getDetectionExplainability` as a fallback.
+   */
+  explanation?: DetectionExplainability;
 }
 
 // ─── Full scan result (by ID and by POST) ─────────────────────────────

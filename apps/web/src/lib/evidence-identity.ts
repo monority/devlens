@@ -73,6 +73,8 @@ export function getEvidenceIdentity(item: EvidenceResponse): string {
       return `resource:${normalizeUrl(item.url)}`;
     case 'link':
       return `link:${normalizeUrl(item.url)}`;
+    case 'resource_content':
+      return `resource_content:${normalizeUrl(item.url)}|${item.match}|${item.snippet}`;
     default: {
       // Fallback for unknown/future evidence types — serialize the full
       // item so identity is deterministic but unique. Uses the actual

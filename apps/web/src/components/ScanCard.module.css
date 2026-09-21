@@ -1535,3 +1535,68 @@
   border-radius: 0.25rem;
   padding: 0.1rem 0.4rem;
 }
+
+/* ─── Step 73: Detection Explainability ─────────────────────────────── */
+
+/* Container for the structured "Detected because" reason list. */
+.explanationReasons {
+  margin-top: 0.25rem;
+}
+
+.explanationReasonsHeading {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.25rem;
+}
+
+/* Fallback shown when a detection carries no direct evidence. */
+.noEvidence {
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-style: italic;
+}
+
+/* A relationship-implied reason line (vs an evidence-backed one). */
+.reasonRelationship {
+  color: #4361ee;
+  font-style: italic;
+}
+
+/* ─── Step 73: Version conflict detail ──────────────────────────────── */
+
+/* Container for the disagreeing-version evidence on a version conflict. */
+.versionConflictDetail {
+  margin-top: 0.35rem;
+}
+
+.versionConflictHeading {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #991b1b;
+  margin-bottom: 0.25rem;
+}
+
+.versionConflictEvidenceList {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+.versionConflictEvidenceItem {
+  font-size: 0.8rem;
+  padding: 0.1rem 0;
+}
+
+.versionConflictSource {
+  display: inline-block;
+  font-weight: 700;
+  color: #991b1b;
+  margin-right: 0.4rem;
+}
+
+.versionConflictValues {
+  display: inline;
+  margin: 0;
+  padding: 0;
+}

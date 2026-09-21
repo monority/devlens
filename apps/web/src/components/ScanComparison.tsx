@@ -337,9 +337,13 @@ function TechnologyComparisonItem({
         <span className={styles.score}>Confidence: {detection.leftConfidence}</span>
       )}
 
-      {/* Version (subordinate): only when the source detection carries one */}
+      {/* Version (subordinate): resolved version, or a conflict notice.
+          When evidence sources disagreed the version is null and we surface
+          the conflict rather than a fabricated placeholder. */}
       {fullDetection?.version ? (
         <span className={styles.version}>Version: {fullDetection.version}</span>
+      ) : fullDetection?.versionConflict ? (
+        <span className={styles.versionConflict}>Version: unavailable — conflict detected</span>
       ) : null}
 
       {/* Existing: score delta for unchanged technologies with changed confidence */}

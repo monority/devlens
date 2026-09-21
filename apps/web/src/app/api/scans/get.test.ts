@@ -182,8 +182,13 @@ describe('GET /api/scans/:id — handler', () => {
 
       expect(response.status).toBe(200);
       if (response.status === 200 && 'scan' in response.body) {
-        // Top-level keys: only "scan", "snapshot", "detections"
-        expect(Object.keys(response.body).sort()).toEqual(['detections', 'scan', 'snapshot']);
+        // Top-level keys: only "scan", "snapshot", "observationCoverage", "detections"
+        expect(Object.keys(response.body).sort()).toEqual([
+          'detections',
+          'observationCoverage',
+          'scan',
+          'snapshot',
+        ]);
 
         // scan keys: only documented camelCase fields (no snake_case)
         const scanKeys = Object.keys(response.body.scan).sort();

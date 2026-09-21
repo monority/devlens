@@ -372,7 +372,7 @@ describe('ScanDetailView', () => {
     const result = makeScanDetail({ detections: [] });
     const html = renderToString(React.createElement(ScanDetailView, { result }));
 
-    expect(html).toContain('No supported technologies were detected');
+    expect(html).toContain('No observable technologies were detected');
     expect(html).toContain('The scan completed successfully');
   });
 
@@ -577,7 +577,7 @@ describe('ScanDetailView', () => {
     const html = renderToString(React.createElement(ScanDetailView, { result }));
 
     expect(html).toContain('The scan completed successfully');
-    expect(html).toContain('No supported technologies were detected');
+    expect(html).toContain('No observable technologies were detected');
     expect(html).toContain('Detections (0)');
   });
 

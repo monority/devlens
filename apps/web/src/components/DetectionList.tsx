@@ -8,6 +8,7 @@
  * a dedicated valid state (not an error).
  */
 
+import type { ObservationCoverage } from '@devlens/core';
 import type { DetectionResponse } from '../lib/types.js';
 import { DetectionItem } from './DetectionItem';
 import { EmptyDetections } from './EmptyDetections';
@@ -15,11 +16,16 @@ import styles from './ScanCard.module.css';
 
 export interface DetectionListProps {
   detections: DetectionResponse[];
+  /** Observation coverage (Step 78) — forwarded to the zero-detection state */
+  observationCoverage?: ObservationCoverage | undefined;
 }
 
-export function DetectionList({ detections }: DetectionListProps): React.ReactElement {
+export function DetectionList({
+  detections,
+  observationCoverage,
+}: DetectionListProps): React.ReactElement {
   if (detections.length === 0) {
-    return <EmptyDetections />;
+    return <EmptyDetections observationCoverage={observationCoverage} />;
   }
 
   return (

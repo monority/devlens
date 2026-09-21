@@ -10,6 +10,8 @@
  * These are plain data shapes only — no domain mapping logic lives here.
  */
 
+import type { ObservationCoverage } from '@devlens/core';
+
 // ─── Scan summary (used in both list and detail) ─────────────────────
 
 /**
@@ -382,6 +384,12 @@ export interface DetectionResponse {
 export interface ScanDetailResponse {
   scan: ScanResponse;
   snapshot: SnapshotResponse | null;
+  /**
+   * Observation coverage / blind-spot intelligence (Step 78 §9 #2).
+   * Computed server-side from the snapshot. May be absent for legacy/forward
+   * compatibility — callers should default to an all-`not_observed` coverage.
+   */
+  observationCoverage?: ObservationCoverage;
   detections: DetectionResponse[];
 }
 

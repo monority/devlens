@@ -15,11 +15,12 @@ import {
   createUrl,
   createHostname,
   createTimestamp,
+  getObservationCoverage,
 } from '@devlens/core';
 import type { ScanResult } from '@devlens/application';
 import type { Crawler } from '@devlens/crawler';
 import type { ScanResultRepository } from '@devlens/application';
-import type { Scan } from '@devlens/core';
+import type { Scan, ObservationCoverage } from '@devlens/core';
 import type { Detector } from '@devlens/detectors';
 import type { DetectionResponse } from '../../../lib/types.js';
 import { detectionToResponse } from '../../../lib/detection-to-response';
@@ -56,6 +57,13 @@ export interface CreateScanResponse {
       description: string | null;
     };
   } | null;
+  /**
+   * Observation coverage / blind-spot intelligence (Step 78 §9 #2).
+   * Always computed server-side from the full domain snapshot (before it
+   * is stripped into the `SnapshotResponse` above) — an absent snapshot
+   * yields an empty, all-`not_observed` coverage.
+   */
+  observationCoverage: ObservationCoverage;
   detections: DetectionResponse[];
 }
 
@@ -151,6 +159,11 @@ function resultToResponse(result: ScanResult): CreateScanResponse {
   const { scan, snapshot, detections } = result;
   const status = scan.status;
 
+  // Derived server-side from the full domain snapshot (Step 78). Computed on
+  // the whole resource set before the snapshot is stripped to its
+  // `SnapshotResponse` shape — no acquisition logic is duplicated here.
+  const observationCoverage = getObservationCoverage(snapshot);
+
   let startedAt: string | null = null;
   let completedAt: string | null = null;
   let failedAt: string | null = null;
@@ -199,6 +212,7 @@ function resultToResponse(result: ScanResult): CreateScanResponse {
           },
         }
       : null,
+    observationCoverage,
     detections: detections.map((d) => detectionToResponse(d)),
   };
 }

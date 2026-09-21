@@ -16,6 +16,7 @@ vi.mock('next/link', () => ({
 }));
 
 import { ScanDetectionResults } from './ScanDetectionResults';
+import type { ObservationCoverage } from '@devlens/core';
 import type { DetectionResponse } from '../lib/types';
 
 // ─── Fixtures ────────────────────────────────────────────────────────
@@ -31,6 +32,17 @@ function makeDetection(
     technology: { id, name, category },
     confidence,
     evidence,
+  };
+}
+
+function makeCoverage(skipped: number): ObservationCoverage {
+  return {
+    discovered: 0,
+    selected: 0,
+    fetched: 1,
+    failed: 0,
+    skipped,
+    sources: [],
   };
 }
 
@@ -125,7 +137,28 @@ describe('ScanDetectionResults', () => {
   it('renders empty state for zero detections', () => {
     const html = renderToString(React.createElement(ScanDetectionResults, { detections: [] }));
 
-    expect(html).toContain('No supported technologies were detected');
+    expect(html).toContain('No observable technologies were detected');
+  });
+
+  it('§15 Case C: detection + 1 skipped resource — detection & evidence render unchanged, no empty state', () => {
+    const html = renderToString(
+      React.createElement(ScanDetectionResults, {
+        detections: [
+          makeDetection('wordpress', 'WordPress', 'cms', 90, [
+            { type: 'meta_tag', name: 'generator', content: 'WordPress 6.4' },
+          ]),
+        ],
+        observationCoverage: makeCoverage(1),
+      }),
+    );
+
+    // Detection + its evidence render normally; the skipped resource does
+    // not alter the detection.
+    expect(html).toContain('WordPress');
+    expect(html).toContain('generator');
+    // With detections present, the zero-detection empty state is not shown.
+    expect(html).not.toContain('Detections (0)');
+    expect(html).not.toContain('No observable technologies were detected');
   });
 
   it('renders semantic headings and list elements', () => {

@@ -49,6 +49,8 @@ export function evidenceTypeLabel(type: EvidenceResponse['type']): string {
       return 'Resource URL';
     case 'link':
       return 'Link';
+    case 'resource_content':
+      return 'Resource Content';
     default:
       return 'Evidence';
   }
@@ -83,6 +85,13 @@ export function evidenceFields(item: EvidenceResponse): EvidenceField[] {
       return [{ label: 'URL', value: item.url }];
     case 'link':
       return [{ label: 'URL', value: item.url }];
+    case 'resource_content':
+      return [
+        { label: 'Resource', value: item.url },
+        { label: 'Type', value: item.resourceType },
+        { label: 'Match', value: item.match },
+        { label: 'Snippet', value: item.snippet },
+      ];
     default: {
       // Safe fallback for future/unknown evidence types — never crashes.
       return [{ label: 'Data', value: JSON.stringify(item) }];

@@ -289,3 +289,106 @@ describe('getScanDetectionResults — Step 69 relationship metadata', () => {
     expect(first).toEqual(second);
   });
 });
+
+describe('getScanDetectionResults — Step 72/73 version intelligence', () => {
+  it('forwards version, versionSource, and versionEvidence when present', () => {
+    const detections: DetectionResponse[] = [
+      {
+        technology: { id: 'nginx', name: 'nginx', category: 'server' },
+        confidence: 80,
+        evidence: [{ type: 'http_header', name: 'Server', value: 'nginx/1.21.6' }],
+        version: '1.21.6',
+        versionSource: 'header',
+        versionEvidence: [{ type: 'http_header', name: 'Server', value: 'nginx/1.21.6' }],
+      },
+    ];
+    const results = getScanDetectionResults(detections);
+    const result = results[0]!;
+
+    expect(result.version).toBe('1.21.6');
+    expect(result.versionSource).toBe('header');
+    expect(result.versionEvidence).toEqual([
+      { type: 'http_header', name: 'Server', value: 'nginx/1.21.6' },
+    ]);
+  });
+
+  it('forwards versionConflict and omits a resolved version (no placeholder)', () => {
+    const detections: DetectionResponse[] = [
+      {
+        technology: { id: 'jquery', name: 'jQuery', category: 'library' },
+        confidence: 70,
+        evidence: [{ type: 'http_header', name: 'X-Version', value: '18.2.0' }],
+        version: null,
+        versionConflict: true,
+        versionEvidence: [
+          { type: 'http_header', name: 'X-Version', value: '18.2.0' },
+          { type: 'meta_tag', name: 'generator', content: '18.3.1' },
+        ],
+      },
+    ];
+    const results = getScanDetectionResults(detections);
+    const result = results[0]!;
+
+    expect(result.version).toBeNull();
+    expect(result.versionConflict).toBe(true);
+    expect(result.versionEvidence).toHaveLength(2);
+  });
+
+  it('omits version/versionConflict/versionSource/versionEvidence when absent', () => {
+    const detections: DetectionResponse[] = [
+      {
+        technology: { id: 'react', name: 'React', category: 'frontend' },
+        confidence: 95,
+        evidence: [{ type: 'http_header', name: 'Server', value: 'nginx' }],
+      },
+    ];
+    const results = getScanDetectionResults(detections);
+    const result = results[0]!;
+
+    expect('version' in result).toBe(false);
+    expect('versionConflict' in result).toBe(false);
+    expect('versionSource' in result).toBe(false);
+    expect('versionEvidence' in result).toBe(false);
+  });
+
+  it('recomputes the explanation against the canonical (deduped) evidence', () => {
+    const detections: DetectionResponse[] = [
+      {
+        technology: { id: 'nginx', name: 'nginx', category: 'server' },
+        confidence: 80,
+        evidence: [
+          { type: 'http_header', name: 'Server', value: 'nginx' },
+          { type: 'http_header', name: 'Server', value: 'nginx' }, // duplicate
+          { type: 'meta_tag', name: 'generator', content: 'nginx' },
+        ],
+      },
+    ];
+    const results = getScanDetectionResults(detections);
+    const result = results[0]!;
+
+    // The explanation always matches the displayed (deduped) evidence count.
+    expect(result.explanation).toBeDefined();
+    expect(result.explanation!.evidenceCount).toBe(result.evidence.length);
+    expect(result.explanation!.evidenceCount).toBe(2);
+  });
+
+  it('forwards derivedFrom + relationshipConflicts and recomputes explanation', () => {
+    const detections: DetectionResponse[] = [
+      {
+        technology: { id: 'woocommerce', name: 'WooCommerce', category: 'ecommerce' },
+        confidence: 60,
+        evidence: [{ type: 'script_url', url: 'https://example.com/wc.js' }],
+        relationshipConflicts: [
+          { type: 'requires', other: 'wordpress', reason: 'missing_requirement' },
+        ],
+      },
+    ];
+    const results = getScanDetectionResults(detections);
+    const result = results[0]!;
+
+    expect(result.relationshipConflicts).toEqual([
+      { type: 'requires', other: 'wordpress', reason: 'missing_requirement' },
+    ]);
+    expect(result.explanation!.relationshipConflicts).toHaveLength(1);
+  });
+});

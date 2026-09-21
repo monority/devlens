@@ -37,6 +37,7 @@
 import type { DetectionResponse } from '../lib/types.js';
 import { evidenceTypeLabel } from '../lib/evidence-presenter';
 import { getEvidenceIdentity, deduplicateEvidence } from '../lib/evidence-identity';
+import { getDetectionExplainability } from '../lib/detection-explainability';
 
 // ─── Pure detection results function ─────────────────────────────────
 
@@ -102,21 +103,36 @@ export function getScanDetectionResults(detections: DetectionResponse[]): Detect
           : 0;
     });
 
-    results.push({
+    const response: DetectionResponse = {
       technology: tech,
       confidence: detection.confidence,
       evidence,
-      // Version is omitted when absent (exactOptionalPropertyTypes), so
-      // callers can rely on "present ⇒ known version".
-      ...(detection.version ? { version: detection.version } : {}),
-      // Step 69: propagate relationship metadata (omit when absent) so the
-      // UI can distinguish direct observations from derived/conflicted ones.
+      // Version intelligence (Step 72) — forwarded when present, never
+      // fabricated. `version !== undefined` preserves an explicit `null` (a
+      // version conflict) so the UI can render the conflict notice rather
+      // than dropping the field entirely; `exactOptionalPropertyTypes` keeps
+      // `version` absent when the detection never had a version signal.
+      ...(detection.version !== undefined ? { version: detection.version } : {}),
+      ...(detection.versionConflict ? { versionConflict: true } : {}),
+      ...(detection.versionSource ? { versionSource: detection.versionSource } : {}),
+      ...(detection.versionEvidence ? { versionEvidence: [...detection.versionEvidence] } : {}),
+      // Step 69: propagate relationship metadata (omit when absent).
       ...(detection.source ? { source: detection.source } : {}),
       ...(detection.derivedFrom ? { derivedFrom: detection.derivedFrom } : {}),
       ...(detection.relationshipConflicts
         ? { relationshipConflicts: detection.relationshipConflicts }
         : {}),
-    });
+    };
+
+    // Recompute the explanation against the canonical (deduped + sorted)
+    // evidence so the rendered explanation always agrees with the evidence
+    // list shown to the user — even if the incoming detection carried a
+    // stale or pre-dedup explanation. Both getScanDetectionResults and
+    // getDetectionExplainability use the same deduplicateEvidence + sort, so
+    // this is consistent and idempotent.
+    response.explanation = getDetectionExplainability(response);
+
+    results.push(response);
   }
 
   return results;

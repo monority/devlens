@@ -196,3 +196,36 @@ describe('evidenceUrl', () => {
     expect(evidenceUrl(item)).toBeNull();
   });
 });
+
+describe('evidence presentation — resource_content (Step 63)', () => {
+  const item: EvidenceResponse = {
+    type: 'resource_content',
+    url: 'https://cdn.example.com/main.js',
+    resourceType: 'script',
+    match: 'ng.version',
+    snippet: 'ng=require(["angular"])',
+  };
+
+  it('labels resource_content as "Resource Content"', () => {
+    expect(evidenceTypeLabel('resource_content')).toBe('Resource Content');
+  });
+
+  it('extracts resource, type, match, and snippet fields', () => {
+    const fields = evidenceFields(item);
+
+    expect(fields).toHaveLength(4);
+    expect(fields[0]!.label).toBe('Resource');
+    expect(fields[0]!.value).toBe('https://cdn.example.com/main.js');
+    expect(fields[1]!.label).toBe('Type');
+    expect(fields[1]!.value).toBe('script');
+    expect(fields[2]!.label).toBe('Match');
+    expect(fields[2]!.value).toBe('ng.version');
+    expect(fields[3]!.label).toBe('Snippet');
+    expect(fields[3]!.value).toBe('ng=require(["angular"])');
+  });
+
+  it('is not a URL-type evidence (content match, not a clickable link)', () => {
+    expect(evidenceIsUrl(item)).toBe(false);
+    expect(evidenceUrl(item)).toBeNull();
+  });
+});

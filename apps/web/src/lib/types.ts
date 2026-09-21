@@ -10,7 +10,7 @@
  * These are plain data shapes only — no domain mapping logic lives here.
  */
 
-import type { ObservationCoverage } from '@devlens/core';
+import type { ObservationCoverage, ScanResultQualitySummary } from '@devlens/core';
 
 // ─── Scan summary (used in both list and detail) ─────────────────────
 
@@ -390,6 +390,14 @@ export interface ScanDetailResponse {
    * compatibility — callers should default to an all-`not_observed` coverage.
    */
   observationCoverage?: ObservationCoverage;
+  /**
+   * Scan-level result-quality summary (Step 79). Computed server-side from
+   * the detection signal quality (Step 76) + observation coverage (Step 78) —
+   * no detection/scoring/coverage logic is recomputed. May be absent for
+   * legacy/forward compatibility; callers should default to
+   * `EMPTY_SCAN_RESULT_QUALITY`.
+   */
+  resultQuality?: ScanResultQualitySummary;
   detections: DetectionResponse[];
 }
 

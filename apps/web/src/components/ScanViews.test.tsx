@@ -15,6 +15,7 @@ import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { ScansHistory, ScanCard, ScansError, ScanNotFound, ScanDetailView } from './ScanViews.js';
 import type { ScanSummary, ScanDetailResponse, DetectionResponse } from '../lib/types.js';
+import { EMPTY_SCAN_RESULT_QUALITY } from '@devlens/core';
 
 // Mock next/link to render a plain <a> tag (no router context needed)
 vi.mock('next/link', () => ({
@@ -925,5 +926,26 @@ describe('ScanDetailView — Scan Overview (Step 37)', () => {
     // Detection list also present
     expect(cleaned).toContain('Detections');
     expect(cleaned).toContain('React');
+  });
+
+  it('renders the result-quality summary for completed scans', () => {
+    const html = renderToString(React.createElement(ScanDetailView, { result: makeScanDetail() }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+    expect(cleaned).toContain('Result quality');
+    expect(cleaned).toContain('No observations');
+  });
+
+  it('renders a provided resultQuality verdict label', () => {
+    const result = makeScanDetail({
+      resultQuality: {
+        ...EMPTY_SCAN_RESULT_QUALITY,
+        quality: 'limited_observation',
+        detectionCount: 2,
+      },
+    });
+    const html = renderToString(React.createElement(ScanDetailView, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+    expect(cleaned).toContain('Limited observation');
+    expect(cleaned).toContain('Result quality');
   });
 });

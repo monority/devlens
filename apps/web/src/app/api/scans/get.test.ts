@@ -182,10 +182,11 @@ describe('GET /api/scans/:id — handler', () => {
 
       expect(response.status).toBe(200);
       if (response.status === 200 && 'scan' in response.body) {
-        // Top-level keys: only "scan", "snapshot", "observationCoverage", "detections"
+        // Top-level keys: only "scan", "snapshot", "observationCoverage", "resultQuality", "detections"
         expect(Object.keys(response.body).sort()).toEqual([
           'detections',
           'observationCoverage',
+          'resultQuality',
           'scan',
           'snapshot',
         ]);

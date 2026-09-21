@@ -814,6 +814,16 @@
   word-break: break-all;
 }
 
+/* Step 76 — compact signal-quality secondary line (§10). Neutral palette
+   reuse: no arbitrary colors, no dominant badge, keeps the detection item
+   height unchanged. */
+.signalQuality {
+  margin-left: 0.5rem;
+  color: #6b7280;
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+
 .noChanges {
   padding: 1.5rem;
   background: #f9fafb;

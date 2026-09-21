@@ -17,6 +17,7 @@ import {
   evidenceUrl,
 } from '../lib/evidence-presenter';
 import { getDetectionExplainability } from '../lib/detection-explainability';
+import { signalQualityLabel } from '../lib/signal-quality';
 import { isKnownTechnology } from '../lib/technology-catalog';
 import type { DetectionResponse, EvidenceResponse } from '../lib/types.js';
 import { ScanOverview } from './ScanOverview';
@@ -214,6 +215,9 @@ function TechnologyChanges({ result }: { result: ComparisonResult }): React.Reac
     );
   }
 
+  const provenanceChanges = result.changes.filter(
+    (c) => c.provenanceChanged && c.kind === 'provenance_changed',
+  );
   return (
     <section className={styles.techChanges}>
       <h2>Technology changes</h2>
@@ -266,6 +270,19 @@ function TechnologyChanges({ result }: { result: ComparisonResult }): React.Reac
           <h3>Present in both ({result.unchanged.length})</h3>
           <ul className={styles.changeList}>
             {result.unchanged.map((d) => (
+              <TechnologyComparisonItem key={d.id} detection={d} />
+            ))}
+          </ul>
+        </>
+      )}
+
+      {/* Step 77 §11 — provenance changes: source/relationship changes
+      that classifyChange routes away from the score/version buckets. */}
+      {provenanceChanges.length > 0 && (
+        <>
+          <h3>Provenance changes ({provenanceChanges.length})</h3>
+          <ul className={styles.changeList}>
+            {provenanceChanges.map((d) => (
               <TechnologyComparisonItem key={d.id} detection={d} />
             ))}
           </ul>
@@ -340,6 +357,17 @@ function TechnologyComparisonItem({
   // from the full detection — reused from the existing explainability pipeline.
   const explainability = fullDetection ? getDetectionExplainability(fullDetection) : null;
 
+  // Step 77 — provenance & signal-quality deltas are READ from the precomputed
+  // before/after (Step 77 §7: reuse `explanation.signalQuality`, never recompute).
+  const before = detection.before;
+  const after = detection.after;
+  const beforeProvenance = before?.source === 'relationship' ? 'Derived' : 'Direct';
+  const afterProvenance = after?.source === 'relationship' ? 'Derived' : 'Direct';
+  const beforeSq = before?.explanation?.signalQuality;
+  const afterSq = after?.explanation?.signalQuality;
+  const beforeSqLabel = before && beforeSq ? signalQualityLabel(before, beforeSq) : null;
+  const afterSqLabel = after && afterSq ? signalQualityLabel(after, afterSq) : null;
+
   return (
     <li className={styles.changeItem}>
       <span className={`${styles.changeBadge} ${badgeClass}`}>{detection.status}</span>
@@ -372,6 +400,22 @@ function TechnologyComparisonItem({
           {(detection.scoreDelta ?? 0) > 0 ? ' ↑' : ' ↓'}
         </span>
       )}
+
+      {/* Step 77 — provenance change (render-only, precomputed before/after) */}
+      {detection.before &&
+      detection.after &&
+      detection.provenanceChanged &&
+      beforeProvenance !== afterProvenance ? (
+        <span className={styles.provenanceChange}>
+          Provenance: {beforeProvenance} → {afterProvenance}
+        </span>
+      ) : null}
+      {/* Step 77 — signal-quality change (only when BOTH sides carry a sq) */}
+      {beforeSqLabel && afterSqLabel && beforeSqLabel !== afterSqLabel ? (
+        <span className={styles.signalQualityChange}>
+          Signal quality: {beforeSqLabel} → {afterSqLabel}
+        </span>
+      ) : null}
 
       {/* NEW: Explainability summary + supporting evidence for added/removed */}
       {fullDetection && explainability && explainability.evidenceCount > 0 && (

@@ -8,7 +8,8 @@ import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { DetectionItem } from './DetectionItem';
-import type { DetectionResponse } from '../lib/types.js';
+import type { DetectionResponse, DetectionExplainability } from '../lib/types.js';
+import { getDetectionExplainability } from '../lib/detection-explainability';
 
 describe('DetectionItem', () => {
   const makeDetection = (overrides: Partial<DetectionResponse> = {}): DetectionResponse => ({
@@ -712,5 +713,112 @@ describe('DetectionItem — Step 76 signal quality rendering', () => {
 
     expect(html).toContain('Derived');
     expect(html).toContain('no direct evidence');
+  });
+});
+
+// Step 77 §14 — presentation of confidence · signal quality · provenance.
+describe('DetectionItem — Step 77 presentation (confidence · signal quality · provenance)', () => {
+  const mk = (overrides: Partial<DetectionResponse> = {}): DetectionResponse => ({
+    technology: { id: 'react', name: 'React', category: 'frontend' },
+    confidence: 95,
+    evidence: [{ type: 'script_url', url: 'https://cdn.example.com/react.js' }],
+    ...overrides,
+  });
+  const explanationWithoutSq = (detection: DetectionResponse): DetectionExplainability => {
+    const full = getDetectionExplainability(detection);
+    const legacy: DetectionExplainability = { ...full };
+    // Simulate a legacy API response whose explanation predates signal
+    // quality (Step 76) — the field is simply absent.
+    delete legacy.signalQuality;
+    return legacy;
+  };
+
+  it('renders a combined confidence · signal-quality · provenance header (§6)', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, {
+        detection: mk({
+          confidence: 100,
+          evidence: [
+            { type: 'script_url', url: 'https://cdn.example.com/react.js' },
+            { type: 'http_header', name: 'X-Powered-By', value: 'React' },
+            { type: 'meta_tag', name: 'generator', content: 'React' },
+          ],
+        }),
+        index: 0,
+      }),
+    );
+
+    expect(html).toContain('Confidence: 100 · Strong · 3 sources · Direct');
+    expect(html).toContain('Confidence: 100');
+    expect(html).not.toContain('%');
+  });
+
+  it('renders a combined header for a single-signal direct detection', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, { detection: mk({ confidence: 95 }), index: 0 }),
+    );
+
+    expect(html).toContain('Confidence: 95 · Single signal · 1 source · Direct');
+  });
+
+  it('renders "Derived · no direct evidence" in the combined header (§10)', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, {
+        detection: mk({
+          confidence: 0,
+          source: 'relationship',
+          derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
+          evidence: [],
+        }),
+        index: 0,
+      }),
+    );
+
+    expect(html).toContain('Confidence: 0 · Derived · no direct evidence');
+    expect(html).toContain('no direct evidence');
+    expect(html).not.toContain('Strong');
+    expect(html).not.toContain('%');
+  });
+
+  it('renders a "No direct evidence available." body for relationship-only detections', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, {
+        detection: mk({
+          confidence: 0,
+          source: 'relationship',
+          derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
+          evidence: [],
+        }),
+        index: 0,
+      }),
+    );
+
+    expect(html).toContain('No direct evidence available.');
+    expect(html).toContain('no direct evidence'); // lowercase, from the combined header
+    expect(html).not.toContain('%');
+  });
+
+  it('renders the version subordinate to the combined header (§6 version is secondary)', () => {
+    // `renderToString` inserts `<!-- -->` between "Version:" and the value,
+    // so assert them as separate substrings (comment-safe).
+    const html = renderToString(
+      React.createElement(DetectionItem, {
+        detection: mk({ confidence: 95, version: '6.4.2' }),
+        index: 0,
+      }),
+    );
+
+    expect(html).toContain('Confidence: 95 · Single signal · 1 source · Direct');
+    expect(html).toContain('Version:');
+    expect(html).toContain('6.4.2');
+    expect(html).not.toContain('95%');
+  });
+
+  it('falls back to a provenance-only line when the API omits signalQuality (legacy)', () => {
+    const detection = mk({ explanation: explanationWithoutSq(mk()) });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+
+    expect(html).toContain('Confidence: 95 · Direct');
+    expect(html).not.toContain('%');
   });
 });

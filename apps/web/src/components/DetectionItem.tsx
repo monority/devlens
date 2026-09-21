@@ -19,7 +19,7 @@ import type { DetectionResponse } from '../lib/types.js';
 import { isKnownTechnology } from '../lib/technology-catalog';
 import { getDetectionExplainability } from '../lib/detection-explainability';
 import { evidenceFields } from '../lib/evidence-presenter';
-import { signalQualityLabel } from '../lib/signal-quality';
+import { getDetectionPresentation } from '../lib/detection-presentation';
 import { EvidenceList } from './EvidenceList';
 import Link from 'next/link';
 import styles from './ScanCard.module.css';
@@ -32,7 +32,6 @@ export interface DetectionItemProps {
 export function DetectionItem({ detection, index }: DetectionItemProps): React.ReactElement {
   const {
     technology,
-    confidence,
     version,
     versionConflict,
     versionSource,
@@ -60,14 +59,15 @@ export function DetectionItem({ detection, index }: DetectionItemProps): React.R
   );
 
   // Derive a structured explanation from the detection's actual evidence.
-  const explainability = getDetectionExplainability(detection);
+  const explainability = detection.explanation ?? getDetectionExplainability(detection);
+  const present = getDetectionPresentation(detection, explainability);
 
   return (
     <li className={styles.detectionItem} key={`${technology.id}-${index}`}>
       <header className={styles.detectionHeader}>
         <span className={styles.techName}>{techName}</span>
         <span className={styles.category}>{technology.category}</span>
-        <span className={styles.score}>Confidence: {confidence}</span>
+        <span className={styles.signalQualityLine}>{present.combinedHeaderLabel}</span>
         {version ? <span className={styles.version}>Version: {version}</span> : null}
         {/* Step 72 — conflict override. When evidence sources disagreed the
             consensus is refused, `version` is null and we render a conflict
@@ -82,16 +82,6 @@ export function DetectionItem({ detection, index }: DetectionItemProps): React.R
         {relationshipConflicts && relationshipConflicts.length > 0 ? (
           <span className={styles.relationshipConflict}>
             Conflict: {relationshipConflicts.map((c) => `${c.type} (${c.other})`)}
-          </span>
-        ) : null}
-
-        {/* Step 76 — compact signal-quality secondary line. Shows the
-            corroboration of independent evidence sources WITHOUT any
-            probabilistic language or percentage (§10). Honors the "derived ·
-            no direct evidence" rendering for relationship-only detections. */}
-        {explainability.signalQuality ? (
-          <span className={styles.signalQuality}>
-            {signalQualityLabel(detection, explainability.signalQuality)}
           </span>
         ) : null}
       </header>

@@ -42,6 +42,7 @@ import type {
 import { evidenceTypeLabel, evidenceFields } from '../lib/evidence-presenter';
 import { getDetectionExplanation } from '../lib/detection-explanation';
 import { getEvidenceIdentity, deduplicateEvidence } from '../lib/evidence-identity';
+import { computeSignalQuality } from '../lib/signal-quality';
 
 // Re-export the explainability types so this remains the single import
 // surface for explainability (`import { ... } from './detection-explainability'`).
@@ -451,5 +452,9 @@ export function getDetectionExplainability(detection: DetectionResponse): Detect
     ...(relationshipConflicts ? { relationshipConflicts } : {}),
     noDirectEvidence,
     graph: buildGraph(detection, uniqueEvidence, isDerived, derivedFrom, relationshipConflicts),
+    // Step 76 — signal quality: descriptive corroboration summary, independent of
+    // `confidence`. Computed from the deduplicated evidence (same input as
+    // `evidenceCount`), so `signalQuality.evidenceCount` always matches it.
+    signalQuality: computeSignalQuality(detection.evidence),
   };
 }

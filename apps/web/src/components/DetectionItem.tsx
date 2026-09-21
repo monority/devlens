@@ -19,6 +19,7 @@ import type { DetectionResponse } from '../lib/types.js';
 import { isKnownTechnology } from '../lib/technology-catalog';
 import { getDetectionExplainability } from '../lib/detection-explainability';
 import { evidenceFields } from '../lib/evidence-presenter';
+import { signalQualityLabel } from '../lib/signal-quality';
 import { EvidenceList } from './EvidenceList';
 import Link from 'next/link';
 import styles from './ScanCard.module.css';
@@ -80,7 +81,17 @@ export function DetectionItem({ detection, index }: DetectionItemProps): React.R
         {isDerived ? <span className={styles.derived}>Derived from {derivedLabel}</span> : null}
         {relationshipConflicts && relationshipConflicts.length > 0 ? (
           <span className={styles.relationshipConflict}>
-            Conflict: {relationshipConflicts.map((c) => `${c.type} (${c.other})`).join(', ')}
+            Conflict: {relationshipConflicts.map((c) => `${c.type} (${c.other})`)}
+          </span>
+        ) : null}
+
+        {/* Step 76 — compact signal-quality secondary line. Shows the
+            corroboration of independent evidence sources WITHOUT any
+            probabilistic language or percentage (§10). Honors the "derived ·
+            no direct evidence" rendering for relationship-only detections. */}
+        {explainability.signalQuality ? (
+          <span className={styles.signalQuality}>
+            {signalQualityLabel(detection, explainability.signalQuality)}
           </span>
         ) : null}
       </header>

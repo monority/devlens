@@ -660,3 +660,57 @@ describe('DetectionItem — Step 73 explainability rendering', () => {
     expect(html).toContain('No direct evidence available.');
   });
 });
+
+describe('DetectionItem — Step 76 signal quality rendering', () => {
+  const makeDetection = (overrides: Partial<DetectionResponse> = {}): DetectionResponse => ({
+    technology: { id: 'react', name: 'React', category: 'frontend' },
+    confidence: 95,
+    evidence: [{ type: 'script_url', url: 'https://cdn.example.com/react.js' }],
+    ...overrides,
+  });
+
+  it('renders a compact single-signal quality line (§10)', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, { detection: makeDetection(), index: 0 }),
+    );
+
+    expect(html).toContain('Single signal');
+    expect(html).toContain('1 source');
+    // A signal-quality line must never look like a probability.
+    expect(html).not.toContain('%');
+  });
+
+  it('renders a compact multi-source quality line (§10)', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, {
+        detection: makeDetection({
+          evidence: [
+            { type: 'http_header', name: 'X-Powered-By', value: 'React' },
+            { type: 'meta_tag', name: 'generator', content: 'React 19' },
+          ],
+        }),
+        index: 0,
+      }),
+    );
+
+    expect(html).toContain('Multi-source');
+    expect(html).toContain('2 sources');
+    expect(html).not.toContain('%');
+  });
+
+  it('renders "Derived · no direct evidence" for a relationship-derived detection (§11)', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, {
+        detection: makeDetection({
+          evidence: [],
+          source: 'relationship',
+          derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
+        }),
+        index: 0,
+      }),
+    );
+
+    expect(html).toContain('Derived');
+    expect(html).toContain('no direct evidence');
+  });
+});

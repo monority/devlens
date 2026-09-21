@@ -213,6 +213,50 @@ export interface ExplanationGraph {
   edges: ExplanationEdge[];
 }
 
+// ─── Signal quality / corroboration (Step 76) ────────────────────────
+
+/**
+ * The observable "source family" an evidence item originates from. Several
+ * evidence `type`s collapse onto the same family (Step 76 §3): e.g.
+ * `script_content`, `html` and `javascript_global` are all content-channel
+ * observations, so multiple inline-script matches count as one source family.
+ */
+export type SourceFamily =
+  'header' | 'meta' | 'script_url' | 'content' | 'resource_url' | 'resource_content' | 'link';
+
+/**
+ * Qualitative corroboration level (Step 76 §5). Small, deterministic and
+ * documented — derived solely from observable evidence source families.
+ *
+ * - `no_evidence`   — no direct evidence (e.g. a derived detection).
+ * - `single_signal` — exactly one observable source family.
+ * - `corroborated`  — two independent source families.
+ * - `strong`        — three or more independent source families.
+ */
+export type SignalQualityLevel = 'no_evidence' | 'single_signal' | 'corroborated' | 'strong';
+
+/**
+ * A descriptive, non-probabilistic summary of how well a detection is
+ * corroborated by independent evidence sources (Step 76 §4).
+ *
+ * This NEVER replaces `confidence` (a ranking score): it only describes the
+ * diversity of observations supporting the detection. It is derived from the
+ * detection's OWN evidence only — a derived detection never borrows its source
+ * technology's strength (§6.A).
+ */
+export interface SignalQuality {
+  /** Quality level — deterministic function of `sourceCount`. */
+  level: SignalQualityLevel;
+  /** Evidence items after canonical deduplication (§6.C). */
+  evidenceCount: number;
+  /** Number of distinct observable source families (§3/§6). */
+  sourceCount: number;
+  /** The distinct source families, sorted for stable rendering/ordering (§7). */
+  sources: SourceFamily[];
+  /** True when ≥2 independent source families corroborate the detection. */
+  corroborated: boolean;
+}
+
 /**
  * Structured, deterministic explanation of a single technology detection.
  * Extends the neutral summary with renderable reasons, version provenance,
@@ -256,10 +300,12 @@ export interface DetectionExplainability {
     other: string;
     reason: 'both_directly_observed' | 'missing_requirement';
   }>;
-  /** True when the detection carries no direct evidence (e.g. derived or absent). */
+  /** True when the detection carries no direct evidence (e.g. derived). */
   noDirectEvidence: boolean;
-  /** Normalized evidence graph (Step 73 §2). */
+  /** Step 73 §2 normalized evidence graph. */
   graph?: ExplanationGraph;
+  /** Step 76 — signal quality / corroboration, independent of `confidence`. */
+  signalQuality?: SignalQuality;
 }
 
 // ─── Detection ───────────────────────────────────────────────────────

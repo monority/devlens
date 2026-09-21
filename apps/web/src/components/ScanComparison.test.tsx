@@ -11,7 +11,9 @@ import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { ScanComparison } from './ScanComparison.js';
 import { compareScans } from '../lib/comparison.js';
-import type { ScanDetailResponse, DetectionResponse } from '../lib/types.js';
+import { getDetectionExplainability } from '../lib/detection-explainability';
+import { computeSignalQuality } from '../lib/signal-quality';
+import type { ScanDetailResponse, DetectionResponse, SignalQuality } from '../lib/types.js';
 
 // Mock next/link so it renders a plain <a> tag (no router context needed)
 vi.mock('next/link', () => ({
@@ -834,5 +836,147 @@ describe('ScanComparison — version rendering', () => {
     const html = renderToString(React.createElement(ScanComparison, { result }));
 
     expect(html).not.toContain('Version:');
+  });
+});
+
+// Step 77 §14 — §11 provenance & signal-quality deltas rendered by ScanComparison.
+
+// Step 77 §14 — §11 provenance & signal-quality deltas rendered by ScanComparison.
+describe('ScanComparison — Step 77 provenance & signal-quality deltas (§11, render-only)', () => {
+  it('renders a provenance change row when source differs (Direct → Derived)', () => {
+    const evidence: DetectionResponse['evidence'] = [
+      { type: 'script_url', url: 'https://cdn.example.com/react.js' },
+    ];
+    const left = makeScan('scan_left', 'completed', [
+      {
+        technology: { id: 'react', name: 'React', category: 'frontend' },
+        confidence: 95,
+        evidence,
+      },
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      {
+        technology: { id: 'react', name: 'React', category: 'frontend' },
+        confidence: 95,
+        source: 'relationship',
+        derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
+        evidence,
+      },
+    ]);
+    const result = compareScans(left, right);
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+
+    expect(html).toContain('Provenance:');
+    expect(html).toContain('Direct');
+    expect(html).toContain('Derived');
+    expect(html).toContain('→');
+  });
+
+  it('renders a signal-quality change row for an unchanged detection (§11, §7)', () => {
+    const mkReact = (sq: SignalQuality): DetectionResponse => {
+      const base: DetectionResponse = {
+        technology: { id: 'react', name: 'React', category: 'frontend' },
+        confidence: 95,
+        evidence: [{ type: 'script_url', url: 'https://cdn.example.com/react.js' }],
+      };
+      return {
+        ...base,
+        // Same evidence/source/confidence on both sides — only the API-computed
+        // explanation.signalQuality differs (Step 77 §7: rendered, never recomputed).
+        explanation: {
+          ...getDetectionExplainability(base),
+          signalQuality: sq,
+        },
+      };
+    };
+    const single = computeSignalQuality([
+      { type: 'script_url', url: 'https://cdn.example.com/react.js' },
+    ]);
+    const corroborated = computeSignalQuality([
+      { type: 'script_url', url: 'https://cdn.example.com/react.js' },
+      { type: 'http_header', name: 'X-Powered-By', value: 'React' },
+    ]);
+    // Vue score change forces hasChanges=true so the "Present in both" section
+    // (unchanged detections via TechnologyComparisonItem) is rendered.
+    const left = makeScan('scan_left', 'completed', [
+      mkReact(single),
+      makeDetection('vue', 'Vue', 'frontend', 50, []),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      mkReact(corroborated),
+      makeDetection('vue', 'Vue', 'frontend', 80, []),
+    ]);
+    const result = compareScans(left, right);
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+
+    expect(html).toContain('Present in both');
+    expect(html).toContain('Signal quality:');
+    expect(html).toContain('Single signal');
+    expect(html).toContain('Multi-source');
+    expect(html).toContain('→');
+  });
+
+  it('omits provenance/signal-quality rows for an unchanged detection without a sq delta (§11 guard)', () => {
+    const evidence: DetectionResponse['evidence'] = [
+      { type: 'script_url', url: 'https://cdn.example.com/react.js' },
+    ];
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95, evidence),
+      makeDetection('vue', 'Vue', 'frontend', 50),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95, evidence),
+      makeDetection('vue', 'Vue', 'frontend', 80),
+    ]);
+    const result = compareScans(left, right);
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+
+    expect(html).toContain('Present in both');
+    expect(html).toContain('React');
+    expect(html).not.toContain('Provenance:');
+    expect(html).not.toContain('Signal quality:');
+  });
+
+  it('renders a score/confidence change row with the delta (85 → 100)', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('react', 'React', 'frontend', 85),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 100),
+    ]);
+    const result = compareScans(left, right);
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+
+    expect(html).toContain('Score / confidence changes');
+    expect(html).toContain('85');
+    expect(html).toContain('100');
+    expect(html).not.toContain('95%');
+    expect(html).not.toContain('100%');
+  });
+
+  it('renders a version change row (6.4.1 → 6.4.2)', () => {
+    const left = makeScan('scan_left', 'completed', [
+      {
+        technology: { id: 'react', name: 'React', category: 'frontend' },
+        confidence: 95,
+        version: '6.4.1',
+        evidence: [],
+      },
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      {
+        technology: { id: 'react', name: 'React', category: 'frontend' },
+        confidence: 95,
+        version: '6.4.2',
+        evidence: [],
+      },
+    ]);
+    const result = compareScans(left, right);
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+
+    expect(html).toContain('version changed');
+    expect(html).toContain('6.4.1');
+    expect(html).toContain('6.4.2');
+    expect(html).toContain('→');
   });
 });

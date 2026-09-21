@@ -415,3 +415,29 @@ export interface ErrorResponse {
 export interface CreateScanRequest {
   url: string;
 }
+
+/**
+ * Step 77 — Detection interpretation & presentation labels (§4).
+ *
+ * Pure presentation strings derived from a DetectionResponse + its
+ * DetectionExplainability. NOT a score/confidence/probability recalculation
+ * (Step 77 §5, §12). Produced by `getDetectionPresentation` and consumed by the
+ * UI — never serialized back to the API.
+ */
+export interface DetectionPresentation {
+  /** "Confidence: 95" — a 0-100 ranking score, never a '%' (Step 77 §5). */
+  confidenceLabel: string;
+  /** Reuses the Step-76 `signalQualityLabel` ("Single signal · 1 source",
+   * "Derived · no direct evidence", "No evidence"). Empty for legacy
+   * responses lacking `explanation.signalQuality` (Step 77 §7).
+   */
+  signalQualityLabel: string;
+  /** "Direct" | "Derived" (Step 77 §6 provenance token). */
+  provenanceLabel: 'Direct' | 'Derived';
+  /** Compact non-duplicative evidence hint (Step 77 §8). */
+  evidenceSummary: string;
+  /** Folded header line (Step 77 §6):
+   *  `Confidence: N · <signalQualityLabel> · Direct`
+   *  or `Confidence: 0 · Derived · no direct evidence`. */
+  combinedHeaderLabel: string;
+}

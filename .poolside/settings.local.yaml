@@ -1,0 +1,6 @@
+tools:
+    shell:
+        allow:
+            - find *
+            - head *
+            - ls *

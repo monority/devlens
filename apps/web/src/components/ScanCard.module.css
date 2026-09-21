@@ -1645,3 +1645,52 @@
   font-size: 0.8rem;
   font-weight: 400;
 }
+
+/* ─── Step 78: Observation coverage & blind-spot intelligence ───────── */
+
+.observationCoverage {
+  margin-bottom: 1.5rem;
+}
+
+.observationCoverage h2 {
+  font-size: 1.1rem;
+  margin-bottom: 0.75rem;
+  color: #111827;
+}
+
+.observationSurface {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.8rem;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.observationSurface:last-child {
+  border-bottom: none;
+}
+
+.observationSurface > span:first-child {
+  color: #4b5563;
+  font-weight: 500;
+}
+
+.observationStatus {
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-weight: 600;
+  text-transform: lowercase;
+  white-space: nowrap;
+}
+
+.observationStatus.notObserved {
+  color: #d1d5db;
+}
+
+.partialWarning {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: #6b7280;
+}

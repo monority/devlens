@@ -326,8 +326,13 @@ describe('POST /api/scans — successful execution', () => {
     expect(result.status).toBe(200);
     const body = result.body;
     if ('scan' in body) {
-      // Top-level keys: only "scan", "snapshot", "detections"
-      expect(Object.keys(body).sort()).toEqual(['detections', 'scan', 'snapshot']);
+      // Top-level keys: only "scan", "snapshot", "observationCoverage", "detections"
+      expect(Object.keys(body).sort()).toEqual([
+        'detections',
+        'observationCoverage',
+        'scan',
+        'snapshot',
+      ]);
 
       // scan keys: only the documented fields (camelCase, no snake_case)
       const scanKeys = Object.keys(body.scan).sort();

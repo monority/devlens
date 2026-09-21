@@ -105,7 +105,7 @@ describe('DetectionList', () => {
     const cleaned = html.replace(/<!-- -->/g, '');
 
     expect(cleaned).toContain('The scan completed successfully');
-    expect(cleaned).toContain('No supported technologies were detected');
+    expect(cleaned).toContain('No observable technologies were detected');
     expect(cleaned).toContain('Detections (0)');
     // Phase 7: zero detections must NOT imply the site is technology-free.
     expect(cleaned).toContain('This does not mean the site uses no technologies');

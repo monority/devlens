@@ -26,3 +26,6 @@ export * from './domain/evidence.js';
 
 // Site snapshot
 export * from './domain/snapshot.js';
+
+// Observation coverage (Step 78)
+export * from './domain/observation-coverage.js';

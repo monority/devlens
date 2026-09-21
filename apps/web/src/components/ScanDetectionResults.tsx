@@ -19,6 +19,7 @@
  * `react-dom/server` — no DOM environment required.
  */
 
+import type { ObservationCoverage } from '@devlens/core';
 import type { DetectionResponse } from '../lib/types.js';
 import { getScanDetectionResults } from '../lib/scan-detection-results';
 import { DetectionList } from './DetectionList';
@@ -26,11 +27,14 @@ import { DetectionList } from './DetectionList';
 export interface ScanDetectionResultsProps {
   /** Already-filtered detection results from the API */
   detections: DetectionResponse[];
+  /** Observation coverage (Step 78) — forwarded to the detection list */
+  observationCoverage?: ObservationCoverage | undefined;
 }
 
 export function ScanDetectionResults({
   detections,
+  observationCoverage,
 }: ScanDetectionResultsProps): React.ReactElement {
   const sorted = getScanDetectionResults(detections);
-  return <DetectionList detections={sorted} />;
+  return <DetectionList detections={sorted} observationCoverage={observationCoverage} />;
 }

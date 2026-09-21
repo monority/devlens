@@ -37,6 +37,8 @@ import { DetectionCoverage } from './DetectionCoverage';
 import { DetectionList } from './DetectionList';
 import { DetectionFilterView } from './DetectionFilterView';
 import { ScanDetectionResults } from './ScanDetectionResults';
+import { ObservationCoverageSummary } from './ObservationCoverageSummary';
+import { EMPTY_OBSERVATION_COVERAGE } from '@devlens/core';
 import styles from './ScanCard.module.css';
 
 // ─── Scan status badge helpers ────────────────────────────────────────
@@ -310,6 +312,13 @@ export function ScanDetailView({
         <ScanSummarySection scan={scan} />
       )}
 
+      {/* ── Observation coverage / blind-spots (completed scans only) ── */}
+      {scan.status === 'completed' && (
+        <ObservationCoverageSummary
+          coverage={result.observationCoverage ?? EMPTY_OBSERVATION_COVERAGE}
+        />
+      )}
+
       {/* ── Technology insights (completed scans only) ── */}
       {scan.status === 'completed' && <ScanInsights result={result} />}
 
@@ -338,14 +347,17 @@ export function ScanDetailView({
             initialCategory={initialCategory ?? ''}
           />
         ) : scan.status === 'completed' ? (
-          <ScanDetectionResults detections={detections} />
+          <ScanDetectionResults
+            detections={detections}
+            observationCoverage={result.observationCoverage}
+          />
         ) : scan.status === 'failed' ? (
           <>
             <h2>Detections (0)</h2>
             <p>Detection results are not available because the scan failed.</p>
           </>
         ) : (
-          <DetectionList detections={detections} />
+          <DetectionList detections={detections} observationCoverage={result.observationCoverage} />
         )}
       </section>
     </article>

@@ -1694,3 +1694,27 @@
   font-size: 0.8rem;
   color: #6b7280;
 }
+
+/* ─── Result quality (Step 79) ────────────────────────────────────────── */
+
+.resultQuality {
+  margin-bottom: 1.5rem;
+}
+
+.resultQualityLabel {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.resultQualityLine {
+  font-size: 0.8rem;
+  color: #6b7280;
+  padding: 0.15rem 0;
+}
+
+.resultQualityContext {
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-style: italic;
+}

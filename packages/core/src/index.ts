@@ -29,3 +29,6 @@ export * from './domain/snapshot.js';
 
 // Observation coverage (Step 78)
 export * from './domain/observation-coverage.js';
+
+// Scan result quality (Step 79)
+export * from './domain/scan-result-quality.js';

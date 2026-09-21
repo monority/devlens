@@ -20,10 +20,11 @@ import {
 import type { ScanResult } from '@devlens/application';
 import type { Crawler } from '@devlens/crawler';
 import type { ScanResultRepository } from '@devlens/application';
-import type { Scan, ObservationCoverage } from '@devlens/core';
+import type { Scan, ObservationCoverage, ScanResultQualitySummary } from '@devlens/core';
 import type { Detector } from '@devlens/detectors';
 import type { DetectionResponse } from '../../../lib/types.js';
 import { detectionToResponse } from '../../../lib/detection-to-response';
+import { getScanResultQuality } from '../../../lib/scan-result-quality';
 
 // ─── Response types ──────────────────────────────────────────────────
 
@@ -64,6 +65,14 @@ export interface CreateScanResponse {
    * yields an empty, all-`not_observed` coverage.
    */
   observationCoverage: ObservationCoverage;
+  /**
+   * Scan-level result-quality summary (Step 79). Computed server-side from
+   * the already-derived detection signal quality (Step 76) and observation
+   * coverage (Step 78) — no detection/scoring/coverage logic is recomputed.
+   * Optional for forward compatibility; always present for scans served by
+   * this handler.
+   */
+  resultQuality?: ScanResultQualitySummary;
   detections: DetectionResponse[];
 }
 
@@ -184,6 +193,16 @@ function resultToResponse(result: ScanResult): CreateScanResponse {
       break;
   }
 
+  const detectionResponses = detections.map((d) => detectionToResponse(d));
+  // Step 79 — result quality reuses the signal quality already attached to
+  // each `DetectionResponse` (by `detectionToResponse` → `getDetectionExplainability`)
+  // and the observation coverage computed above. No detection/scoring/coverage
+  // logic is recomputed here.
+  const resultQuality = getScanResultQuality({
+    detections: detectionResponses,
+    observationCoverage,
+  });
+
   return {
     scan: {
       id: scan.id,
@@ -213,7 +232,8 @@ function resultToResponse(result: ScanResult): CreateScanResponse {
         }
       : null,
     observationCoverage,
-    detections: detections.map((d) => detectionToResponse(d)),
+    detections: detectionResponses,
+    resultQuality,
   };
 }
 

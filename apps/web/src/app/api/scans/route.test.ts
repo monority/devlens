@@ -326,13 +326,22 @@ describe('POST /api/scans — successful execution', () => {
     expect(result.status).toBe(200);
     const body = result.body;
     if ('scan' in body) {
-      // Top-level keys: only "scan", "snapshot", "observationCoverage", "detections"
+      // Top-level keys: only "scan", "snapshot", "observationCoverage", "resultQuality", "detections"
       expect(Object.keys(body).sort()).toEqual([
         'detections',
         'observationCoverage',
+        'resultQuality',
         'scan',
         'snapshot',
       ]);
+
+      // Step 79 — result-quality summary computed server-side and attached
+      // top-level. The shape-test fixture has 0 detections (mockDetector =>
+      // `detect: () => []`) and an empty snapshot, so it is `no_observations`.
+      expect(body.resultQuality).toBeDefined();
+      expect(body.resultQuality?.quality).toBe('no_observations');
+      expect(body.resultQuality?.detectionCount).toBe(0);
+      expect(body.resultQuality?.hasPartialObservation).toBe(false);
 
       // scan keys: only the documented fields (camelCase, no snake_case)
       const scanKeys = Object.keys(body.scan).sort();

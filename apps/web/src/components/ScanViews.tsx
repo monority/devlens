@@ -38,7 +38,8 @@ import { DetectionList } from './DetectionList';
 import { DetectionFilterView } from './DetectionFilterView';
 import { ScanDetectionResults } from './ScanDetectionResults';
 import { ObservationCoverageSummary } from './ObservationCoverageSummary';
-import { EMPTY_OBSERVATION_COVERAGE } from '@devlens/core';
+import { ResultQualitySummary } from './ResultQualitySummary';
+import { EMPTY_OBSERVATION_COVERAGE, EMPTY_SCAN_RESULT_QUALITY } from '@devlens/core';
 import styles from './ScanCard.module.css';
 
 // ─── Scan status badge helpers ────────────────────────────────────────
@@ -317,6 +318,11 @@ export function ScanDetailView({
         <ObservationCoverageSummary
           coverage={result.observationCoverage ?? EMPTY_OBSERVATION_COVERAGE}
         />
+      )}
+
+      {/* ── Scan-level result quality (Step 79; completed scans only) ── */}
+      {scan.status === 'completed' && (
+        <ResultQualitySummary resultQuality={result.resultQuality ?? EMPTY_SCAN_RESULT_QUALITY} />
       )}
 
       {/* ── Technology insights (completed scans only) ── */}

@@ -722,6 +722,82 @@ describe('ScanComparison — added/removed technology explainability', () => {
   });
 });
 
+// ─── Step 74: version change presentation ─────────────────────────────
+describe('ScanComparison — Step 74 version change presentation', () => {
+  // Local fixture: a React detection with an optional version + conflict flag.
+  const reactVersion = (version: string | null, conflict = false): DetectionResponse => ({
+    ...makeDetection('react', 'React', 'frontend', 95),
+    version,
+    ...(conflict ? { versionConflict: true } : {}),
+  });
+
+  it('renders a "Version changes" section with before → after transition', () => {
+    const left = makeScan('scan_left', 'completed', [reactVersion('6.4.2')]);
+    const right = makeScan('scan_right', 'completed', [reactVersion('6.5.1')]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('Version changes (1)');
+    expect(cleaned).toContain('version changed');
+    expect(cleaned).toContain('6.4.2');
+    expect(cleaned).toContain('6.5.1');
+    // The comparison summary row also surfaces the count.
+    expect(cleaned).toContain('Version changes');
+  });
+
+  it('surfaces a conflict badge on an unchanged tech; no version_changed section', () => {
+    const left = makeScan('scan_left', 'completed', [
+      { ...makeDetection('angular', 'Angular', 'framework', 70) },
+      reactVersion('6.4.2', true),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      reactVersion('6.5.1'),
+      { ...makeDetection('svelte', 'Svelte', 'frontend', 80) },
+    ]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // Conflict forbids a `version_changed` classification for react.
+    expect(cleaned).not.toContain('Version changes (');
+    // The per-item badge on the unchanged (present-in-both) tech still
+    // surfaces the conflict honestly (Step 72 §5).
+    expect(cleaned).toContain('Version: unavailable — conflict detected');
+    // Sibling changes are still reported.
+    expect(cleaned).toContain('Added (1)');
+    expect(cleaned).toContain('Removed (1)');
+    // Summary row still rendered (count 0).
+    expect(cleaned).toContain('Version changes');
+  });
+
+  it('surfaces added/removed/version counts together in the summary', () => {
+    const left = makeScan('scan_left', 'completed', [
+      { ...makeDetection('angular', 'Angular', 'framework', 70) },
+      reactVersion('6.4.2'),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      reactVersion('6.5.1'),
+      { ...makeDetection('svelte', 'Svelte', 'frontend', 80) },
+    ]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // Per-section count badges (priority-ordered: added → removed → version → …).
+    expect(cleaned).toContain('Added (1)');
+    expect(cleaned).toContain('Removed (1)');
+    expect(cleaned).toContain('Version changes (1)');
+    // Summary rows for every kind.
+    expect(cleaned).toContain('Version changes');
+    expect(cleaned).toContain('Score changes');
+    expect(cleaned).toContain('Overall');
+  });
+});
+
 describe('ScanComparison — version rendering', () => {
   it('renders the version for an added technology that carries one', () => {
     const left = makeScan('scan_left', 'completed', [

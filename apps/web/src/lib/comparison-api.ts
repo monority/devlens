@@ -16,6 +16,16 @@ import { fetchScanById } from './api';
 import { compareScans } from './comparison';
 import type { ComparisonResult, ComparisonInput } from './comparison';
 
+// Step 74 — re-export the pure diff model so consumers only need to import
+// from the comparison adapter when they want the structured `changes`.
+export type {
+  DetectionChange,
+  DetectionChangeKind,
+  DetectionDiff,
+  VersionChange,
+  TechnologyComparison,
+} from './comparison';
+
 /**
  * Fetches two scans by ID and compares them.
  *

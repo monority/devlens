@@ -32,3 +32,7 @@ export * from './domain/observation-coverage.js';
 
 // Scan result quality (Step 79)
 export * from './domain/scan-result-quality.js';
+
+// Detection provenance (Step 80) — deterministic, derived provenance per
+// detection (evidence count, canonical evidence types, strongest type).
+export * from './domain/detection-provenance.js';

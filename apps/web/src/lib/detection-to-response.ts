@@ -14,6 +14,7 @@
  */
 
 import type { Detection } from '@devlens/core';
+import { computeDetectionProvenance } from '@devlens/core';
 import type { DetectionResponse } from '../lib/types.js';
 import { getDetectionExplainability } from './detection-explainability';
 
@@ -63,6 +64,16 @@ export function detectionToResponse(detection: Detection): DetectionResponse {
   // Ship a single, canonical explanation so the UI never has to reconcile
   // two independently-computed views of the same detection.
   response.explanation = getDetectionExplainability(response);
+
+  // Step 80 — deterministic, derived provenance (evidence count, canonical
+  // evidence types, strongest evidence type). Derived purely from the
+  // detection's existing evidence + confidence; never persisted, never
+  // fabricated. Attached only to directly-observed detections (which carry
+  // evidence); relationship-derived detections (evidence === []) omit it,
+  // matching "absent when absent" semantics above.
+  if (detection.evidence.length > 0) {
+    response.provenance = computeDetectionProvenance(detection);
+  }
 
   return response;
 }

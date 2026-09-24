@@ -497,6 +497,14 @@
   color: #6b7280;
 }
 
+/* Step 80 — minimal provenance "signals" line in the detection footer. */
+.provenanceSignals {
+  margin-left: 0.75rem;
+  font-size: 0.8rem;
+  color: #4b5563;
+  font-style: italic;
+}
+
 /* Evidence tree (collapsible details) */
 .evidenceTree {
   margin-top: 0.5rem;

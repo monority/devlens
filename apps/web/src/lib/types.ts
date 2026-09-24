@@ -10,7 +10,11 @@
  * These are plain data shapes only — no domain mapping logic lives here.
  */
 
-import type { ObservationCoverage, ScanResultQualitySummary } from '@devlens/core';
+import type {
+  DetectionProvenance,
+  ObservationCoverage,
+  ScanResultQualitySummary,
+} from '@devlens/core';
 
 // ─── Scan summary (used in both list and detail) ─────────────────────
 
@@ -371,6 +375,16 @@ export interface DetectionResponse {
    * the same model client-side via `getDetectionExplainability` as a fallback.
    */
   explanation?: DetectionExplainability;
+  /**
+   * Step 80 — deterministic, derived provenance for this detection: the
+   * post-dedup evidence count, the distinct evidence modalities in a
+   * canonical order, and the strongest evidence type. Derived from the
+   * detection's existing `evidence` + `confidence` (no new DB column,
+   * no fabricated data); absent when the detection has no direct evidence
+   * (e.g. a relationship-derived detection). Mirrors the core
+   * `DetectionProvenance`/`computeDetectionProvenance`.
+   */
+  provenance?: DetectionProvenance;
 }
 
 // ─── Full scan result (by ID and by POST) ─────────────────────────────

@@ -14,7 +14,7 @@
  */
 
 import type { Detection } from '@devlens/core';
-import { computeDetectionProvenance } from '@devlens/core';
+import { computeDetectionProvenance, computeDetectionIntegrity } from '@devlens/core';
 import type { DetectionResponse } from '../lib/types.js';
 import { getDetectionExplainability } from './detection-explainability';
 
@@ -73,6 +73,17 @@ export function detectionToResponse(detection: Detection): DetectionResponse {
   // matching "absent when absent" semantics above.
   if (detection.evidence.length > 0) {
     response.provenance = computeDetectionProvenance(detection);
+  }
+
+  // Step 81 — structural integrity validation. Pure, deterministic, and
+  // never mutates the detection. Only surfaces `integrity` on the response
+  // when structural issues are found (valid === false) — a clean detection
+  // adds no API noise. The provenance that was just computed (or undefined
+  // for derived detections) is passed so the validator can cross-check that
+  // provenance is consistent with the evidence (§5.2 / §5.3 / §5.5).
+  const integrity = computeDetectionIntegrity(detection, response.provenance);
+  if (!integrity.valid) {
+    response.integrity = integrity;
   }
 
   return response;

@@ -12,6 +12,7 @@
 
 import type {
   DetectionProvenance,
+  DetectionIntegrity,
   ObservationCoverage,
   ScanResultQualitySummary,
 } from '@devlens/core';
@@ -385,6 +386,20 @@ export interface DetectionResponse {
    * `DetectionProvenance`/`computeDetectionProvenance`.
    */
   provenance?: DetectionProvenance;
+  /**
+   * Step 81 — structural integrity verdict for this detection, computed
+   * server-side by `detectionToResponse` from the domain `Detection` + its
+   * provenance. Present only when the detection has structural issues
+   * (`valid === false`); a clean detection omits the field so the common
+   * case adds no API noise. The verdict is deterministic and never mutates
+   * the detection — it is a pure diagnostic that flags:
+   * - evidence/provenance count or type mismatches,
+   * - duplicate evidence items,
+   * - missing technology identity,
+   * - empty evidence on a directly-observed detection,
+   * - provenance accidentally attached to a derived detection.
+   */
+  integrity?: DetectionIntegrity;
 }
 
 // ─── Full scan result (by ID and by POST) ─────────────────────────────

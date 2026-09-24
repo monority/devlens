@@ -127,6 +127,47 @@ success. Concrete detectors (header-based, HTML-pattern-based, etc.)
 are deferred to a later step. The domain only defines the shape of
 evidence records.
 
+## Result pipeline
+
+A finalized `Detection` is projected through a chain of **derived, pure
+layers** after scoring. Each layer is a deterministic read over the previous
+one — no layer fabricates data, re-scores, or re-crawls. The layers are owned
+by distinct modules in `@devlens/core`:
+
+```text
+Observation
+    ↓
+Detection
+    ↓
+Deduplication
+    ↓
+Scoring (ConfidenceScorer / DetectionScorer)
+    ↓
+Scan Quality        (Step 79 — scan-level)        scan-result-quality.ts
+    ↓
+Provenance          (Step 80 — per-detection)     detection-provenance.ts
+    ↓
+Integrity           (Step 81 — per-detection)     detection-integrity.ts
+    ↓
+API / UI
+```
+
+### Ownership
+
+| Layer      | Module (`@devlens/core`)     | What it is — single source of truth                                                                                                                                                                            |
+| ---------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Detection  | `detection.ts` (`Detection`) | What was detected: a technology, a confidence, and its evidence.                                                                                                                                               |
+| Evidence   | `evidence.ts` (`Evidence`)   | Why it was detected: the raw observations backing a detection.                                                                                                                                                 |
+| Quality    | `scan-result-quality.ts`     | Contextual quality of the _scan/result_ (observation coverage + signal quality). Scan-level, not per-detection.                                                                                                |
+| Provenance | `detection-provenance.ts`    | Per-detection summary of _which_ evidence types support it — post-dedup evidence count, canonical evidence-type order, strongest type. Derived from existing evidence only.                                    |
+| Integrity  | `detection-integrity.ts`     | Per-detection structural validator — a pure diagnostic that the finalized detection, its evidence, and its provenance remain internally consistent. Reports issues; never mutates, re-scores, or deduplicates. |
+
+**Derivation rules:**
+
+- **Quality** is derived from `ObservationCoverage` (Step 78) plus per-detection signal quality; it is a scan-level summary.
+- **Provenance** is derived from a finalized `Detection`'s already-deduplicated `evidence`; it is absent for relationship-derived detections (no direct evidence).
+- **Integrity** reuses the Step-80 provenance computation to verify `evidenceCount`, `evidenceTypes`, and `strongestEvidenceType` are consistent with the evidence. It is a pure, O(n), deterministic check with no IO.
+
 ## Value Objects
 
 Value objects are branded primitive types. They prevent accidental
@@ -221,13 +262,17 @@ state cannot be corrupted after construction.
 ```
 src/
 ├── domain/
-│   ├── value-objects.ts   # Branded types & factories
-│   ├── scan.ts            # Scan, ScanTarget, ScanStatus, lifecycle factories
-│   ├── technology.ts      # Technology, TechnologyCategory
-│   ├── detection.ts       # Detection, createDetection
-│   ├── evidence.ts        # Evidence discriminated union
-│   └── snapshot.ts        # SiteSnapshot, HttpObservation, etc.
-└── index.ts               # Public API re-exports
+│   ├── value-objects.ts           # Branded types & factories
+│   ├── scan.ts                    # Scan, ScanTarget, ScanStatus, lifecycle factories
+│   ├── technology.ts              # Technology, TechnologyCategory
+│   ├── detection.ts               # Detection, createDetection
+│   ├── evidence.ts                # Evidence discriminated union
+│   ├── snapshot.ts                # SiteSnapshot, HttpObservation, etc.
+│   ├── observation-coverage.ts    # Step 78 — ObservationCoverage
+│   ├── scan-result-quality.ts     # Step 79 — ScanResultQualitySummary
+│   ├── detection-provenance.ts    # Step 80 — DetectionProvenance, computeDetectionProvenance
+│   └── detection-integrity.ts     # Step 81 — DetectionIntegrity, computeDetectionIntegrity
+└── index.ts                       # Public API re-exports
 ```
 
 ## Dependency Direction

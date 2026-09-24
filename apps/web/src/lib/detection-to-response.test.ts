@@ -250,3 +250,109 @@ describe('detectionToResponse — determinism & immutability', () => {
     expect(detection.evidence.length).toBe(originalEvidenceLength);
   });
 });
+
+describe('detectionToResponse — Step 81 integrity', () => {
+  it('omits integrity for a valid detection (no API noise for the common case)', () => {
+    const response = detectionToResponse(
+      makeDetection({
+        evidence: [
+          { type: 'http_header', name: 'Server', value: 'nginx' },
+          { type: 'meta_tag', name: 'generator', content: 'nginx' },
+        ],
+      }),
+    );
+
+    expect(response.integrity).toBeUndefined();
+    expect('integrity' in response).toBe(false);
+  });
+
+  it('omits integrity for a valid derived detection (§7: derived = no provenance)', () => {
+    const response = detectionToResponse(
+      makeDetection({
+        evidence: [],
+        source: 'relationship',
+        derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
+      }),
+    );
+
+    expect(response.integrity).toBeUndefined();
+    expect('integrity' in response).toBe(false);
+    // Provenance is also absent for derived detections (Step 80).
+    expect(response.provenance).toBeUndefined();
+  });
+
+  it('surfaces integrity when the detection has duplicate evidence (§5.4)', () => {
+    const response = detectionToResponse(
+      makeDetection({
+        evidence: [
+          { type: 'http_header', name: 'Server', value: 'nginx' },
+          { type: 'http_header', name: 'Server', value: 'nginx' },
+        ],
+      }),
+    );
+
+    expect(response.integrity).toBeDefined();
+    expect(response.integrity!.valid).toBe(false);
+    expect(response.integrity!.issues).toContain('DUPLICATE_EVIDENCE');
+  });
+
+  it('does not mutate the detection when integrity issues are found', () => {
+    const detection = makeDetection({
+      evidence: [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+      ],
+    });
+    const originalEvidenceLength = detection.evidence.length;
+
+    const response = detectionToResponse(detection);
+
+    expect(detection.evidence.length).toBe(originalEvidenceLength);
+    expect(response.integrity).toBeDefined();
+  });
+
+  it('produces deterministic integrity output (same input → same output)', () => {
+    const detection = makeDetection({
+      evidence: [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+      ],
+    });
+
+    expect(detectionToResponse(detection)).toEqual(detectionToResponse(detection));
+  });
+
+  it('integrity issues are in canonical order (§12)', () => {
+    // Construct a detection with an invalid identity + duplicate evidence.
+    const detection = {
+      technology: { id: '', name: '', category: '' },
+      confidence: 80,
+      evidence: [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+      ],
+    } as unknown as Detection;
+
+    const response = detectionToResponse(detection);
+
+    expect(response.integrity).toBeDefined();
+    // Canonical order from §12:
+    // INVALID_DETECTION_IDENTITY, INVALID_EVIDENCE_TYPE, DUPLICATE_EVIDENCE,
+    // PROVENANCE_MISMATCH, EMPTY_EVIDENCE.
+    expect(response.integrity!.issues).toEqual(
+      expect.arrayContaining(['INVALID_DETECTION_IDENTITY', 'DUPLICATE_EVIDENCE']),
+    );
+    // Verify canonical ordering is respected.
+    const issues = response.integrity!.issues;
+    const order = [
+      'INVALID_DETECTION_IDENTITY',
+      'INVALID_EVIDENCE_TYPE',
+      'DUPLICATE_EVIDENCE',
+      'PROVENANCE_MISMATCH',
+      'EMPTY_EVIDENCE',
+    ];
+    const indices = issues.map((i) => order.indexOf(i));
+    const sorted = [...indices].sort((a, b) => a - b);
+    expect(indices).toEqual(sorted);
+  });
+});

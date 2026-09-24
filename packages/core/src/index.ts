@@ -36,3 +36,8 @@ export * from './domain/scan-result-quality.js';
 // Detection provenance (Step 80) — deterministic, derived provenance per
 // detection (evidence count, canonical evidence types, strongest type).
 export * from './domain/detection-provenance.js';
+
+// Detection result integrity (Step 81) — structural validator that ensures
+// the finalized detection, its evidence, and its provenance remain internally
+// consistent. Pure, deterministic, never mutates the detection.
+export * from './domain/detection-integrity.js';

@@ -822,3 +822,68 @@ describe('DetectionItem — Step 77 presentation (confidence · signal quality �
     expect(html).not.toContain('%');
   });
 });
+
+// Step 80 §14 — minimal provenance surface proving the `DetectionResponse.provenance`
+// contract is consumed by the UI.
+describe('DetectionItem — Step 80 provenance (signals line)', () => {
+  const makeDetection = (overrides: Partial<DetectionResponse> = {}): DetectionResponse =>
+    ({
+      technology: { id: 'nginx', name: 'nginx', category: 'server' },
+      confidence: 80,
+      evidence: [{ type: 'http_header', name: 'Server', value: 'nginx' }],
+      ...overrides,
+    }) as DetectionResponse;
+
+  it('renders the "N signals" line with type labels', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, {
+        detection: makeDetection({
+          evidence: [
+            { type: 'http_header', name: 'Server', value: 'nginx' },
+            { type: 'meta_tag', name: 'generator', content: 'nginx' },
+            { type: 'script_url', url: 'https://cdn.example.com/app.js' },
+          ],
+          provenance: {
+            evidenceCount: 3,
+            evidenceTypes: ['http_header', 'meta_tag', 'script_url'],
+            strongestEvidenceType: 'http_header',
+          },
+        }),
+        index: 0,
+      }),
+    );
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('3 signals');
+    expect(cleaned).toContain('HTTP Header');
+    expect(cleaned).toContain('Meta Tag');
+    expect(cleaned).toContain('Script URL');
+  });
+
+  it('renders the singular form for a single evidence type', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, {
+        detection: makeDetection({
+          provenance: {
+            evidenceCount: 1,
+            evidenceTypes: ['script_url'],
+            strongestEvidenceType: 'script_url',
+          },
+        }),
+        index: 0,
+      }),
+    );
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('1 signal');
+  });
+
+  it('omits the signals line when provenance is absent', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, { detection: makeDetection(), index: 0 }),
+    );
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).not.toContain('signals');
+  });
+});

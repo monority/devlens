@@ -18,7 +18,7 @@
 import type { DetectionResponse } from '../lib/types.js';
 import { isKnownTechnology } from '../lib/technology-catalog';
 import { getDetectionExplainability } from '../lib/detection-explainability';
-import { evidenceFields } from '../lib/evidence-presenter';
+import { evidenceFields, evidenceTypeLabel } from '../lib/evidence-presenter';
 import { getDetectionPresentation } from '../lib/detection-presentation';
 import { EvidenceList } from './EvidenceList';
 import Link from 'next/link';
@@ -129,6 +129,21 @@ export function DetectionItem({ detection, index }: DetectionItemProps): React.R
             {explainability.evidenceCount} evidence{' '}
             {explainability.evidenceCount === 1 ? 'item' : 'items'}
           </span>
+          {/* Step 80 — minimal provenance surface: a deterministic "signals" line
+              proving the `DetectionResponse.provenance` contract is consumable.
+              Shows the post-dedup evidence count + the distinct evidence types
+              (canonical order) as human-readable labels. Omitted when the
+              detection carries no direct evidence (e.g. relationship-derived). */}
+          {detection.provenance ? (
+            <span
+              className={styles.provenanceSignals}
+              title="Evidence types supporting this detection"
+            >
+              {detection.provenance.evidenceCount} signal
+              {detection.provenance.evidenceCount === 1 ? '' : 's'} —{' '}
+              {detection.provenance.evidenceTypes.map(evidenceTypeLabel).join(', ')}
+            </span>
+          ) : null}
         </footer>
       )}
 

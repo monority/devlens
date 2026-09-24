@@ -236,6 +236,16 @@ describe('GET /api/scans/:id — handler', () => {
           { type: 'http_header', name: 'Server', value: 'nginx' },
           { type: 'meta_tag', name: 'generator', content: 'TestCMS 1.0' },
         ]);
+
+        // Step 80 — provenance is derived at response-mapping time on every
+        // directly-observed detection (the GET path maps through the same
+        // `detectionToResponse`, so it must carry provenance too).
+        expect(detection).toHaveProperty('provenance');
+        expect(detection!.provenance).toEqual({
+          evidenceCount: 2,
+          evidenceTypes: ['http_header', 'meta_tag'],
+          strongestEvidenceType: 'http_header',
+        });
       }
     });
 

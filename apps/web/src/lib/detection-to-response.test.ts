@@ -154,6 +154,10 @@ describe('detectionToResponse — Step 69 relationship provenance', () => {
     expect(response.explanation!.kind).toBe('derived');
     expect(response.explanation!.reasons).toHaveLength(1);
     expect(response.explanation!.reasons[0]!.kind).toBe('relationship');
+    // Step 80 — a relationship-derived detection has no direct evidence, so
+    // provenance is omitted (absent when absent).
+    expect(response.provenance).toBeUndefined();
+    expect('provenance' in response).toBe(false);
   });
 
   it('forwards relationshipConflicts on a direct detection', () => {
@@ -168,6 +172,63 @@ describe('detectionToResponse — Step 69 relationship provenance', () => {
 
     expect(response.relationshipConflicts).toHaveLength(2);
     expect(response.explanation!.kind).toBe('direct');
+  });
+});
+
+describe('detectionToResponse — Step 80 provenance', () => {
+  it('attaches deterministic provenance to a direct detection', () => {
+    const response = detectionToResponse(
+      makeDetection({
+        evidence: [
+          { type: 'http_header', name: 'Server', value: 'nginx' },
+          { type: 'meta_tag', name: 'generator', content: 'nginx' },
+        ],
+      }),
+    );
+
+    expect(response.provenance).toEqual({
+      evidenceCount: 2,
+      evidenceTypes: ['http_header', 'meta_tag'],
+      strongestEvidenceType: 'http_header',
+    });
+  });
+
+  it('orders evidenceTypes canonically, independent of input order', () => {
+    const a = detectionToResponse(
+      makeDetection({
+        evidence: [
+          { type: 'script_content', snippet: '__NEXT_DATA__' },
+          { type: 'script_url', url: 'https://cdn.example.com/app.js' },
+          { type: 'meta_tag', name: 'generator', content: 'Next.js' },
+        ],
+      }),
+    );
+    const b = detectionToResponse(
+      makeDetection({
+        evidence: [
+          { type: 'meta_tag', name: 'generator', content: 'Next.js' },
+          { type: 'script_url', url: 'https://cdn.example.com/app.js' },
+          { type: 'script_content', snippet: '__NEXT_DATA__' },
+        ],
+      }),
+    );
+
+    expect(a.provenance).toEqual(b.provenance);
+    expect(a.provenance!.evidenceTypes).toEqual(['meta_tag', 'script_url', 'script_content']);
+    // §7 fallback: highest-precedence type present (http_header > meta_tag > …).
+    expect(a.provenance!.strongestEvidenceType).toBe('meta_tag');
+  });
+
+  it('counts evidence after the pipeline dedup (single source ⇒ no bonus)', () => {
+    const response = detectionToResponse(
+      makeDetection({ evidence: [{ type: 'script_url', url: 'https://cdn.example.com/r.js' }] }),
+    );
+
+    expect(response.provenance).toEqual({
+      evidenceCount: 1,
+      evidenceTypes: ['script_url'],
+      strongestEvidenceType: 'script_url',
+    });
   });
 });
 

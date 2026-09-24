@@ -411,9 +411,17 @@ describe('POST /api/scans — successful execution', () => {
           confidence: 80,
           evidence: [{ type: 'http_header', name: 'Server', value: 'nginx' }],
           explanation: expect.any(Object),
+          // Step 80 — provenance is derived at response-mapping time and
+          // attached to every directly-observed detection.
+          provenance: {
+            evidenceCount: 1,
+            evidenceTypes: ['http_header'],
+            strongestEvidenceType: 'http_header',
+          },
         },
       ]);
       expect(body.detections[0]!).toHaveProperty('explanation');
+      expect(body.detections[0]!).toHaveProperty('provenance');
     }
   });
 });

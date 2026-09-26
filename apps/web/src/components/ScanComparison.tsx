@@ -19,6 +19,7 @@ import {
 import { getDetectionExplainability } from '../lib/detection-explainability';
 import { signalQualityLabel } from '../lib/signal-quality';
 import { isKnownTechnology } from '../lib/technology-catalog';
+import { integrityIssueLabel } from '../lib/detection-integrity-presenter';
 import type { DetectionResponse, EvidenceResponse } from '../lib/types.js';
 import { ScanOverview } from './ScanOverview';
 import { getScanOverview } from '../lib/scan-overview';
@@ -289,6 +290,20 @@ function TechnologyChanges({ result }: { result: ComparisonResult }): React.Reac
         </>
       )}
 
+      {/* Step 87 — integrity verdict changes: structural soundness shifts
+          (e.g. a formerly clean detection now has duplicate evidence or a
+          provenance mismatch). Reuses the Step 86 integrity-issue labels. */}
+      {result.integrityChanges.length > 0 && (
+        <>
+          <h3>Integrity changes ({result.integrityChanges.length})</h3>
+          <ul className={styles.changeList}>
+            {result.integrityChanges.map((d) => (
+              <IntegrityChangeItem key={d.id} detection={d} />
+            ))}
+          </ul>
+        </>
+      )}
+
       {/* Score/confidence changes */}
       {result.scoreChanges.length > 0 && (
         <>
@@ -457,6 +472,39 @@ function VersionChangeItem({ detection }: { detection: TechnologyComparison }): 
           <span className={styles.version}>{to}</span>
         </span>
       )}
+    </li>
+  );
+}
+
+// ─── Integrity change item (Step 87) ─────────────────────────────────
+
+/**
+ * Renders a technology whose structural integrity verdict changed between
+ * the two scans. Shows the before/after issue labels for each side, reusing
+ * the Step 86 `integrityIssueLabel` presenter.
+ */
+function IntegrityChangeItem({
+  detection,
+}: {
+  detection: TechnologyComparison;
+}): React.ReactElement {
+  const before = detection.before;
+  const after = detection.after;
+
+  const beforeIssues =
+    before?.integrity && !before.integrity.valid ? before.integrity.issues : null;
+  const afterIssues = after?.integrity && !after.integrity.valid ? after.integrity.issues : null;
+
+  const beforeLabel = beforeIssues ? beforeIssues.map(integrityIssueLabel).join(', ') : 'Valid';
+  const afterLabel = afterIssues ? afterIssues.map(integrityIssueLabel).join(', ') : 'Valid';
+
+  return (
+    <li className={styles.changeItem}>
+      <span className={styles.integrityChangeBadge}>integrity changed</span>
+      {detection.name}
+      <span className={styles.category}>{detection.category}</span>
+      <span className={styles.integrityBefore}>Before: {beforeLabel}</span>
+      <span className={styles.integrityAfter}>After: {afterLabel}</span>
     </li>
   );
 }

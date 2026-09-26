@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { compareScans, evidenceKey } from '../lib/comparison.js';
 import { getEvidenceIdentity } from '../lib/evidence-identity.js';
 import type { ScanDetailResponse, DetectionResponse } from '../lib/types.js';
+import type { DetectionIntegrity } from '@devlens/core';
 
 // ─── Test fixtures ───────────────────────────────────────────────────
 
@@ -698,6 +699,232 @@ describe('compareScans — Step 74 change intelligence', () => {
 
       expect(change.before?.version).toBe('6.4.2');
       expect(change.after?.version).toBe('6.5.1');
+    });
+  });
+
+  // ─── Step 87: integrity change detection ────────────────────────────
+
+  describe('integrity change', () => {
+    const dupEvidenceIntegrity: DetectionIntegrity = {
+      valid: false,
+      issues: ['DUPLICATE_EVIDENCE' as const],
+    };
+    const provenanceMismatchIntegrity: DetectionIntegrity = {
+      valid: false,
+      issues: ['PROVENANCE_MISMATCH' as const],
+    };
+
+    it('valid → invalid (duplicate evidence) is flagged as integrityChanged', () => {
+      const leftReact = makeDetection('react', 'React', 'frontend', 95);
+      const rightReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        integrity: dupEvidenceIntegrity,
+      });
+      const result = compareScans(
+        makeScanWithDetections([leftReact]),
+        makeScanWithDetections([rightReact]),
+      );
+      const change = result.changes[0]!;
+
+      expect(change.integrityChanged).toBe(true);
+      expect(result.integrityChanges).toHaveLength(1);
+      expect(result.integrityChanges[0]!.id).toBe('react');
+    });
+
+    it('invalid → valid (issues resolved) is flagged as integrityChanged', () => {
+      const leftReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        integrity: dupEvidenceIntegrity,
+      });
+      const rightReact = makeDetection('react', 'React', 'frontend', 95);
+      const result = compareScans(
+        makeScanWithDetections([leftReact]),
+        makeScanWithDetections([rightReact]),
+      );
+      const change = result.changes[0]!;
+
+      expect(change.integrityChanged).toBe(true);
+      expect(result.integrityChanges).toHaveLength(1);
+    });
+
+    it('same issues on both sides is not flagged', () => {
+      const leftReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        integrity: dupEvidenceIntegrity,
+      });
+      const rightReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        integrity: dupEvidenceIntegrity,
+      });
+      const result = compareScans(
+        makeScanWithDetections([leftReact]),
+        makeScanWithDetections([rightReact]),
+      );
+      const change = result.changes[0]!;
+
+      expect(change.integrityChanged).toBe(false);
+      expect(result.integrityChanges).toHaveLength(0);
+    });
+
+    it('different issue sets on both sides is flagged', () => {
+      const leftReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        integrity: dupEvidenceIntegrity,
+      });
+      const rightReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        integrity: provenanceMismatchIntegrity,
+      });
+      const result = compareScans(
+        makeScanWithDetections([leftReact]),
+        makeScanWithDetections([rightReact]),
+      );
+      const change = result.changes[0]!;
+
+      expect(change.integrityChanged).toBe(true);
+      expect(result.integrityChanges).toHaveLength(1);
+    });
+
+    it('both valid (no integrity field) is not flagged', () => {
+      const leftReact = makeDetection('react', 'React', 'frontend', 95);
+      const rightReact = makeDetection('react', 'React', 'frontend', 95);
+      const result = compareScans(
+        makeScanWithDetections([leftReact]),
+        makeScanWithDetections([rightReact]),
+      );
+      const change = result.changes[0]!;
+
+      expect(change.integrityChanged).toBe(false);
+      expect(result.integrityChanges).toHaveLength(0);
+    });
+
+    it('added/removed technologies do not flag integrityChanged', () => {
+      // React is only on the right (added) — no before integrity to compare.
+      const rightReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        integrity: dupEvidenceIntegrity,
+      });
+      const result = compareScans(makeScanWithDetections([]), makeScanWithDetections([rightReact]));
+      const change = result.changes[0]!;
+
+      expect(change.integrityChanged).toBe(false);
+      expect(change.kind).toBe('added');
+    });
+
+    it('integrity-only change sets hasChanges=true but kind=unchanged', () => {
+      // Same confidence, same evidence, same version — only integrity differs.
+      const leftReact = makeDetection('react', 'React', 'frontend', 95);
+      const rightReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        integrity: dupEvidenceIntegrity,
+      });
+      const result = compareScans(
+        makeScanWithDetections([leftReact]),
+        makeScanWithDetections([rightReact]),
+      );
+      const change = result.changes[0]!;
+
+      expect(change.integrityChanged).toBe(true);
+      expect(change.kind).toBe('unchanged');
+      expect(result.hasChanges).toBe(true);
+      expect(result.integrityChanges).toHaveLength(1);
+    });
+
+    it('issue added (subset → superset) is flagged as integrityChanged', () => {
+      // Before has one issue, after has two — the second is "added".
+      const leftReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        integrity: {
+          valid: false,
+          issues: ['DUPLICATE_EVIDENCE' as const],
+        },
+      });
+      const rightReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        integrity: {
+          valid: false,
+          issues: ['DUPLICATE_EVIDENCE' as const, 'EMPTY_EVIDENCE' as const],
+        },
+      });
+      const result = compareScans(
+        makeScanWithDetections([leftReact]),
+        makeScanWithDetections([rightReact]),
+      );
+      const change = result.changes[0]!;
+
+      expect(change.integrityChanged).toBe(true);
+      expect(result.integrityChanges).toHaveLength(1);
+    });
+
+    it('issue removed (superset → subset) is flagged as integrityChanged', () => {
+      // Before has two issues, after has one — the first is "removed".
+      const leftReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        integrity: {
+          valid: false,
+          issues: ['DUPLICATE_EVIDENCE' as const, 'EMPTY_EVIDENCE' as const],
+        },
+      });
+      const rightReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        integrity: {
+          valid: false,
+          issues: ['DUPLICATE_EVIDENCE' as const],
+        },
+      });
+      const result = compareScans(
+        makeScanWithDetections([leftReact]),
+        makeScanWithDetections([rightReact]),
+      );
+      const change = result.changes[0]!;
+
+      expect(change.integrityChanged).toBe(true);
+      expect(result.integrityChanges).toHaveLength(1);
+    });
+
+    it('removed detection with integrity does not flag integrityChanged', () => {
+      // React is only on the left (removed) — no after integrity to compare.
+      const leftReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        integrity: dupEvidenceIntegrity,
+      });
+      const result = compareScans(makeScanWithDetections([leftReact]), makeScanWithDetections([]));
+      const change = result.changes[0]!;
+
+      expect(change.integrityChanged).toBe(false);
+      expect(change.kind).toBe('removed');
+    });
+
+    it('canonical issue ordering is preserved in the integrity key', () => {
+      // Issues appear in canonical order (Step 81 §12: INTEGRITY_ISSUE_ORDER).
+      // The integrityKey joins them as-is, so the order must match the
+      // canonical upstream ordering.
+      const leftReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        integrity: {
+          valid: false,
+          issues: ['INVALID_DETECTION_IDENTITY' as const, 'DUPLICATE_EVIDENCE' as const],
+        },
+      });
+      const rightReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        integrity: {
+          valid: false,
+          issues: ['INVALID_DETECTION_IDENTITY' as const, 'DUPLICATE_EVIDENCE' as const],
+        },
+      });
+      const result = compareScans(
+        makeScanWithDetections([leftReact]),
+        makeScanWithDetections([rightReact]),
+      );
+      const change = result.changes[0]!;
+
+      // Same canonical issue set → unchanged.
+      expect(change.integrityChanged).toBe(false);
+    });
+
+    it('integrity comparison is deterministic (JSON-serializable, stable)', () => {
+      const leftReact = makeDetection('react', 'React', 'frontend', 95);
+      const rightReact = makeDetection('react', 'React', 'frontend', 95, [], {
+        integrity: {
+          valid: false,
+          issues: ['DUPLICATE_EVIDENCE' as const, 'PROVENANCE_MISMATCH' as const],
+        },
+      });
+      const left = makeScanWithDetections([leftReact]);
+      const right = makeScanWithDetections([rightReact]);
+
+      const a = compareScans(left, right);
+      const b = compareScans(left, right);
+
+      expect(() => JSON.stringify(a)).not.toThrow();
+      expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+      expect(a.integrityChanges).toHaveLength(1);
     });
   });
 });

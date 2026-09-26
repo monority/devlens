@@ -134,6 +134,16 @@ export interface TechnologyComparison {
   /** rightConfidence - leftConfidence (alias of scoreDelta). */
   confidenceDelta: number | null;
 
+  // ── Step 87: integrity ─────────────────────────────────────────────
+  /**
+   * True when the structural integrity verdict differs between before/after
+   * for a technology present in both scans. Absent when the technology is
+   * only on one side (nothing to compare). Integrity is `undefined` when
+   * the detection is valid (absent = valid per Step 81 §10); a change is
+   * flagged whenever the normalized verdict differs.
+   */
+  integrityChanged: boolean;
+
   // ── Step 74: single, prioritized change classification ─────────────
   kind: DetectionChangeKind;
 }
@@ -183,6 +193,8 @@ export interface ComparisonResult {
   versionChanges: DetectionChange[];
   /** Step 74 — number of technologies with a substantive change (kind !== 'unchanged'). */
   changeCount: number;
+  /** Step 87 — technologies whose structural integrity verdict changed between scans. */
+  integrityChanges: DetectionChange[];
 }
 
 /** Step 74 §2 — the canonical per-technology change record (alias of TechnologyComparison). */
@@ -285,6 +297,38 @@ function computeProvenanceChange(
 }
 
 /**
+ * Normalizes a detection's integrity verdict into a stable comparison key
+ * for cross-scan integrity change detection (Step 87).
+ *
+ * Per Step 81 §10, `integrity` is absent (`undefined`) when the detection is
+ * valid. A valid detection and a detection with `valid: true, issues: []`
+ * are equivalent. A detected issue set is serialized in its existing
+ * canonical order (Step 81 §12: `INTEGRITY_ISSUE_ORDER`).
+ *
+ * Returns `'valid'` for clean detections or `'invalid:<issue1>,<issue2>'`
+ * for detections with structural problems.
+ */
+function integrityKey(d: DetectionResponse | null): string {
+  if (!d || !d.integrity || d.integrity.valid) {
+    return 'valid';
+  }
+  return 'invalid:' + d.integrity.issues.join(',');
+}
+
+/**
+ * Detects whether the structural integrity verdict changed between two
+ * detections for the same technology. Only meaningful when both sides are
+ * present (in-both technologies); returns false otherwise.
+ */
+function computeIntegrityChange(
+  before: DetectionResponse | null,
+  after: DetectionResponse | null,
+): boolean {
+  if (!before || !after) return false;
+  return integrityKey(before) !== integrityKey(after);
+}
+
+/**
  * Assigns the single, prioritized `DetectionChangeKind` for a technology
  * present in both scans (Step 74 §4/§10 priority order).
  */
@@ -369,6 +413,7 @@ export function compareScans(
 
     const version = computeVersionChange(leftD, rightD);
     const provenanceChanged = computeProvenanceChange(leftD, rightD);
+    const integrityChanged = computeIntegrityChange(leftD, rightD);
 
     // Single, deduplicated classification (Step 74 §10 priority).
     const kind: DetectionChangeKind =
@@ -396,6 +441,8 @@ export function compareScans(
       provenanceChanged,
       evidenceChanged,
       confidenceDelta: scoreDelta,
+      // Step 87 — integrity verdict change (valid↔invalid, or issue-set change)
+      integrityChanged,
       kind,
     });
   }
@@ -409,11 +456,15 @@ export function compareScans(
   const versionChanges = changes.filter((c) => c.kind === 'version_changed');
   const scoreChanges = changes.filter((c) => c.kind === 'confidence_changed');
   const evidenceChanges = changes.flatMap((c) => c.evidenceChanges);
+  const integrityChanges = changes.filter((c) => c.integrityChanged);
 
   // hasChanges is true if there are any substantive changes: a non-unchanged
-  // kind OR a changed evidence set (preserves prior semantics for evidence-only
-  // diffs while now also covering version/provenance/confidence changes).
-  const hasChanges = changes.some((c) => c.kind !== 'unchanged' || c.evidenceChanged);
+  // kind OR a changed evidence set OR an integrity verdict change.
+  // Preserves prior semantics for evidence-only diffs while now also covering
+  // version/provenance/confidence changes and integrity shifts.
+  const hasChanges = changes.some(
+    (c) => c.kind !== 'unchanged' || c.evidenceChanged || c.integrityChanged,
+  );
   const changeCount = changes.filter((c) => c.kind !== 'unchanged').length;
 
   return {
@@ -436,6 +487,8 @@ export function compareScans(
     changes,
     versionChanges,
     changeCount,
+    // Step 87
+    integrityChanges,
   };
 }
 

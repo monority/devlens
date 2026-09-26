@@ -191,6 +191,17 @@ The `integrity` and `provenance` fields are forwarded through the
 `getScanDetectionResults` sort/dedup pipeline (Step 80/81 response
 fields must survive canonical re-ordering).
 
+Step 87 extends integrity consumption into the **scan comparison**
+workflow: `compareScans()` (`comparison.ts`) carries full
+`DetectionResponse` objects for each technology's `before`/`after` pair
+(Step 74 §2), so `integrity` is already available but was previously
+unused. Step 87 adds a secondary `integrityChanged` flag and an
+`integrityChanges` derived view to `ComparisonResult`, plus an
+"Integrity changes" section in `ScanComparison.tsx`. The Step 86
+`integrityIssueLabel` presenter is reused for before/after labels.
+Integrity is a secondary flag — `classifyChange()` priority and
+`DetectionChangeKind` are unchanged.
+
 ## Value Objects
 
 Value objects are branded primitive types. They prevent accidental

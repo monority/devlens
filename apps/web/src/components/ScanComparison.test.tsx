@@ -14,6 +14,7 @@ import { compareScans } from '../lib/comparison.js';
 import { getDetectionExplainability } from '../lib/detection-explainability';
 import { computeSignalQuality } from '../lib/signal-quality';
 import type { ScanDetailResponse, DetectionResponse, SignalQuality } from '../lib/types.js';
+import type { DetectionIntegrity, DetectionIntegrityIssue } from '@devlens/core';
 
 // Mock next/link so it renders a plain <a> tag (no router context needed)
 vi.mock('next/link', () => ({
@@ -978,5 +979,143 @@ describe('ScanComparison — Step 77 provenance & signal-quality deltas (§11, r
     expect(html).toContain('6.4.1');
     expect(html).toContain('6.4.2');
     expect(html).toContain('→');
+  });
+});
+
+// ─── Step 87: integrity change presentation ────────────────────────── ──────────────────────────
+
+describe('ScanComparison — Step 87 integrity changes', () => {
+  const integrity = (issues: DetectionIntegrityIssue[]): DetectionIntegrity => ({
+    valid: false as const,
+    issues,
+  });
+
+  it('renders an "Integrity changes" section when a detection gains issues', () => {
+    const left = makeScan('scan_left', 'completed', [
+      {
+        ...makeDetection('react', 'React', 'frontend', 95, [
+          { type: 'http_header', name: 'Server', value: 'nginx' },
+        ]),
+      },
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      {
+        ...makeDetection('react', 'React', 'frontend', 95, [
+          { type: 'http_header', name: 'Server', value: 'nginx' },
+        ]),
+        integrity: integrity(['DUPLICATE_EVIDENCE' as const]),
+      },
+    ]);
+    const result = compareScans(left, right);
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('Integrity changes (1)');
+    expect(cleaned).toContain('integrity changed');
+    expect(cleaned).toContain('React');
+    expect(cleaned).toContain('Before: Valid');
+    expect(cleaned).toContain('After: Duplicate evidence');
+  });
+
+  it('renders before/after issue labels for issue-set changes', () => {
+    const left = makeScan('scan_left', 'completed', [
+      {
+        ...makeDetection('react', 'React', 'frontend', 95),
+        integrity: integrity(['DUPLICATE_EVIDENCE' as const]),
+      },
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      {
+        ...makeDetection('react', 'React', 'frontend', 95),
+        integrity: integrity(['PROVENANCE_MISMATCH' as const]),
+      },
+    ]);
+    const result = compareScans(left, right);
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('Integrity changes (1)');
+    expect(cleaned).toContain('Before: Duplicate evidence');
+    expect(cleaned).toContain('After: Provenance mismatch');
+  });
+
+  it('does not render an "Integrity changes" section when both sides are valid', () => {
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95, [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+      ]),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95, [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+      ]),
+    ]);
+    const result = compareScans(left, right);
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+
+    expect(html).not.toContain('Integrity changes');
+  });
+
+  it('does not render an "Integrity changes" section when both sides have identical issues', () => {
+    const left = makeScan('scan_left', 'completed', [
+      {
+        ...makeDetection('react', 'React', 'frontend', 95),
+        integrity: integrity(['DUPLICATE_EVIDENCE' as const]),
+      },
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      {
+        ...makeDetection('react', 'React', 'frontend', 95),
+        integrity: integrity(['DUPLICATE_EVIDENCE' as const]),
+      },
+    ]);
+    const result = compareScans(left, right);
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+
+    expect(html).not.toContain('Integrity changes');
+  });
+
+  it('renders the integrity section when an issue is resolved (invalid → valid)', () => {
+    const left = makeScan('scan_left', 'completed', [
+      {
+        ...makeDetection('react', 'React', 'frontend', 95),
+        integrity: integrity(['PROVENANCE_MISMATCH' as const]),
+      },
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95),
+    ]);
+    const result = compareScans(left, right);
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('Integrity changes (1)');
+    expect(cleaned).toContain('Before: Provenance mismatch');
+    expect(cleaned).toContain('After: Valid');
+  });
+
+  it('renders integrity section alongside existing comparison sections', () => {
+    // React has an integrity change AND a score change — both sections render.
+    const left = makeScan('scan_left', 'completed', [
+      {
+        ...makeDetection('react', 'React', 'frontend', 90),
+        integrity: integrity(['PROVENANCE_MISMATCH' as const]),
+      },
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      {
+        ...makeDetection('react', 'React', 'frontend', 95),
+      },
+    ]);
+    const result = compareScans(left, right);
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // Integrity section present.
+    expect(cleaned).toContain('Integrity changes (1)');
+    expect(cleaned).toContain('Before: Provenance mismatch');
+    expect(cleaned).toContain('After: Valid');
+    // Score section still present (existing comparison information rendered).
+    expect(cleaned).toContain('Score / confidence changes (1)');
   });
 });

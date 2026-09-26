@@ -29,6 +29,7 @@
 import Link from 'next/link';
 import { isScanning } from '../lib/scan-utils';
 import { getScanOverview } from '../lib/scan-overview';
+import { summarizeIntegrity } from '../lib/detection-integrity-presenter';
 import type { ScanSummary, ScanDetailResponse, SnapshotResponse } from '../lib/types.js';
 import { ScanSummary as ScanSummarySection } from './ScanSummary';
 import { ScanOverview } from './ScanOverview';
@@ -39,6 +40,7 @@ import { DetectionFilterView } from './DetectionFilterView';
 import { ScanDetectionResults } from './ScanDetectionResults';
 import { ObservationCoverageSummary } from './ObservationCoverageSummary';
 import { ResultQualitySummary } from './ResultQualitySummary';
+import { DetectionIntegritySummary } from './DetectionIntegritySummary';
 import { EMPTY_OBSERVATION_COVERAGE, EMPTY_SCAN_RESULT_QUALITY } from '@devlens/core';
 import styles from './ScanCard.module.css';
 
@@ -323,6 +325,11 @@ export function ScanDetailView({
       {/* ── Scan-level result quality (Step 79; completed scans only) ── */}
       {scan.status === 'completed' && (
         <ResultQualitySummary resultQuality={result.resultQuality ?? EMPTY_SCAN_RESULT_QUALITY} />
+      )}
+
+      {/* ── Detection integrity (Step 86; completed scans only) ── */}
+      {scan.status === 'completed' && (
+        <DetectionIntegritySummary summary={summarizeIntegrity(result.detections)} />
       )}
 
       {/* ── Technology insights (completed scans only) ── */}

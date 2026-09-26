@@ -1726,3 +1726,33 @@
   color: #6b7280;
   font-style: italic;
 }
+
+/* ─── Detection integrity (Step 86) ──────────────────────────────────── */
+
+/* Scan-level panel: mirrors `.resultQuality` — plain section, calm gray body */
+/* text, `.8rem`. Heading inherits `.detail h2`. Amber h2 tint is the only */
+/* diagnostic accent and reuses the existing `.targetWarning` palette. */
+.detectionIntegrity h2 {
+  color: #92400e;
+}
+
+.detectionIntegritySummary {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.detectionIntegrityIssue {
+  font-size: 0.8rem;
+  color: #6b7280;
+  padding: 0.15rem 0;
+}
+
+/* Per-detection inline diagnostic in `.detectionHeader` — small amber notice */
+/* (warning tier), consistent with the other inline header signals. */
+.detectionIntegrityNotice {
+  margin-left: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #92400e;
+}

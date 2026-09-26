@@ -122,6 +122,15 @@ export function getScanDetectionResults(detections: DetectionResponse[]): Detect
       ...(detection.relationshipConflicts
         ? { relationshipConflicts: detection.relationshipConflicts }
         : {}),
+      // Step 80 — propagate the deterministic provenance verdict so the
+      // per-detection "signals" line (DetectionItem) survives sort/dedup.
+      // Without this the provenance computed server-side was silently
+      // dropped during the canonical re-ordering pipeline.
+      ...(detection.provenance ? { provenance: detection.provenance } : {}),
+      // Step 81/86 — propagate the structural integrity verdict so the
+      // per-detection integrity notice (Step 86 UI) survives sort/dedup.
+      // The verdict is never recomputed here — only forwarded as-is.
+      ...(detection.integrity ? { integrity: detection.integrity } : {}),
     };
 
     // Recompute the explanation against the canonical (deduped + sorted)

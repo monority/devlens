@@ -392,3 +392,128 @@ describe('getScanDetectionResults — Step 72/73 version intelligence', () => {
     expect(result.explanation!.relationshipConflicts).toHaveLength(1);
   });
 });
+
+// ─── Step 80/81/86 field propagation ────────────────────────────────
+
+describe('getScanDetectionResults — Step 80 provenance propagation', () => {
+  it('forwards provenance when present', () => {
+    const detections: DetectionResponse[] = [
+      {
+        technology: { id: 'nginx', name: 'nginx', category: 'server' },
+        confidence: 80,
+        evidence: [
+          { type: 'http_header', name: 'Server', value: 'nginx' },
+          { type: 'meta_tag', name: 'generator', content: 'nginx' },
+        ],
+        provenance: {
+          evidenceCount: 2,
+          evidenceTypes: ['http_header', 'meta_tag'],
+          strongestEvidenceType: 'http_header',
+        },
+      },
+    ];
+    const results = getScanDetectionResults(detections);
+
+    expect(results[0]!.provenance).toEqual({
+      evidenceCount: 2,
+      evidenceTypes: ['http_header', 'meta_tag'],
+      strongestEvidenceType: 'http_header',
+    });
+  });
+
+  it('omits provenance when absent (exactOptionalPropertyTypes)', () => {
+    const detections: DetectionResponse[] = [
+      {
+        technology: { id: 'nginx', name: 'nginx', category: 'server' },
+        confidence: 80,
+        evidence: [{ type: 'http_header', name: 'Server', value: 'nginx' }],
+      },
+    ];
+    const results = getScanDetectionResults(detections);
+
+    expect(results[0]!.provenance).toBeUndefined();
+  });
+
+  it('omits provenance for a relationship-derived detection (no evidence)', () => {
+    const detections: DetectionResponse[] = [
+      {
+        technology: { id: 'react', name: 'React', category: 'frontend' },
+        confidence: 0,
+        evidence: [],
+        source: 'relationship',
+        derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
+      },
+    ];
+    const results = getScanDetectionResults(detections);
+
+    expect(results[0]!.provenance).toBeUndefined();
+  });
+});
+
+describe('getScanDetectionResults — Step 81/86 integrity propagation', () => {
+  it('forwards an invalid integrity verdict through sort/dedup', () => {
+    const detections: DetectionResponse[] = [
+      {
+        technology: { id: 'b', name: 'Zebra', category: 'cat' },
+        confidence: 80,
+        evidence: [{ type: 'http_header', name: 'Server', value: 'nginx' }],
+        integrity: { valid: false, issues: ['DUPLICATE_EVIDENCE' as const] },
+      },
+      {
+        technology: { id: 'a', name: 'Apple', category: 'cat' },
+        confidence: 95,
+        evidence: [{ type: 'script_url', url: 'https://example.com/app.js' }],
+      },
+    ];
+    const results = getScanDetectionResults(detections);
+
+    // After sort by confidence DESC, Apple (95) comes first.
+    expect(results.map((r) => r.technology.id)).toEqual(['a', 'b']);
+    // Integrity verdict survives the sort/dedup pipeline.
+    expect(results[1]!.integrity).toEqual({
+      valid: false,
+      issues: ['DUPLICATE_EVIDENCE'],
+    });
+    // Clean detection still has no integrity field.
+    expect(results[0]!.integrity).toBeUndefined();
+  });
+
+  it('omits integrity when absent (exactOptionalPropertyTypes)', () => {
+    const detections: DetectionResponse[] = [
+      {
+        technology: { id: 'nginx', name: 'nginx', category: 'server' },
+        confidence: 80,
+        evidence: [{ type: 'http_header', name: 'Server', value: 'nginx' }],
+      },
+    ];
+    const results = getScanDetectionResults(detections);
+
+    expect(results[0]!.integrity).toBeUndefined();
+  });
+
+  it('preserves integrity verdicts when deduplicating by technology ID', () => {
+    const detections: DetectionResponse[] = [
+      {
+        technology: { id: 'react', name: 'React', category: 'frontend' },
+        confidence: 70,
+        evidence: [{ type: 'script_url', url: 'https://a.com/r.js' }],
+        integrity: { valid: false, issues: ['DUPLICATE_EVIDENCE' as const] },
+      },
+      {
+        technology: { id: 'react', name: 'React', category: 'frontend' },
+        confidence: 95,
+        evidence: [{ type: 'script_url', url: 'https://b.com/r.js' }],
+        integrity: { valid: false, issues: ['EMPTY_EVIDENCE' as const] },
+      },
+    ];
+    const results = getScanDetectionResults(detections);
+
+    // Highest confidence wins.
+    expect(results[0]!.confidence).toBe(95);
+    // Its integrity verdict (EMPTY_EVIDENCE) is forwarded, not the lower-confidence one's.
+    expect(results[0]!.integrity).toEqual({
+      valid: false,
+      issues: ['EMPTY_EVIDENCE'],
+    });
+  });
+});

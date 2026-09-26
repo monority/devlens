@@ -168,6 +168,29 @@ API / UI
 - **Provenance** is derived from a finalized `Detection`'s already-deduplicated `evidence`; it is absent for relationship-derived detections (no direct evidence).
 - **Integrity** reuses the Step-80 provenance computation to verify `evidenceCount`, `evidenceTypes`, and `strongestEvidenceType` are consistent with the evidence. It is a pure, O(n), deterministic check with no IO.
 
+### §21 UI presentation layer (Step 86)
+
+The domain integrity verdict (`DetectionIntegrity`, attached to
+`DetectionResponse.integrity` by the Step 81 response mapper) is a
+**pure projected diagnostic** — the core layer computes it, the UI only
+renders it. The web layer adds two presentation-only components that
+consume the existing contract without reinterpreting validity:
+
+- **`detection-integrity-presenter.ts`** — a pure function
+  (`summarizeIntegrity`) that aggregates per-detection `integrity`
+  verdicts into a scan-level `ScanIntegritySummary` (affected count,
+  total issues, per-issue tally in canonical `INTEGRITY_ISSUE_ORDER`).
+  It never calls `computeDetectionIntegrity`.
+- **`DetectionIntegritySummary.tsx`** — a scan-level `<section>` panel
+  rendered in `ScanDetailView` (completed scans only), reusing the
+  `ResultQualitySummary` gray palette.
+- **`DetectionItem.tsx`** — a per-detection inline notice in the header
+  for detections whose `integrity.valid === false`.
+
+The `integrity` and `provenance` fields are forwarded through the
+`getScanDetectionResults` sort/dedup pipeline (Step 80/81 response
+fields must survive canonical re-ordering).
+
 ## Value Objects
 
 Value objects are branded primitive types. They prevent accidental

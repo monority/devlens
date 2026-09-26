@@ -887,3 +887,142 @@ describe('DetectionItem — Step 80 provenance (signals line)', () => {
     expect(cleaned).not.toContain('signals');
   });
 });
+
+// Step 86 §5/§6 — per-detection integrity verdict in the header.
+describe('DetectionItem — Step 86 integrity notice', () => {
+  const makeDetection = (overrides: Partial<DetectionResponse> = {}): DetectionResponse => ({
+    technology: { id: 'react', name: 'React', category: 'frontend' },
+    confidence: 95,
+    evidence: [{ type: 'script_url', url: 'https://cdn.example.com/react.js' }],
+    ...overrides,
+  });
+
+  it('does not render an integrity notice for a clean detection (no integrity field)', () => {
+    const html = renderToString(
+      React.createElement(DetectionItem, { detection: makeDetection(), index: 0 }),
+    );
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).not.toContain('Integrity issue');
+    expect(cleaned).not.toContain('Integrity issues');
+  });
+
+  it('does not render an integrity notice for a valid-but-present verdict', () => {
+    const detection = makeDetection({ integrity: { valid: true, issues: [] } });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+
+    expect(html).not.toContain('Integrity issue');
+  });
+
+  it('renders an integrity notice for an invalid detection with one issue', () => {
+    const detection = makeDetection({
+      integrity: {
+        valid: false,
+        issues: ['DUPLICATE_EVIDENCE' as const],
+      },
+    });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+
+    expect(html).toContain('Integrity issue');
+    expect(html).toContain('Duplicate evidence');
+  });
+
+  it('renders "Integrity issues" (plural) for multiple issues', () => {
+    const detection = makeDetection({
+      integrity: {
+        valid: false,
+        issues: ['DUPLICATE_EVIDENCE' as const, 'EMPTY_EVIDENCE' as const],
+      },
+    });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+
+    expect(html).toContain('Integrity issues');
+    expect(html).toContain('Duplicate evidence');
+    expect(html).toContain('Empty evidence');
+  });
+
+  it('renders all five canonical issue types in order', () => {
+    const detection = makeDetection({
+      integrity: {
+        valid: false,
+        issues: [
+          'INVALID_DETECTION_IDENTITY' as const,
+          'INVALID_EVIDENCE_TYPE' as const,
+          'DUPLICATE_EVIDENCE' as const,
+          'PROVENANCE_MISMATCH' as const,
+          'EMPTY_EVIDENCE' as const,
+        ],
+      },
+    });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+
+    // Labels appear in canonical order
+    const identityPos = html.indexOf('Invalid detection identity');
+    const evidenceTypePos = html.indexOf('Invalid evidence type');
+    const duplicatePos = html.indexOf('Duplicate evidence');
+    const provenancePos = html.indexOf('Provenance mismatch');
+    const emptyPos = html.indexOf('Empty evidence');
+
+    expect(identityPos).toBeLessThan(evidenceTypePos);
+    expect(evidenceTypePos).toBeLessThan(duplicatePos);
+    expect(duplicatePos).toBeLessThan(provenancePos);
+    expect(provenancePos).toBeLessThan(emptyPos);
+  });
+
+  it('surfaces issue descriptions in a tooltip (title attribute)', () => {
+    const detection = makeDetection({
+      integrity: {
+        valid: false,
+        issues: ['DUPLICATE_EVIDENCE' as const],
+      },
+    });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+
+    // The title attribute contains the longer description.
+    expect(html).toContain('class=');
+    // The description text should be in the title for the tooltip.
+    expect(html).toContain('appears more than once');
+  });
+
+  it('preserves the existing provenance signals line alongside the integrity notice', () => {
+    const detection = makeDetection({
+      evidence: [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+        { type: 'meta_tag', name: 'generator', content: 'nginx' },
+      ],
+      provenance: {
+        evidenceCount: 2,
+        evidenceTypes: ['http_header', 'meta_tag'],
+        strongestEvidenceType: 'http_header',
+      },
+      integrity: {
+        valid: false,
+        issues: ['DUPLICATE_EVIDENCE' as const],
+      },
+    });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // Both the provenance "signals" line and the integrity notice coexist.
+    expect(cleaned).toContain('2 signals');
+    expect(cleaned).toContain('Integrity issue');
+    expect(cleaned).toContain('Duplicate evidence');
+  });
+
+  it('does not alter normal detection rendering for invalid detections', () => {
+    const detection = makeDetection({
+      integrity: {
+        valid: false,
+        issues: ['EMPTY_EVIDENCE' as const],
+      },
+    });
+    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // Normal rendering is intact alongside the integrity notice.
+    expect(cleaned).toContain('React');
+    expect(cleaned).toContain('frontend');
+    expect(cleaned).toContain('Confidence: 95');
+    expect(cleaned).toContain('Script URL');
+  });
+});

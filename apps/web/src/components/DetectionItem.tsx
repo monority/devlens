@@ -20,6 +20,10 @@ import { isKnownTechnology } from '../lib/technology-catalog';
 import { getDetectionExplainability } from '../lib/detection-explainability';
 import { evidenceFields, evidenceTypeLabel } from '../lib/evidence-presenter';
 import { getDetectionPresentation } from '../lib/detection-presentation';
+import {
+  integrityIssueLabel,
+  integrityIssueDescription,
+} from '../lib/detection-integrity-presenter';
 import { EvidenceList } from './EvidenceList';
 import Link from 'next/link';
 import styles from './ScanCard.module.css';
@@ -82,6 +86,22 @@ export function DetectionItem({ detection, index }: DetectionItemProps): React.R
         {relationshipConflicts && relationshipConflicts.length > 0 ? (
           <span className={styles.relationshipConflict}>
             Conflict: {relationshipConflicts.map((c) => `${c.type} (${c.other})`)}
+          </span>
+        ) : null}
+        {/* Step 86 — per-detection integrity verdict. Per the Step 81 contract,
+            `integrity` is present only when the detection is structurally
+            invalid; clean detections omit it, so no notice is rendered there.
+            The existing provenance/signals footer below is preserved. */}
+        {detection.integrity && !detection.integrity.valid ? (
+          <span
+            className={styles.detectionIntegrityNotice}
+            title={detection.integrity.issues
+              .map((issue) => integrityIssueDescription(issue))
+              .join('; ')}
+          >
+            {detection.integrity.issues.length === 1 ? 'Integrity issue' : 'Integrity issues'}
+            {': '}
+            {detection.integrity.issues.map((issue) => integrityIssueLabel(issue)).join(', ')}
           </span>
         ) : null}
       </header>

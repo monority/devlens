@@ -949,3 +949,139 @@ describe('ScanDetailView — Scan Overview (Step 37)', () => {
     expect(cleaned).toContain('Result quality');
   });
 });
+
+// ─── Step 86: Detection integrity summary in ScanDetailView ──────────
+
+describe('ScanDetailView — Step 86 detection integrity summary', () => {
+  /** Build a detection optionally carrying a Step 81 integrity verdict. */
+  function integrityDetection(
+    id: string,
+    name: string,
+    integrity?: { valid: boolean; issues: readonly string[] },
+  ): DetectionResponse {
+    return {
+      technology: { id, name, category: 'frontend' },
+      confidence: 90,
+      evidence: [{ type: 'script_url', url: 'https://example.com/app.js' }],
+      ...(integrity ? { integrity } : {}),
+    } as DetectionResponse;
+  }
+
+  it('renders the integrity summary for a completed scan with integrity issues', () => {
+    const result: ScanDetailResponse = {
+      scan: makeCompletedScan(),
+      snapshot: null,
+      detections: [
+        integrityDetection('react', 'React', {
+          valid: false,
+          issues: ['DUPLICATE_EVIDENCE' as const, 'EMPTY_EVIDENCE' as const],
+        }),
+      ],
+    };
+    const html = renderToString(React.createElement(ScanDetailView, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('Detection integrity');
+    // 1 affected detection
+    expect(cleaned).toContain('1 detection with');
+    expect(cleaned).toContain('2 issues');
+    expect(cleaned).toContain('Duplicate evidence: 1');
+    expect(cleaned).toContain('Empty evidence: 1');
+  });
+
+  it('does not render the integrity summary when all detections are clean', () => {
+    const result: ScanDetailResponse = {
+      scan: makeCompletedScan(),
+      snapshot: null,
+      detections: [integrityDetection('react', 'React'), integrityDetection('vue', 'Vue')],
+    };
+    const html = renderToString(React.createElement(ScanDetailView, { result }));
+
+    expect(html).not.toContain('Detection integrity');
+  });
+
+  it('does not render the integrity summary for a pending scan', () => {
+    const result: ScanDetailResponse = {
+      scan: makePendingScan(),
+      snapshot: null,
+      detections: [
+        integrityDetection('react', 'React', {
+          valid: false,
+          issues: ['DUPLICATE_EVIDENCE' as const],
+        }),
+      ],
+    };
+    const html = renderToString(React.createElement(ScanDetailView, { result }));
+
+    expect(html).not.toContain('Detection integrity');
+  });
+
+  it('does not render the integrity summary for a failed scan', () => {
+    const result: ScanDetailResponse = {
+      scan: makeFailedScan(),
+      snapshot: null,
+      detections: [],
+    };
+    const html = renderToString(React.createElement(ScanDetailView, { result }));
+
+    expect(html).not.toContain('Detection integrity');
+  });
+
+  it('renders the affected detection count when multiple detections have issues', () => {
+    const result: ScanDetailResponse = {
+      scan: makeCompletedScan(),
+      snapshot: null,
+      detections: [
+        integrityDetection('react', 'React', {
+          valid: false,
+          issues: ['DUPLICATE_EVIDENCE' as const],
+        }),
+        integrityDetection('vue', 'Vue', {
+          valid: false,
+          issues: ['EMPTY_EVIDENCE' as const],
+        }),
+        integrityDetection('nginx', 'nginx'), // clean — must not be counted
+      ],
+    };
+    const html = renderToString(React.createElement(ScanDetailView, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('2 detections with');
+  });
+
+  it('integrity summary does not replace the existing result-quality section', () => {
+    const result: ScanDetailResponse = {
+      scan: makeCompletedScan(),
+      snapshot: null,
+      detections: [
+        integrityDetection('react', 'React', {
+          valid: false,
+          issues: ['DUPLICATE_EVIDENCE' as const],
+        }),
+      ],
+    };
+    const html = renderToString(React.createElement(ScanDetailView, { result }));
+
+    expect(html).toContain('Result quality');
+    expect(html).toContain('Detection integrity');
+  });
+
+  it('per-detection integrity notice is visible within the detection list', () => {
+    const result: ScanDetailResponse = {
+      scan: makeCompletedScan(),
+      snapshot: null,
+      detections: [
+        integrityDetection('react', 'React', {
+          valid: false,
+          issues: ['DUPLICATE_EVIDENCE' as const],
+        }),
+      ],
+    };
+    const html = renderToString(React.createElement(ScanDetailView, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // Per-detection notice appears alongside the technology name.
+    expect(cleaned).toContain('Integrity issue');
+    expect(cleaned).toContain('Duplicate evidence');
+  });
+});

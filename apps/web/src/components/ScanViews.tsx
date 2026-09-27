@@ -108,6 +108,19 @@ export function ScanCard({
       <div className={styles.cardHeader}>
         <span className={`${styles.statusBadge} ${statusCss}`}>{status}</span>
         <time dateTime={scan.createdAt}>{scan.createdAt}</time>
+        {/* Terminal timestamp for terminal scans (completed/failed). Only
+            terminal scans carry a `completedAt`/`failedAt` (pending/running do
+            not by domain-model design — see docs/architecture/api.md). */}
+        {scan.status === 'completed' && scan.completedAt && (
+          <time dateTime={scan.completedAt} className={styles.terminalTime}>
+            {scan.completedAt}
+          </time>
+        )}
+        {scan.status === 'failed' && scan.failedAt && (
+          <time dateTime={scan.failedAt} className={styles.terminalTime}>
+            {scan.failedAt}
+          </time>
+        )}
       </div>
       <div className={styles.cardBody}>
         <p className={styles.target}>{scan.target}</p>
@@ -117,6 +130,13 @@ export function ScanCard({
           </span>
         )}
         <p className={styles.hostname}>{scan.hostname}</p>
+        {/* Failure reason (Step 88 15B) — code + message so a failed scan is
+            actionable from the card without opening the detail page. */}
+        {scan.status === 'failed' && scan.error && (
+          <p className={styles.scanError}>
+            {scan.error.code}: {scan.error.message}
+          </p>
+        )}
       </div>
       <div className={styles.cardFooter}>
         <Link href={`/scans/${scan.id}`}>View details →</Link>

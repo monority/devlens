@@ -35,6 +35,24 @@
   margin: 0;
 }
 
+/* Step 88 15B — terminal (completedAt/failedAt) timestamp in the card header.
+   Terminal scans only; pending/running have no terminal timestamp by design. */
+.terminalTime {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: #9ca3af;
+}
+
+/* Step 88 15B — failure reason (code + message) line for failed scans. */
+.scanError {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #991b2b;
+  margin: 0.25rem 0 0 0;
+}
+
 .sameTargetCount {
   display: inline-block;
   font-size: 0.75rem;

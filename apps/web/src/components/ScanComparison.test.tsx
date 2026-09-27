@@ -444,6 +444,33 @@ describe('ScanComparison — comparison summary', () => {
     expect(html).toContain('Comparison summary');
     expect(html).toContain('No Changes');
   });
+
+  it('renders the Integrity changes count in the summary', () => {
+    // A detection that is clean in the left scan but gains an integrity
+    // verdict in the right scan → exactly one integrity change.
+    const left = makeScan('scan_left', 'completed', [
+      makeDetection('react', 'React', 'frontend', 95, [
+        { type: 'http_header', name: 'Server', value: 'nginx' },
+      ]),
+    ]);
+    const right = makeScan('scan_right', 'completed', [
+      {
+        ...makeDetection('react', 'React', 'frontend', 95, [
+          { type: 'http_header', name: 'Server', value: 'nginx' },
+        ]),
+        integrity: { valid: false as const, issues: ['DUPLICATE_EVIDENCE' as const] },
+      },
+    ]);
+    const result = compareScans(left, right);
+
+    const html = renderToString(React.createElement(ScanComparison, { result }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // Step 88 15A: the compact summary `dl` now surfaces an
+    // "Integrity changes" row with the count (previously dropped).
+    expect(cleaned).toMatch(/Integrity changes<\/dt>\s*<dd>1<\/dd>/);
+    expect(cleaned).toContain('Integrity changes');
+  });
 });
 
 // ─── Navigation tests ────────────────────────────────────────────────
@@ -1053,7 +1080,7 @@ describe('ScanComparison — Step 87 integrity changes', () => {
     const result = compareScans(left, right);
     const html = renderToString(React.createElement(ScanComparison, { result }));
 
-    expect(html).not.toContain('Integrity changes');
+    expect(html).not.toContain('Integrity changes (');
   });
 
   it('does not render an "Integrity changes" section when both sides have identical issues', () => {
@@ -1072,7 +1099,7 @@ describe('ScanComparison — Step 87 integrity changes', () => {
     const result = compareScans(left, right);
     const html = renderToString(React.createElement(ScanComparison, { result }));
 
-    expect(html).not.toContain('Integrity changes');
+    expect(html).not.toContain('Integrity changes (');
   });
 
   it('renders the integrity section when an issue is resolved (invalid → valid)', () => {

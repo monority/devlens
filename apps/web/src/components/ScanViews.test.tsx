@@ -227,6 +227,37 @@ describe('ScanCard', () => {
     expect(cleaned).toContain('href="/scans/scan_001"');
     expect(cleaned).toContain('2 scans');
   });
+
+  it('renders the terminal (completedAt) timestamp for a completed scan', () => {
+    const html = renderToString(React.createElement(ScanCard, { scan: makeCompletedScan() }));
+    expect(html).toContain('2025-06-01T12:00:05.000Z');
+  });
+
+  it('does not render a terminal timestamp for a pending scan', () => {
+    const html = renderToString(React.createElement(ScanCard, { scan: makePendingScan() }));
+    expect(html).not.toMatch(/terminalTime/);
+  });
+
+  it('does not render a terminal timestamp for a running scan', () => {
+    const html = renderToString(React.createElement(ScanCard, { scan: makeRunningScan() }));
+    expect(html).not.toMatch(/terminalTime/);
+  });
+
+  it('renders the terminal (failedAt) timestamp and failure reason for a failed scan', () => {
+    const html = renderToString(React.createElement(ScanCard, { scan: makeFailedScan() }));
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // Terminal timestamp (Step 88 15B).
+    expect(html).toContain('2025-06-01T12:00:01.000Z');
+    // Failure reason — code + message (Step 88 15B).
+    expect(cleaned).toContain('timeout');
+    expect(cleaned).toContain('Request timed out');
+  });
+
+  it('does not render a failure reason line for a completed scan', () => {
+    const html = renderToString(React.createElement(ScanCard, { scan: makeCompletedScan() }));
+    expect(html).not.toMatch(/scanError/);
+  });
 });
 
 // ─── ScansHistory tests ──────────────────────────────────────────────

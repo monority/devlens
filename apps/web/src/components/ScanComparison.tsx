@@ -151,7 +151,8 @@ function ComparisonError({ result }: { result: ComparisonResult }): React.ReactE
  * Compact summary of comparison counts, derived directly from the
  * `ComparisonResult` without recomputing any comparison semantics.
  *
- * Shows: Added, Removed, Score changes, Evidence changes, Overall.
+ * Shows: Added, Removed, Version changes, Score changes, Evidence changes,
+ * Integrity changes, Overall.
  */
 function ComparisonSummary({ result }: { result: ComparisonResult }): React.ReactElement {
   const evidenceChangeCount = result.evidenceChanges.filter((e) => e.status !== 'unchanged').length;
@@ -179,6 +180,10 @@ function ComparisonSummary({ result }: { result: ComparisonResult }): React.Reac
         <div>
           <dt>Evidence changes</dt>
           <dd>{evidenceChangeCount}</dd>
+        </div>
+        <div>
+          <dt>Integrity changes</dt>
+          <dd>{result.integrityChanges.length}</dd>
         </div>
         <div>
           <dt>Overall</dt>

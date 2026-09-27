@@ -27,7 +27,10 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { getTechnologyById } from '@/lib/technology-catalog';
 import { getAllScanResults, scanResultToSummary } from '@/lib/scan-data';
+import { technologyDetectionHistory } from '@/lib/technology-detection-history';
 import { TechnologyDetectedInScans } from '@/components/TechnologyDetectedInScans';
+import { TechnologyDetectionTimeline } from '@/components/TechnologyDetectionTimeline';
+import type { ScanResult } from '@devlens/application';
 import type { ScanSummary } from '@/lib/types';
 import styles from './page.module.css';
 
@@ -57,26 +60,32 @@ export async function generateMetadata({
 }
 
 /**
- * Fetches scan results that detected the given technology ID.
+ * Fetches the full scan results that detected the given technology ID.
  *
  * Reuses `getAllScanResults()` (which calls `listScans` from
- * `@devlens/application`) to fetch all scan results in a single
- * query. Filters in-memory by checking each scan's detections for
- * the canonical technology ID.
+ * `@devlens/application`) to fetch all scan results in a single query, then
+ * filters in-memory by checking each scan's detections for the canonical
+ * technology ID.
  *
- * Only completed scans carry detections — failed, pending, and
- * running scans have empty detection arrays. So the result set
- * is inherently restricted to completed scans.
+ * Returns the **full** `ScanResult[]` (detections retained) so the page can:
+ *   - derive `ScanSummary[]` via `scanResultToSummary` for the existing
+ *     `TechnologyDetectedInScans` cards (in-memory mapping only — no
+ *     per-detection API round-trip); and
+ *   - project a `TechnologyDetectionHistoryEntry[]` via
+ *     `technologyDetectionHistory`, which itself reuses the exact scan-detail
+ *     pipeline (`detectionToResponse` → `getScanDetectionResults`).
  *
- * Returns `null` on error (database/infrastructure failure),
- * so the caller can render an error state.
+ * Only completed scans carry detections — failed, pending, and running scans
+ * have empty detection arrays — so the result set is inherently restricted to
+ * completed-scan results.
+ *
+ * Returns `null` on error (database/infrastructure failure), so the caller can
+ * render an error state.
  */
-async function fetchDetectedScans(techId: string): Promise<ScanSummary[] | null> {
+async function fetchDetectedScans(techId: string): Promise<ScanResult[] | null> {
   try {
     const results = await getAllScanResults();
-    return results
-      .filter((result) => result.detections.some((d) => d.technology.id === techId))
-      .map(scanResultToSummary);
+    return results.filter((result) => result.detections.some((d) => d.technology.id === techId));
   } catch {
     return null;
   }
@@ -95,6 +104,14 @@ export default async function TechnologyDetailPage({
   }
 
   const detectedScans = await fetchDetectedScans(id);
+
+  // Derive compact summaries for the existing ScanCard-based "Detected in
+  // scans" section. The full `ScanResult[]` is retained for the timeline,
+  // which reuses the exact scan-detail pipeline (no per-detection N+1).
+  const scanSummaries: ScanSummary[] | null = detectedScans
+    ? detectedScans.map(scanResultToSummary)
+    : null;
+  const detectionHistory = detectedScans ? technologyDetectionHistory(detectedScans, id) : [];
 
   return (
     <main className={styles.main}>
@@ -118,7 +135,9 @@ export default async function TechnologyDetailPage({
         </dl>
       </div>
 
-      <TechnologyDetectedInScans scans={detectedScans} />
+      <TechnologyDetectedInScans scans={scanSummaries} />
+
+      <TechnologyDetectionTimeline entries={detectionHistory} />
 
       <div className={styles.footer}>
         <Link href="/technologies" className={styles.backLink}>

@@ -35,13 +35,24 @@ import cardStyles from './ScanCard.module.css';
 export interface ScanComparisonSelectorProps {
   /** All scans from the server (unfiltered; includes non-completed) */
   scans: ScanSummary[];
+  /**
+   * When provided, pre-selects and locks this scan as "Previous" (left) and
+   * opens the selector expanded — used by the compare page when only `left`
+   * is in the URL (e.g. the scan-detail "Compare with another scan" link), so
+   * the user only needs to choose the scan to compare it against. The locked
+   * scan's "Previous" checkbox is checked and disabled.
+   */
+  defaultLeft?: string;
 }
 
-export function ScanComparisonSelector({ scans }: ScanComparisonSelectorProps): React.ReactElement {
+export function ScanComparisonSelector({
+  scans,
+  defaultLeft,
+}: ScanComparisonSelectorProps): React.ReactElement {
   const router = useRouter();
 
-  const [enabled, setEnabled] = useState(false);
-  const [left, setLeft] = useState<string | null>(null);
+  const [enabled, setEnabled] = useState(defaultLeft !== undefined);
+  const [left, setLeft] = useState<string | null>(defaultLeft ?? null);
   const [right, setRight] = useState<string | null>(null);
 
   const hasCompleted = scans.some(isComparable);
@@ -149,6 +160,7 @@ export function ScanComparisonSelector({ scans }: ScanComparisonSelectorProps): 
                         type="checkbox"
                         checked={left === scan.id}
                         onChange={() => selectLeft(scan.id)}
+                        disabled={scan.id === defaultLeft}
                         aria-label={`${left === scan.id ? 'Deselect' : 'Select'} ${scan.id} as Previous (left)`}
                       />
                       <span>Previous</span>

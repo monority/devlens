@@ -15,10 +15,12 @@
  */
 
 import Link from 'next/link';
-import { fetchScanById } from '@/lib/api';
+import { fetchScanById, fetchScans } from '@/lib/api';
+import { isComparable } from '@/lib/comparison-selector';
 import { compareScans } from '@/lib/comparison';
 import { ScansError } from '@/components/ScanViews';
 import { ScanComparison } from '@/components/ScanComparison';
+import { ScanComparisonSelector } from '@/components/ScanComparisonSelector';
 import styles from '../page.module.css';
 
 /**
@@ -50,8 +52,48 @@ export default async function ScanComparisonPage({
 }) {
   const { left, right } = await searchParams;
 
-  // Both scan IDs must be provided.
-  if (!left || !right) {
+  // No left at all — genuinely missing parameters.
+  if (!left) {
+    return <MissingParams />;
+  }
+
+  // Only `left` is provided — this is the entry point used by the scan-detail
+  // "Compare with another scan" link, which pre-seeds `left` for the current
+  // scan. Let the user pick the scan to compare it against via the existing
+  // selection UI, reusing the canonical `ScanComparisonSelector` (no new
+  // comparison/detection logic — the selector delegates to the same
+  // `/scans/compare?left=…&right=…` route once both are chosen).
+  if (!right) {
+    try {
+      const scansResult = await fetchScans();
+      const leftSummary = scansResult.scans.find((s) => s.id === left);
+      if (leftSummary && isComparable(leftSummary)) {
+        return (
+          <main className={styles.main}>
+            <div className={styles.header}>
+              <h1 className={styles.title}>Compare scans</h1>
+              <p className={styles.subtitle}>
+                Comparing scan <code>{left}</code>. Choose another scan to compare it against.
+              </p>
+            </div>
+            <ScanComparisonSelector scans={scansResult.scans} defaultLeft={left} />
+          </main>
+        );
+      }
+    } catch {
+      return (
+        <main className={styles.main}>
+          <div className={styles.header}>
+            <h1 className={styles.title}>Scan Comparison</h1>
+            <p className={styles.subtitle}>Error loading scans</p>
+          </div>
+          <ScansError />
+        </main>
+      );
+    }
+
+    // `left` is missing from the list or not comparable — fall back to the
+    // missing-parameters notice.
     return <MissingParams />;
   }
 

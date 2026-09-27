@@ -12,8 +12,8 @@
  *
  * Navigation: a "back" link and a "New scan" link are available in all
  * states, so users can return to scan history or start another scan
- * without extra clicks. A "Compare" link is available when a scan is
- * found. A "Re-scan" link (pointing to `/scans/new?target=...`) is
+ * without extra clicks. A "Compare" link is available when a scan is found
+ * and completed (comparisons require completed scans). A "Re-scan" link (pointing to `/scans/new?target=...`) is
  * available when a found scan has a usable target, allowing the user to
  * quickly re-scan the same target.
  *
@@ -122,12 +122,14 @@ export default async function ScanDetailPage({
               Re-scan
             </Link>
           ) : null}
-          <Link
-            href={`/scans/compare?left=${encodeURIComponent(id)}`}
-            className={styles.compareLink}
-          >
-            Compare with another scan
-          </Link>
+          {result.scan.status === 'completed' && (
+            <Link
+              href={`/scans/compare?left=${encodeURIComponent(id)}`}
+              className={styles.compareLink}
+            >
+              Compare with another scan
+            </Link>
+          )}
           <CopyReportLink scanId={result.scan.id} />
           <ExportScanButton result={result} />
         </div>

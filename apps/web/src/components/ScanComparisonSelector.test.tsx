@@ -148,3 +148,31 @@ describe('ScanComparisonSelector — accessibility', () => {
     expect(html).toContain('<button');
   });
 });
+
+describe('ScanComparisonSelector — pre-seeded comparison entry (defaultLeft)', () => {
+  // Covers the scan-detail "Compare with another scan" entry point: the
+  // compare page pre-seeds `left` so the user only picks `right`.
+  it('renders the picker expanded with defaultLeft locked as Previous', () => {
+    const html = renderToString(
+      React.createElement(ScanComparisonSelector, { scans: makeScans(), defaultLeft: 'scan_a' }),
+    );
+
+    // Expanded picker (not the collapsed "Compare two scans" button)
+    expect(html).toContain('Compare scans');
+    expect(html).not.toContain('Compare two scans');
+
+    // scan_a's Previous checkbox is checked (→ "Deselect") and disabled (locked)
+    expect(html).toContain('Deselect scan_a as Previous (left)');
+    expect(html).toContain('disabled');
+  });
+
+  it('remains collapsed and unpreseeded when defaultLeft is not provided', () => {
+    const html = renderToString(
+      React.createElement(ScanComparisonSelector, { scans: makeScans() }),
+    );
+
+    // Back-compat: no defaultLeft → collapsed button, nothing pre-selected
+    expect(html).toContain('Compare two scans');
+    expect(html).not.toContain('Deselect scan_a as Previous (left)');
+  });
+});

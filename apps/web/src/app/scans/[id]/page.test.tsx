@@ -211,4 +211,23 @@ describe('ScanDetailPage — Re-scan action', () => {
     expect(cleaned).toContain('Compare with another scan');
     expect(cleaned).toContain('href="/scans/compare?left=scan_001"');
   });
+
+  it('does not render a Compare link for a non-completed scan', async () => {
+    mockFetchScanById.mockResolvedValue({
+      scan: makeScan('https://example.com/', 'running'),
+      snapshot: null,
+      detections: [],
+    });
+
+    const html = renderToString(
+      await ScanDetailPage({
+        params: Promise.resolve({ id: 'scan_001' }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    // Comparisons require completed scans; the link must not offer a dead end.
+    expect(cleaned).not.toContain('Compare with another scan');
+  });
 });

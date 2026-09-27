@@ -23,10 +23,12 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }));
 
-// Mock the API module so fetchScanById is controllable per-test.
+// Mock the API module so fetchScanById / fetchScans are controllable per-test.
 const mockFetchScanById = vi.hoisted(() => vi.fn());
+const mockFetchScans = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/api', () => ({
   fetchScanById: mockFetchScanById,
+  fetchScans: mockFetchScans,
 }));
 
 // Mock the ScanComparison presentation component so we can verify the
@@ -35,6 +37,21 @@ vi.mock('@/lib/api', () => ({
 vi.mock('@/components/ScanComparison', () => ({
   ScanComparison: ({ result }: { result: unknown }) =>
     React.createElement('div', { 'data-testid': 'scan-comparison' }, JSON.stringify(result)),
+}));
+
+// Mock the selector so the left-only entry renders without a real router and
+// so we can assert the pre-seeded `defaultLeft`.
+vi.mock('@/components/ScanComparisonSelector', () => ({
+  ScanComparisonSelector: ({ scans, defaultLeft }: { scans: unknown; defaultLeft?: string }) =>
+    React.createElement(
+      'div',
+      {
+        'data-testid': 'scan-selector',
+        'data-default-left': defaultLeft ?? null,
+        'data-scan-count': Array.isArray(scans) ? scans.length : 0,
+      },
+      'selector',
+    ),
 }));
 
 // Must import after mocks
@@ -88,15 +105,6 @@ describe('ScanComparisonPage — missing params', () => {
     expect(cleaned).toContain('right');
   });
 
-  it('renders "Missing scan IDs" when only left is provided', async () => {
-    const html = renderToString(
-      await ScanComparisonPage({ searchParams: Promise.resolve({ left: 'scan_a' }) }),
-    );
-    const cleaned = html.replace(/<!-- -->/g, '');
-
-    expect(cleaned).toContain('Missing scan IDs');
-  });
-
   it('renders "Missing scan IDs" when only right is provided', async () => {
     const html = renderToString(
       await ScanComparisonPage({ searchParams: Promise.resolve({ right: 'scan_b' }) }),
@@ -112,6 +120,64 @@ describe('ScanComparisonPage — missing params', () => {
 
     expect(cleaned).toContain('href="/scans"');
     expect(cleaned).toContain('Back to scan history');
+  });
+});
+
+describe('ScanComparisonPage — left-only entry (scan-detail "Compare with another scan")', () => {
+  // The scan-detail "Compare with another scan" link pre-seeds `left` only.
+  // The compare page must let the user pick `right` (reusing the existing
+  // selector) instead of dead-ending on "Missing scan IDs".
+
+  it('renders the scan selector pre-seeded with left when left is completed', async () => {
+    mockFetchScans.mockResolvedValue({
+      scans: [
+        makeScanDetail({ id: 'scan_a', status: 'completed' }),
+        makeScanDetail({ id: 'scan_b', status: 'completed' }),
+      ],
+    });
+
+    const html = renderToString(
+      await ScanComparisonPage({ searchParams: Promise.resolve({ left: 'scan_a' }) }),
+    );
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('data-testid="scan-selector"');
+    expect(cleaned).toContain('data-default-left="scan_a"');
+    expect(cleaned).not.toContain('Missing scan IDs');
+  });
+
+  it('falls back to missing-params when left is not completed', async () => {
+    mockFetchScans.mockResolvedValue({
+      scans: [makeScanDetail({ id: 'scan_a', status: 'running' })],
+    });
+
+    const html = renderToString(
+      await ScanComparisonPage({ searchParams: Promise.resolve({ left: 'scan_a' }) }),
+    );
+
+    expect(html.replace(/<!-- -->/g, '')).toContain('Missing scan IDs');
+  });
+
+  it('falls back to missing-params when left is not in the scan list', async () => {
+    mockFetchScans.mockResolvedValue({
+      scans: [makeScanDetail({ id: 'scan_x', status: 'completed' })],
+    });
+
+    const html = renderToString(
+      await ScanComparisonPage({ searchParams: Promise.resolve({ left: 'scan_a' }) }),
+    );
+
+    expect(html.replace(/<!-- -->/g, '')).toContain('Missing scan IDs');
+  });
+
+  it('shows an error state when the scans list cannot be loaded', async () => {
+    mockFetchScans.mockRejectedValue(new Error('network'));
+
+    const html = renderToString(
+      await ScanComparisonPage({ searchParams: Promise.resolve({ left: 'scan_a' }) }),
+    );
+
+    expect(html.replace(/<!-- -->/g, '')).toContain('Error loading scans');
   });
 });
 

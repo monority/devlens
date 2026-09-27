@@ -110,6 +110,14 @@ describe('TechnologyDetailPage — wiring (Step 88)', () => {
     expect(cleaned).toContain('80'); // confidence preserved exactly
     expect(cleaned).toContain('Direct');
     expect(cleaned).toContain('Valid');
+
+    // Step 89 compact summary, placed immediately before the timeline: the
+    // single detected scan yields one observation ⇒ indeterminate.
+    expect(cleaned).toContain('Detection history summary');
+    expect(cleaned).toContain('Latest confidence');
+    expect(cleaned).toContain('First detected');
+    expect(cleaned).toContain('Last detected');
+    expect(cleaned).toContain('Indeterminate');
   });
 
   it('renders nothing from the timeline when no scan detected the technology', async () => {
@@ -127,8 +135,10 @@ describe('TechnologyDetailPage — wiring (Step 88)', () => {
 
     // TechnologyDetectedInScans empty state is still rendered.
     expect(cleaned).toContain('No scans have detected this technology yet.');
-    // Timeline renders nothing (component returns null for []).
+    // Timeline renders nothing (component returns null for []) — and so does
+    // the Step 89 summary (it disappears when there is no history).
     expect(cleaned).not.toContain('Detection history');
+    expect(cleaned).not.toContain('Detection history summary');
   });
 
   it('renders an error state when scan data cannot be loaded', async () => {
@@ -142,7 +152,8 @@ describe('TechnologyDetailPage — wiring (Step 88)', () => {
 
     // fetchDetectedScans returns null → TechnologyDetectedInScans error state.
     expect(cleaned).toContain('Unable to load scan data for this technology.');
-    // No timeline when data is unavailable.
+    // No timeline and no summary when data is unavailable.
     expect(cleaned).not.toContain('Detection history');
+    expect(cleaned).not.toContain('Detection history summary');
   });
 });

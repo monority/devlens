@@ -1,0 +1,95 @@
+/**
+ * TechnologyDetectionHistorySummary — compact, consistent styles (Step 89 §6).
+ * Mirrors the palette/conventions of the existing technology page and timeline.
+ */
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 1.5rem 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+/* Definition-list grid for the stat rows. `display: contents` keeps the `<dl>`
+   semantics while letting children participate in the grid. */
+.stats,
+.changes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.5rem 1rem;
+}
+
+.stat {
+  display: contents;
+}
+
+.statDt {
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+
+.statDd {
+  font-weight: 600;
+  color: #111827;
+  text-align: right;
+}
+
+.changes {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+}
+
+/* Stability badge — status is also conveyed as text, never color alone. */
+.stability {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.stabilityStable {
+  background-color: #dcfce7; /* green-100 */
+  color: #166534; /* green-800 */
+}
+
+.stabilityChanged {
+  background-color: #fef3c7; /* amber-100 */
+  color: #92400e; /* amber-800 */
+}
+
+.stabilityIndeterminate {
+  background-color: #f3f4f6; /* gray-100 */
+  color: #374151; /* gray-800 */
+}
+
+/* Change-indicator dots — text label is always present (never color-only). */
+.indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-weight: 600;
+}
+
+.indicator::before {
+  content: '';
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+}
+
+.indicatorUnchanged::before {
+  background-color: #9ca3af; /* gray-400 */
+}
+
+.indicatorChanged::before {
+  background-color: #f59e0b; /* amber-500 */
+}

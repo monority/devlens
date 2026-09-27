@@ -28,7 +28,9 @@ import type { Metadata } from 'next';
 import { getTechnologyById } from '@/lib/technology-catalog';
 import { getAllScanResults, scanResultToSummary } from '@/lib/scan-data';
 import { technologyDetectionHistory } from '@/lib/technology-detection-history';
+import { technologyDetectionHistorySummary } from '@/lib/technology-detection-history-summary';
 import { TechnologyDetectedInScans } from '@/components/TechnologyDetectedInScans';
+import { TechnologyDetectionHistorySummary } from '@/components/TechnologyDetectionHistorySummary';
 import { TechnologyDetectionTimeline } from '@/components/TechnologyDetectionTimeline';
 import type { ScanResult } from '@devlens/application';
 import type { ScanSummary } from '@/lib/types';
@@ -112,6 +114,10 @@ export default async function TechnologyDetailPage({
     ? detectedScans.map(scanResultToSummary)
     : null;
   const detectionHistory = detectedScans ? technologyDetectionHistory(detectedScans, id) : [];
+  // Compact quality/stability summary (Step 89), derived from the same history.
+  const detectionHistorySummary = detectedScans
+    ? technologyDetectionHistorySummary(detectionHistory)
+    : null;
 
   return (
     <main className={styles.main}>
@@ -136,6 +142,10 @@ export default async function TechnologyDetailPage({
       </div>
 
       <TechnologyDetectedInScans scans={scanSummaries} />
+
+      {/* Step 89: compact stability summary, placed immediately before the
+          detailed timeline per §6. Renders nothing when there is no history. */}
+      <TechnologyDetectionHistorySummary summary={detectionHistorySummary} />
 
       <TechnologyDetectionTimeline entries={detectionHistory} />
 

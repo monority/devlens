@@ -21,7 +21,10 @@
  * §5 comparison semantics (compare structured values, never formatted strings):
  * - confidence: exact value (no rounding)
  * - version: the already-normalized `version` (`null` on conflict/absent — see
- *   `TechnologyDetectionHistoryEntry.version`)
+ *   `TechnologyDetectionHistoryEntry.version`). A `versionConflict` on either
+ *   side forbids a transition (Step 74 §5 / Step 72), so a resolved↔conflict
+ *   pair does NOT count as a version change — mirroring `computeVersionChange`
+ *   in `comparison.ts`; only a present↔different-present transition counts.
  * - provenance: the canonical provenance representation (evidenceCount, the
  *   canonically-ordered evidenceTypes, strongestEvidenceType); absent for
  *   relationship-derived entries — so direct→derived and derived→direct are
@@ -151,8 +154,13 @@ export function technologyDetectionHistorySummary(
     if (a.confidence !== b.confidence) {
       confidenceChanged = true;
     }
-    // `version` is already normalized (null on conflict/absent; see entry docs).
-    if (a.version !== b.version) {
+    // §4 / Step 74 §5 + Step 72: a `versionConflict` on either side forbids a
+    // version transition (the consensus is refused, so no transition is
+    // reported). This mirrors `computeVersionChange` in `comparison.ts` so the
+    // history-summary's stability signal agrees with scan comparison. Only a
+    // present↔different-present transition counts; a resolved↔conflict pair
+    // (conflict normalizes `version` to `null`) is NOT a version change.
+    if (!a.versionConflict && !b.versionConflict && a.version !== b.version) {
       versionChanged = true;
     }
     if (canonicalProvenanceKey(a.provenance) !== canonicalProvenanceKey(b.provenance)) {

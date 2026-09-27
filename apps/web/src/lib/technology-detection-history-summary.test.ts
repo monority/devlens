@@ -178,7 +178,12 @@ describe('technologyDetectionHistorySummary', () => {
       expect(technologyDetectionHistorySummary(history)!.versionChanged).toBe(false);
     });
 
-    it('treats a version conflict (normalized to null) as a version change from a resolved version', () => {
+    it('does not treat a resolved→conflict transition as a version change (conflict forbids transition, Step 72 / comparison §74)', () => {
+      // A `versionConflict` on either side forbids a version transition — the
+      // consensus is refused, so a resolved version → conflict (normalized to
+      // `null`) is NOT reported as a version change. This mirrors
+      // `computeVersionChange` in `comparison.ts` so history-summary stability
+      // agrees with scan comparison.
       const history = [
         // newest: version conflict → entry.version normalized to null
         makeEntry({
@@ -190,7 +195,22 @@ describe('technologyDetectionHistorySummary', () => {
         // oldest: resolved version
         makeEntry({ scanId: 'a', scanCreatedAt: '2025-06-01T00:00:00.000Z', version: '1.0' }),
       ];
-      expect(technologyDetectionHistorySummary(history)!.versionChanged).toBe(true);
+      expect(technologyDetectionHistorySummary(history)!.versionChanged).toBe(false);
+    });
+
+    it('does not treat a conflict→resolved transition as a version change (conflict on either side)', () => {
+      const history = [
+        // newest: resolved version
+        makeEntry({ scanId: 'b', scanCreatedAt: '2025-06-02T00:00:00.000Z', version: '1.0' }),
+        // oldest: version conflict → entry.version normalized to null
+        makeEntry({
+          scanId: 'a',
+          scanCreatedAt: '2025-06-01T00:00:00.000Z',
+          version: null,
+          versionConflict: true,
+        }),
+      ];
+      expect(technologyDetectionHistorySummary(history)!.versionChanged).toBe(false);
     });
 
     it('does not flag a change when both observations are version conflicts (both normalized to null)', () => {

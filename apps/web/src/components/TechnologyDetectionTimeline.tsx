@@ -113,6 +113,11 @@ export function TechnologyDetectionTimeline({
                     {formatDate(entry.scanCompletedAt)}
                   </time>
                 )}
+                {/* Step 91 §6: the scan target hostname (site) so each historical
+                    observation is self-identifying. Rendered as plain text (not a
+                    link) to avoid a duplicate navigation element — the scan date
+                    above already links to /scans/{scanId} (§8). */}
+                <span className={styles.scanHostname}>{entry.scanHostname}</span>
               </td>
 
               <td className={`${styles.td} ${styles.colConfidence}`}>

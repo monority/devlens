@@ -323,6 +323,18 @@ describe('technologyDetectionHistory — scan metadata', () => {
     expect(history[0]!.scanCompletedAt).toBe('2025-06-01T10:00:05.000Z');
     expect(history[0]!.scanCreatedAt).toBe('2025-06-01T10:00:00.000Z');
   });
+
+  it('forwards the scan target hostname (Step 91 §6) from existing scan data', () => {
+    const scans = [
+      makeScan('scan_a', '2025-06-01T10:00:00.000Z', COMPLETED('2025-06-01T10:00:05.000Z'), [
+        makeDetection(NGINX),
+      ]),
+    ];
+    const history = technologyDetectionHistory(scans, NGINX);
+    // hostname is read from the already-loaded ScanResult.scan.target.hostname
+    // (Step 91 §11) — no additional fetch or query.
+    expect(history[0]!.scanHostname).toBe('example.com');
+  });
 });
 
 // ─── 8. Determinism / no mutation ────────────────────────────────────

@@ -88,6 +88,21 @@
   color: #9ca3af;
 }
 
+/* Step 91 §6: scan target hostname (site) — compact secondary context that
+   identifies which site a historical observation was scanned against, so a
+   timeline row is self-identifying ("what scan am I looking at?"). Mirrors the
+   muted `.terminalTime` surface; `word-break` keeps long hostnames within the
+   fixed-layout scan column. Rendered as plain text (not a link) by the
+   timeline — see TechnologyDetectionTimeline.tsx. */
+.scanHostname {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: #9ca3af;
+  word-break: break-word;
+}
+
 .confidence {
   font-weight: 600;
   color: #2563eb;

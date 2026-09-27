@@ -45,6 +45,7 @@ function makeEntry(i: EntryInput): TechnologyDetectionHistoryEntry {
     scanCreatedAt: i.scanCreatedAt ?? SAME_TIME,
     scanCompletedAt: i.scanCompletedAt ?? SAME_TIME,
     scanStatus: 'completed' as const,
+    scanHostname: 'example.com',
     confidence: i.confidence ?? 90,
     version: i.version ?? null,
     versionConflict: i.versionConflict ?? false,

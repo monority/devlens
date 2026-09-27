@@ -62,6 +62,14 @@ export interface TechnologyDetectionHistoryEntry {
   readonly scanCompletedAt: string | null;
   /** Always `'completed'` — only completed scans carry detections (by domain design). */
   readonly scanStatus: 'completed';
+  /**
+   * Scan target hostname (the site the scan was run against). Surfaced on each
+   * timeline row so a historical observation is self-identifying — "what scan
+   * am I looking at?" (Step 91 §4/§6). Derived from the `ScanTarget.hostname`
+   * already attached to the `ScanResult.scan` loaded by the technology detail
+   * page — no additional fetch or query (Step 91 §11).
+   */
+  readonly scanHostname: string;
   /** The exact confidence value carried by the canonical detection (never recalculated). */
   readonly confidence: number;
   /**
@@ -147,6 +155,10 @@ function toHistoryEntry(
     scanCreatedAt: meta.createdAt,
     scanCompletedAt: status.type === 'completed' ? status.completedAt : null,
     scanStatus: 'completed',
+    // Step 91 §6: surface the scan target hostname so each historical
+    // observation is identifiable by site. Read from the already-loaded
+    // `ScanResult.scan.target.hostname` (no new fetch — §11).
+    scanHostname: meta.target.hostname,
     confidence: detection.confidence,
     // `version` is absent when never observed; null on a conflict. `?? null`
     // collapses absent ⇒ null so consumers see a stable `string | null`.

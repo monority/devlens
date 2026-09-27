@@ -29,6 +29,7 @@ function makeEntry(
     scanCreatedAt: '2025-06-01T12:00:00.000Z',
     scanCompletedAt: '2025-06-01T12:00:05.000Z',
     scanStatus: 'completed',
+    scanHostname: 'example.com',
     confidence: 80,
     version: null,
     versionConflict: false,
@@ -97,6 +98,47 @@ describe('TechnologyDetectionTimeline — scan link', () => {
   it('renders the terminal (completed) timestamp', () => {
     const html = renderToString(<TechnologyDetectionTimeline entries={[makeEntry()]} />);
     expect(html).toContain('dateTime="2025-06-01T12:00:05.000Z"');
+  });
+});
+
+// ─── 3b. Scan context (Step 91 §6) ───────────────────────────────────
+// The timeline row must identify "what scan am I looking at" by surfacing the
+// scan target hostname (the site). This is contextual text — NOT a link, since
+// the scan date already links to /scans/{scanId} (§8: no duplicate navigation).
+
+describe('TechnologyDetectionTimeline — scan context', () => {
+  it('renders the scan target hostname alongside the scan date', () => {
+    const html = renderToString(
+      <TechnologyDetectionTimeline entries={[makeEntry({ scanHostname: 'app.example.com' })]} />,
+    );
+    expect(html).toContain('app.example.com');
+  });
+
+  it('preserves exactly one scan link and leaves the date link text unchanged', () => {
+    const html = renderToString(
+      <TechnologyDetectionTimeline
+        entries={[makeEntry({ scanId: 'abc123', scanHostname: 'app.example.com' })]}
+      />,
+    );
+    const cleaned = html.replace(/<!-- -->/g, '');
+    // Only the scan date navigates to /scans/abc123 — the hostname is plain
+    // text context, so there is no duplicate navigation element (§8/§10).
+    expect(cleaned.match(/href="\/scans\/abc123"/g)).toHaveLength(1);
+    expect(cleaned).toContain('Jun 1, 2025 at 12:00 UTC');
+    expect(cleaned).toContain('app.example.com');
+  });
+
+  it('renders a distinct hostname for each row (multi-row)', () => {
+    const html = renderToString(
+      <TechnologyDetectionTimeline
+        entries={[
+          makeEntry({ scanId: 'scan_a', scanHostname: 'a.example.com' }),
+          makeEntry({ scanId: 'scan_b', scanHostname: 'b.example.com' }),
+        ]}
+      />,
+    );
+    expect(html).toContain('a.example.com');
+    expect(html).toContain('b.example.com');
   });
 });
 

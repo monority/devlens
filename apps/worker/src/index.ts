@@ -9,6 +9,9 @@
 import { main } from './main.js';
 
 void main().catch((error: unknown) => {
-  console.error('Worker encountered an unexpected error:', error);
+  console.error(
+    'Worker encountered an unexpected error:',
+    error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+  );
   process.exitCode = 1;
 });

@@ -3,3 +3,9 @@ packages:
   - 'packages/*'
 allowBuilds:
   esbuild: true
+overrides:
+  # F-013: Force postcss to a patched version (>=8.5.23 resolves all 4 CVEs).
+  # Next.js 15.5.x pins postcss 8.4.31 (vulnerable); no Next.js release
+  # bundles a patched postcss. Vite already uses 8.5.26, so this aligns
+  # the tree to a single safe version without affecting vite.
+  postcss: 8.5.26

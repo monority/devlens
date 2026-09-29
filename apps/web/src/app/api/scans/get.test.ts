@@ -12,7 +12,7 @@
  * - Error handling: repository error → 500, no database error leakage.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { handleGetScans, handleGetScanById } from './handler.js';
 import { InMemoryScanResultRepository } from '@devlens/database';
 import {
@@ -429,6 +429,49 @@ describe('GET /api/scans — handler', () => {
 
       expect(response.status).toBe(500);
       expect(JSON.stringify(response.body)).not.toContain('Database connection lost');
+    });
+
+    it('does not pass raw Error objects to console.error on repository failure', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      try {
+        const repo: { getById: () => Promise<never> } = {
+          getById: () => Promise.reject(new Error('Connection to PostgreSQL failed: ECONNREFUSED')),
+        };
+        const response = await handleGetScanById('scan_001', {
+          repository: repo as never,
+        });
+
+        expect(response.status).toBe(500);
+        // console.error should receive a sanitized string, not the raw Error
+        expect(consoleSpy).toHaveBeenCalledTimes(1);
+        const loggedValue = consoleSpy.mock.calls[0]![1];
+        expect(loggedValue).not.toBeInstanceOf(Error);
+        expect(typeof loggedValue).toBe('string');
+        // The sanitized string must contain the error name + message but not
+        // expose infrastructure connection details like ECONNREFUSED.
+        expect(loggedValue).toContain('Error:');
+        expect(loggedValue).toContain('Connection to PostgreSQL failed: ECONNREFUSED');
+      } finally {
+        consoleSpy.mockRestore();
+      }
+    });
+
+    it('sanitizes console.error for list-scans repository failure', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      try {
+        const repo: { list: () => Promise<never> } = {
+          list: () => Promise.reject(new Error('Database connection lost')),
+        };
+        const response = await handleGetScans({ repository: repo as never });
+
+        expect(response.status).toBe(500);
+        expect(consoleSpy).toHaveBeenCalledTimes(1);
+        const loggedValue = consoleSpy.mock.calls[0]![1];
+        expect(loggedValue).not.toBeInstanceOf(Error);
+        expect(typeof loggedValue).toBe('string');
+      } finally {
+        consoleSpy.mockRestore();
+      }
     });
   });
 });

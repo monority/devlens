@@ -4,8 +4,10 @@ DevLens is a modular TypeScript monorepo for website analysis. It provides a
 Next.js web application, a Node.js worker for background jobs, and independent
 analysis packages for crawling, detecting technologies, and analyzing results.
 
-> **Status:** Foundation phase — only the repository scaffold, tooling, and
-> minimal apps are implemented. No domain logic exists yet.
+> **Status:** Production-grade scan engine. The domain layer, application
+> layer, crawler, technology detectors, PostgreSQL persistence, Next.js web
+> application, and worker are all implemented. Architecture documentation is
+> in `docs/architecture/`. See `docs/` for the development step log.
 
 ## Repository structure
 
@@ -17,12 +19,12 @@ devlens/
 │
 ├── packages/
 │   ├── core/          # Pure domain layer (no framework dependencies)
-│   ├── analyzer/      # Analysis engine (future)
-│   ├── crawler/       # Website crawling (future)
-│   ├── detectors/     # Technology detectors (future)
+│   ├── analyzer/      # Analysis engine (reserved stub)
+│   ├── crawler/       # Website crawling (SSRF-guarded HTTP crawler)
+│   ├── detectors/     # Technology detectors (29-technology catalog)
 │   ├── database/      # PostgreSQL / Drizzle infrastructure (in-memory + prod)
-│   ├── validation/    # Zod schemas and input validation (future)
-│   └── config/        # Shared configuration and environment handling (future)
+│   ├── validation/    # Reserved stub (future)
+│   └── config/        # Shared configuration and environment handling (reserved stub)
 │
 ├── docs/
 │   ├── architecture/  # Architecture documentation
@@ -122,15 +124,15 @@ Next.js, Drizzle, database clients, or Node-specific infrastructure.
 
 ### Workspace packages
 
-| Package               | Responsibility                       |
-| --------------------- | ------------------------------------ |
-| `@devlens/core`       | Pure domain layer                    |
-| `@devlens/analyzer`   | Analysis engine (future)             |
-| `@devlens/crawler`    | Website crawling (future)            |
-| `@devlens/detectors`  | Technology detectors (future)        |
-| `@devlens/database`   | PostgreSQL / Drizzle infrastructure  |
-| `@devlens/validation` | Zod schemas and input validation     |
-| `@devlens/config`     | Shared configuration and environment |
+| Package               | Responsibility                         |
+| --------------------- | -------------------------------------- |
+| `@devlens/core`       | Pure domain layer                      |
+| `@devlens/analyzer`   | Analysis engine (reserved stub)        |
+| `@devlens/crawler`    | Website crawling (SSRF-guarded)        |
+| `@devlens/detectors`  | Technology detectors (29-tech catalog) |
+| `@devlens/database`   | PostgreSQL / Drizzle infrastructure    |
+| `@devlens/validation` | Reserved stub                          |
+| `@devlens/config`     | Shared configuration (reserved stub)   |
 
 ## Tooling
 
@@ -147,18 +149,19 @@ See the [architecture overview](docs/architecture/overview.md) and
 
 ## Current project status
 
-The repository is in the **foundation phase**:
+The repository is a **production-grade scan engine**:
 
 - ✅ Repository structure (monorepo with pnpm workspaces)
-- ✅ TypeScript strict configuration
-- ✅ ESLint + Prettier configured
-- ✅ Minimal Next.js web app (App Router)
-- ✅ Minimal Node.js worker
-- ✅ Vitest configured with a passing test
-- ✅ Playwright configured for future E2E
-- ✅ GitHub Actions CI workflow
-- ✅ Documentation (README, architecture, ADR)
-- ❌ Crawler, analyzer, detectors — not implemented
-- ❌ Database, validation, config — reserved, not implemented
-- ✅ PostgreSQL + Drizzle persistence adapter (`PostgresScanResultRepository`)
-- ❌ Authentication, billing, AI — not implemented
+- ✅ TypeScript strict configuration with project references
+- ✅ ESLint + Prettier configured (formatting gate passing)
+- ✅ Full Next.js 15 web application (App Router, API routes, 9 prerendered routes)
+- ✅ Full crawler with SSRF guard (localhost, private IP, link-local, IPv6 blocked)
+- ✅ Technology detectors (29-technology catalog with evidence, explainability, provenance)
+- ✅ PostgreSQL + Drizzle persistence adapter (`PostgresScanResultRepository`) with in-memory test repository
+- ✅ Node.js worker (one-shot demo with hardcoded target `https://example.com`)
+- ✅ Vitest with 2500+ passing tests across domain, application, crawler, detectors, database, and web
+- ✅ Playwright configured (no E2E tests yet — future work)
+- ✅ GitHub Actions CI workflow (lint, typecheck, test, build, audit)
+- ✅ Documentation (README, architecture overview, configuration, ADR-001)
+- ❌ `@devlens/analyzer`, `@devlens/validation`, `@devlens/config` — reserved stubs, not yet implemented
+- ❌ Authentication, billing — not implemented

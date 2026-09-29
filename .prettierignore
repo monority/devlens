@@ -9,3 +9,7 @@ coverage
 pnpm-lock.yaml
 *.tsbuildinfo
 **/drizzle/**
+# Development-history documentation (Step journal / scratch docs)
+docs/
+# Generated baseline/audit log files
+*.log

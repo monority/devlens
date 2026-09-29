@@ -237,6 +237,25 @@ function resultToResponse(result: ScanResult): CreateScanResponse {
   };
 }
 
+// ─── Error logging helper ────────────────────────────────────────────
+
+/**
+ * Extracts a safe, minimal representation of an error for server-side
+ * logging. Never passes the full error object to `console.error` —
+ * raw error objects may carry infrastructure details (e.g. PostgreSQL
+ * connection strings embedded in driver error properties) that should
+ * not appear in server logs.
+ *
+ * Logs only the error name and message, plus any stable application
+ * context provided by the caller.
+ */
+function toLoggableError(error: unknown): string {
+  if (error instanceof Error) {
+    return `${error.name}: ${error.message}`;
+  }
+  return String(error);
+}
+
 // ─── Request handler (pure, testable without Next.js runtime) ────────
 
 /**
@@ -329,7 +348,7 @@ export async function handleCreateScan(
     // Any error reaching here is an infrastructure failure (persistence,
     // unexpected). Domain scan failures are handled inside runScan —
     // they produce a failed ScanResult that is persisted normally.
-    console.error('Scan execution or persistence failed:', error);
+    console.error('Scan execution or persistence failed:', toLoggableError(error));
     return {
       status: 500,
       body: { error: { code: 'INTERNAL_ERROR', message: 'An internal error occurred.' } },
@@ -365,7 +384,7 @@ export async function handleGetScans(options: HandleGetOptions): Promise<HandleG
       body: { scans: results.map((r) => resultToResponse(r).scan) },
     };
   } catch (error) {
-    console.error('Failed to list scans:', error);
+    console.error('Failed to list scans:', toLoggableError(error));
     return {
       status: 500,
       body: { error: { code: 'INTERNAL_ERROR', message: 'An internal error occurred.' } },
@@ -398,7 +417,7 @@ export async function handleGetScanById(
   }
 
   try {
-    const result = await getScan(scanId as never, options.repository);
+    const result = await getScan(createScanId(scanId), options.repository);
 
     if (result === null) {
       return {
@@ -409,7 +428,7 @@ export async function handleGetScanById(
 
     return { status: 200, body: resultToResponse(result) };
   } catch (error) {
-    console.error('Failed to retrieve scan:', error);
+    console.error('Failed to retrieve scan:', toLoggableError(error));
     return {
       status: 500,
       body: { error: { code: 'INTERNAL_ERROR', message: 'An internal error occurred.' } },

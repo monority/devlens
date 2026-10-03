@@ -8,7 +8,7 @@
  * with zero Next.js dependencies.
  */
 
-import { executeScan, getScan, listScans } from '@devlens/application';
+import { executeScan, getScan, listScans, listScansByTechnology } from '@devlens/application';
 import {
   createScan,
   createScanId,
@@ -22,8 +22,13 @@ import type { Crawler } from '@devlens/crawler';
 import type { ScanResultRepository } from '@devlens/application';
 import type { Scan, ObservationCoverage, ScanResultQualitySummary } from '@devlens/core';
 import type { Detector } from '@devlens/detectors';
-import type { DetectionResponse } from '../../../lib/types.js';
+import type {
+  DetectionResponse,
+  TechnologyScanSummary,
+  TechnologyScansResponse,
+} from '../../../lib/types.js';
 import { detectionToResponse } from '../../../lib/detection-to-response';
+import { scanResultToSummary } from '../../../lib/scan-data';
 import { getScanResultQuality } from '../../../lib/scan-result-quality';
 
 // ─── Response types ──────────────────────────────────────────────────
@@ -115,6 +120,16 @@ export type ScanSummaryResponse = CreateScanResponse['scan'];
  */
 export type HandleGetScansResult =
   { status: 200; body: ListScansResponse } | { status: 500; body: ErrorResponse };
+
+/**
+ * Result for `GET /api/scans?technologyId=<id>` — the bulk, technology-scoped
+ * scan listing that backs the technology detail page (F-001 boundary fix).
+ *
+ * - 200: the scans that detected the given technology (may be empty).
+ * - 500: infrastructure failure (repository error, etc.).
+ */
+export type HandleGetScansByTechnologyResult =
+  { status: 200; body: TechnologyScansResponse } | { status: 500; body: ErrorResponse };
 
 /**
  * Discriminated union for GET /api/scans/:id.
@@ -385,6 +400,59 @@ export async function handleGetScans(options: HandleGetOptions): Promise<HandleG
     };
   } catch (error) {
     console.error('Failed to list scans:', toLoggableError(error));
+    return {
+      status: 500,
+      body: { error: { code: 'INTERNAL_ERROR', message: 'An internal error occurred.' } },
+    };
+  }
+}
+
+/**
+ * Projects a domain `ScanResult` onto the technology detail page's minimal
+ * shape: the lean scan summary + the scan's raw detections (the page maps
+ * them to `DetectionResponse` through its existing presentation pipeline).
+ */
+function resultToTechnologyScanSummary(result: ScanResult): TechnologyScanSummary {
+  return {
+    scan: scanResultToSummary(result),
+    detections: [...result.detections],
+  };
+}
+
+/**
+ * Handles `GET /api/scans?technologyId=<technologyId>` — the bulk,
+ * technology-scoped scan listing backing the technology detail page
+ * (F-001: the page no longer reads PostgreSQL directly).
+ *
+ * A single `listScansByTechnology` call (itself one repository `list()` call)
+ * retrieves every scan whose detections include the given technology, then
+ * each result is reduced to the lean `{ scan, detections }` projection the
+ * page renders. Because only completed scans carry detections by
+ * domain-model design, non-completed scans are naturally excluded by the
+ * technology predicate — no per-scan DB round-trip and no HTTP N+1.
+ *
+ * - An empty/absent `technologyId` yields `{ scans: [] }` with HTTP 200 —
+ *   never a 404 (a technology with no detected scans is a valid, empty view;
+ *   unknown technology *ids* are handled upstream by the page's
+ *   `getTechnologyById` → `notFound()`).
+ * - Repository errors are returned as 500 with a generic message — no
+ *   database internals are leaked.
+ */
+export async function handleGetScansByTechnology(
+  technologyId: string,
+  options: HandleGetOptions,
+): Promise<HandleGetScansByTechnologyResult> {
+  if (technologyId.trim() === '') {
+    return { status: 200, body: { scans: [] } };
+  }
+  try {
+    const results = await listScansByTechnology(technologyId, options.repository);
+    return {
+      status: 200,
+      body: { scans: results.map((r) => resultToTechnologyScanSummary(r)) },
+    };
+  } catch (error) {
+    console.error('Failed to list scans by technology:', toLoggableError(error));
     return {
       status: 500,
       body: { error: { code: 'INTERNAL_ERROR', message: 'An internal error occurred.' } },

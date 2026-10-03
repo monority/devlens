@@ -16,6 +16,7 @@ import type {
   CreateScanResponse,
   ErrorResponse,
   CreateScanRequest,
+  TechnologyScansResponse,
 } from './types.js';
 
 /** Error thrown when the API returns a non-OK status that is not 404. */
@@ -80,6 +81,32 @@ export async function fetchScanById(id: string): Promise<ScanDetailResponse | nu
   }
 
   return (await res.json()) as ScanDetailResponse;
+}
+
+/**
+ * Fetches the scans that detected a given technology from
+ * `GET /api/scans?technologyId=<id>` — the single data source for the
+ * technology detail page (F-001 boundary fix).
+ *
+ * The server returns only the scans whose detections include the requested
+ * technology, each reduced to a lean `{ scan, detections }` projection.
+ *
+ * @returns the matching scan summaries + their detections (possibly an empty
+ *          list when no scan detected the technology)
+ * @throws {ApiError} if the server returns a non-200 status
+ */
+export async function fetchScansByTechnology(
+  technologyId: string,
+): Promise<TechnologyScansResponse> {
+  const res = await fetch(`/api/scans?technologyId=${encodeURIComponent(technologyId)}`, {
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    throw new ApiError(res.status, await readBody(res));
+  }
+
+  return (await res.json()) as TechnologyScansResponse;
 }
 
 /**

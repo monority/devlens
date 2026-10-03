@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { handleGetScans, handleGetScanById } from './handler.js';
+import { handleGetScans, handleGetScanById, handleGetScansByTechnology } from './handler.js';
 import { InMemoryScanResultRepository } from '@devlens/database';
 import {
   createScan,
@@ -92,6 +92,14 @@ function makeDetection(): Detection {
       { type: 'http_header' as const, name: 'Server', value: 'nginx' },
       { type: 'meta_tag' as const, name: 'generator', content: 'TestCMS 1.0' },
     ],
+  };
+}
+
+function makeDetectionFor(id: string, confidence = 80): Detection {
+  return {
+    technology: { id: id as never, name: id, category: 'server' as never },
+    confidence: confidence as never,
+    evidence: [{ type: 'http_header' as const, name: 'Server', value: id }],
   };
 }
 
@@ -463,6 +471,214 @@ describe('GET /api/scans — handler', () => {
           list: () => Promise.reject(new Error('Database connection lost')),
         };
         const response = await handleGetScans({ repository: repo as never });
+
+        expect(response.status).toBe(500);
+        expect(consoleSpy).toHaveBeenCalledTimes(1);
+        const loggedValue = consoleSpy.mock.calls[0]![1];
+        expect(loggedValue).not.toBeInstanceOf(Error);
+        expect(typeof loggedValue).toBe('string');
+      } finally {
+        consoleSpy.mockRestore();
+      }
+    });
+  });
+});
+
+// ─── GET /api/scans?technologyId=<id> (technology detail page boundary) ─
+
+describe('GET /api/scans?technologyId — handler', () => {
+  describe('GET scans by technology', () => {
+    it('returns 200 with empty list for an empty repository', async () => {
+      const repo = new InMemoryScanResultRepository();
+      const response = await handleGetScansByTechnology('nginx', { repository: repo });
+
+      expect(response.status).toBe(200);
+      if (response.status === 200) {
+        expect(response.body).toEqual({ scans: [] });
+      }
+    });
+
+    it('returns 200 with empty list when technologyId is blank', async () => {
+      const repo = new InMemoryScanResultRepository();
+      await repo.save({
+        scan: makeCompletedScan('scan_a'),
+        snapshot: makeSnapshot(),
+        detections: [makeDetectionFor('nginx')],
+      });
+      const response = await handleGetScansByTechnology('   ', { repository: repo });
+
+      expect(response.status).toBe(200);
+      if (response.status === 200) {
+        expect(response.body).toEqual({ scans: [] });
+      }
+    });
+
+    it('returns 200 with empty list when no scan detected the technology', async () => {
+      const repo = new InMemoryScanResultRepository();
+      await repo.save({
+        scan: makeCompletedScan('scan_1'),
+        snapshot: makeSnapshot(),
+        detections: [makeDetectionFor('react')],
+      });
+
+      const response = await handleGetScansByTechnology('nginx', { repository: repo });
+
+      expect(response.status).toBe(200);
+      if (response.status === 200) {
+        expect(response.body.scans).toEqual([]);
+      }
+    });
+
+    it('returns 200 with only the scans that detected the technology', async () => {
+      const repo = new InMemoryScanResultRepository();
+      await repo.save({
+        scan: makeCompletedScan('scan_a', '2025-06-01T11:00:00.000Z'),
+        snapshot: makeSnapshot(),
+        detections: [makeDetectionFor('nginx')],
+      });
+      await repo.save({
+        scan: makeCompletedScan('scan_b', '2025-06-02T12:00:00.000Z'),
+        snapshot: makeSnapshot(),
+        detections: [makeDetectionFor('react')],
+      });
+
+      const response = await handleGetScansByTechnology('nginx', { repository: repo });
+
+      expect(response.status).toBe(200);
+      if (response.status === 200) {
+        expect(response.body.scans).toHaveLength(1);
+        expect(response.body.scans[0]!.scan.id).toBe('scan_a');
+        expect(response.body.scans[0]!.detections).toHaveLength(1);
+        expect(response.body.scans[0]!.detections[0]!.technology.id).toBe('nginx');
+      }
+    });
+
+    it('preserves repository ordering (createdAt DESC, scanId ASC) for matching scans', async () => {
+      const repo = new InMemoryScanResultRepository();
+      // Saved in non-sorted order.
+      await repo.save({
+        scan: makeCompletedScan('scan_c', '2025-06-01T11:00:00.000Z'),
+        snapshot: makeSnapshot(),
+        detections: [makeDetectionFor('nginx')],
+      });
+      await repo.save({
+        scan: makeCompletedScan('scan_a', '2025-06-01T12:00:00.000Z'),
+        snapshot: makeSnapshot(),
+        detections: [makeDetectionFor('nginx')],
+      });
+      await repo.save({
+        scan: makeCompletedScan('scan_b', '2025-06-01T11:00:00.000Z'),
+        snapshot: makeSnapshot(),
+        detections: [makeDetectionFor('nginx')],
+      });
+
+      const response = await handleGetScansByTechnology('nginx', { repository: repo });
+
+      expect(response.status).toBe(200);
+      if (response.status === 200) {
+        const ids = response.body.scans.map((s) => s.scan.id);
+        expect(ids).toEqual(['scan_a', 'scan_b', 'scan_c']);
+      }
+    });
+
+    it('naturally excludes failed scans (they carry no detections)', async () => {
+      const repo = new InMemoryScanResultRepository();
+      await repo.save({
+        scan: makeCompletedScan('scan_completed'),
+        snapshot: makeSnapshot(),
+        detections: [makeDetectionFor('nginx')],
+      });
+      await repo.save({
+        scan: makeFailedScan('scan_failed'),
+        snapshot: null,
+        detections: [],
+      });
+
+      const response = await handleGetScansByTechnology('nginx', { repository: repo });
+
+      expect(response.status).toBe(200);
+      if (response.status === 200) {
+        expect(response.body.scans.map((s) => s.scan.id)).toEqual(['scan_completed']);
+      }
+    });
+
+    it('response shape exposes only {scan, detections} per item — no DB internals', async () => {
+      const repo = new InMemoryScanResultRepository();
+      await repo.save({
+        scan: makeCompletedScan('scan_shape'),
+        snapshot: makeSnapshot(),
+        detections: [makeDetectionFor('nginx')],
+      });
+
+      const response = await handleGetScansByTechnology('nginx', { repository: repo });
+
+      expect(response.status).toBe(200);
+      if (response.status === 200) {
+        // Top-level: only "scans"
+        expect(Object.keys(response.body).sort()).toEqual(['scans']);
+        // Per item: only "scan" and "detections" — no snapshot / coverage / quality
+        const item = response.body.scans[0]!;
+        expect(Object.keys(item).sort()).toEqual(['detections', 'scan']);
+        // `scan` is the lean ScanSummary (same keys as GET /api/scans list)
+        const scanKeys = Object.keys(item.scan).sort();
+        expect(scanKeys).toEqual(
+          [
+            'completedAt',
+            'createdAt',
+            'error',
+            'failedAt',
+            'hostname',
+            'id',
+            'startedAt',
+            'status',
+            'target',
+          ].sort(),
+        );
+        // `detections` carry the raw domain Detection fields (the page maps
+        // them to DetectionResponse via detectionToResponse) — no explanation /
+        // provenance / integrity bloat on the wire.
+        const det = item.detections[0]!;
+        expect(det.technology.id).toBe('nginx');
+        expect(det.confidence).toBe(80);
+        expect(det.evidence).toHaveLength(1);
+        expect(det).not.toHaveProperty('explanation');
+        expect(det).not.toHaveProperty('provenance');
+        expect(det).not.toHaveProperty('integrity');
+      }
+    });
+  });
+
+  describe('error handling', () => {
+    it('returns 500 when the repository throws on list', async () => {
+      const repo: { list: () => Promise<never> } = {
+        list: () => Promise.reject(new Error('Connection refused')),
+      };
+      const response = await handleGetScansByTechnology('nginx', { repository: repo as never });
+
+      expect(response.status).toBe(500);
+      expect(response.body).toMatchObject({
+        error: { code: 'INTERNAL_ERROR', message: 'An internal error occurred.' },
+      });
+    });
+
+    it('does not leak the database error message in the 500 response', async () => {
+      const repo: { list: () => Promise<never> } = {
+        list: () => Promise.reject(new Error('Connection to PostgreSQL failed: ECONNREFUSED')),
+      };
+      const response = await handleGetScansByTechnology('nginx', { repository: repo as never });
+
+      expect(response.status).toBe(500);
+      expect(JSON.stringify(response.body)).not.toContain('Connection to PostgreSQL');
+      expect(JSON.stringify(response.body)).not.toContain('ECONNREFUSED');
+    });
+
+    it('sanitizes console.error for repository failure', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      try {
+        const repo: { list: () => Promise<never> } = {
+          list: () => Promise.reject(new Error('Connection to PostgreSQL failed: ECONNREFUSED')),
+        };
+        const response = await handleGetScansByTechnology('nginx', { repository: repo as never });
 
         expect(response.status).toBe(500);
         expect(consoleSpy).toHaveBeenCalledTimes(1);

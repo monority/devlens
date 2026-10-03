@@ -10,13 +10,23 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
-import { fetchScans, fetchScanById, createScan, ApiError, extractErrorMessage } from './api.js';
+import {
+  fetchScans,
+  fetchScanById,
+  fetchScansByTechnology,
+  createScan,
+  ApiError,
+  extractErrorMessage,
+} from './api.js';
 import type {
   ScanResponse,
   ScansListResponse,
   ScanDetailResponse,
   CreateScanResponse,
+  TechnologyScanSummary,
+  TechnologyScansResponse,
 } from './types.js';
+import type { Detection } from '@devlens/core';
 
 // ─── Test fixtures ───────────────────────────────────────────────────
 
@@ -43,6 +53,18 @@ function mockFailedScan(): ScanResponse {
     failedAt: '2025-06-01T12:00:05.000Z',
     error: { code: 'timeout', message: 'Request timed out' },
   });
+}
+
+function mockTechnologyScan(scanId: string): TechnologyScanSummary {
+  const detection: Detection = {
+    technology: { id: 'nginx' as never, name: 'nginx', category: 'server' as never },
+    confidence: 80 as never,
+    evidence: [{ type: 'http_header' as const, name: 'Server', value: 'nginx' }],
+  };
+  return {
+    scan: mockScan({ id: scanId }),
+    detections: [detection],
+  };
 }
 
 /**
@@ -145,6 +167,60 @@ describe('fetchScans', () => {
       expect(serialized).not.toContain('Connection refused');
       expect(serialized).not.toContain('ECONNREFUSED');
     }
+  });
+});
+
+describe('fetchScansByTechnology', () => {
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    global.fetch = vi.fn() as typeof fetch;
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('fetches /api/scans?technologyId=<id> and returns matching scans', async () => {
+    const data: TechnologyScansResponse = { scans: [mockTechnologyScan('scan_001')] };
+    global.fetch = mockFetch(data);
+
+    const result = await fetchScansByTechnology('nginx');
+
+    expect(result.scans).toHaveLength(1);
+    expect(result.scans[0]!.scan.id).toBe('scan_001');
+    expect(result.scans[0]!.detections[0]!.technology.id).toBe('nginx');
+    expect(global.fetch).toHaveBeenCalledWith('/api/scans?technologyId=nginx', {
+      cache: 'no-store',
+    });
+  });
+
+  it('returns an empty list when no scan detected the technology', async () => {
+    global.fetch = mockFetch({ scans: [] });
+
+    const result = await fetchScansByTechnology('nginx');
+
+    expect(result.scans).toEqual([]);
+  });
+
+  it('encodes special characters in the technology id', async () => {
+    global.fetch = mockFetch({ scans: [] });
+
+    await fetchScansByTechnology('ng/in');
+
+    expect(global.fetch).toHaveBeenCalledWith('/api/scans?technologyId=ng%2Fin', {
+      cache: 'no-store',
+    });
+  });
+
+  it('throws ApiError on 500', async () => {
+    global.fetch = mockFetch(
+      { error: { code: 'INTERNAL_ERROR', message: 'An internal error occurred.' } },
+      { status: 500 },
+    );
+
+    await expect(fetchScansByTechnology('nginx')).rejects.toThrow(ApiError);
+    await expect(fetchScansByTechnology('nginx')).rejects.toMatchObject({ status: 500 });
   });
 });
 

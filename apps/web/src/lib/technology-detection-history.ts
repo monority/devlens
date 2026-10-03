@@ -2,13 +2,15 @@
  * Technology detection history — a pure, deterministic projection of *how one
  * technology's detection has evolved across completed scans.
  *
- * This is a **presentation helper**: it turns the existing `ScanResult[]`
- * (already loaded by the technology detail page via `getAllScanResults`) into a
- * chronological history for a single technology, reusing — and only reusing —
- * the existing detection pipeline so the history is byte-for-byte consistent
- * with the scan-detail view:
+ * This is a **presentation helper**: it turns the lean scan projection
+ * already loaded by the technology detail page via the
+ * `GET /api/scans?technologyId=...` endpoint (a `TechnologyScanSummary[]` — a
+ * flat scan summary + that scan's raw detections) into a chronological history
+ * for a single technology, reusing — and only reusing — the existing detection
+ * pipeline so the history is byte-for-byte consistent with the scan-detail
+ * view:
  *
- *   ScanResult[]
+ *   TechnologyScanSummary[]
  *     → detectionToResponse(detection)      (Step 73 API mapping: +explanation/+provenance/+integrity)
  *     → getScanDetectionResults(responses)  (canonicalize: sort, dedup by tech ID, recompute explanation)
  *     → pick the entry whose technology.id === techId
@@ -22,7 +24,7 @@
  * - Pure (no React, HTTP, DB, browser)
  * - Synchronous / deterministic (scan ordering is canonical: createdAt DESC,
  *   scanId ASC — the repo's scan chronology; equal timestamps tie-break by id)
- * - Immutable — never mutates the input `ScanResult[]` or any of its nested
+ * - Immutable — never mutates the input `scans` or any of its nested
  *   detection/evidence objects (`detectionToResponse` and
  *   `getScanDetectionResults` both allocate new arrays/objects).
  * - Serializable (plain objects, no runtime classes, no circular refs).
@@ -32,9 +34,8 @@
  * (absent on the response = valid), and the attached verdict when invalid.
  */
 
-import type { ScanResult } from '@devlens/application';
 import type { DetectionProvenance, DetectionIntegrity } from '@devlens/core';
-import type { DetectionResponse, SignalQuality } from './types.js';
+import type { DetectionResponse, SignalQuality, TechnologyScanSummary } from './types.js';
 import { detectionToResponse } from './detection-to-response';
 import { getScanDetectionResults } from './scan-detection-results';
 import { computeSignalQuality } from './signal-quality';
@@ -122,7 +123,7 @@ export interface TechnologyDetectionHistoryEntry {
  * This matches the repository's scan chronology (`createdAt DESC, scanId ASC`
  * used by `listScans`), so the timeline's order agrees with the scan history.
  */
-function compareScanChronological(a: ScanResult, b: ScanResult): number {
+function compareScanChronological(a: TechnologyScanSummary, b: TechnologyScanSummary): number {
   if (a.scan.createdAt !== b.scan.createdAt) {
     return a.scan.createdAt < b.scan.createdAt ? 1 : -1;
   }
@@ -135,7 +136,7 @@ function compareScanChronological(a: ScanResult, b: ScanResult): number {
  * stays consistent with the scan-detail view.
  */
 function toHistoryEntry(
-  scanResult: ScanResult,
+  scanResult: TechnologyScanSummary,
   detection: DetectionResponse,
 ): TechnologyDetectionHistoryEntry {
   const meta = scanResult.scan;
@@ -153,12 +154,12 @@ function toHistoryEntry(
   return {
     scanId: meta.id,
     scanCreatedAt: meta.createdAt,
-    scanCompletedAt: status.type === 'completed' ? status.completedAt : null,
+    scanCompletedAt: status === 'completed' ? meta.completedAt : null,
     scanStatus: 'completed',
     // Step 91 §6: surface the scan target hostname so each historical
-    // observation is identifiable by site. Read from the already-loaded
-    // `ScanResult.scan.target.hostname` (no new fetch — §11).
-    scanHostname: meta.target.hostname,
+    // observation is identifiable by site. Read from the API-provided scan
+    // summary's `hostname` (no new fetch — §11).
+    scanHostname: meta.hostname,
     confidence: detection.confidence,
     // `version` is absent when never observed; null on a conflict. `?? null`
     // collapses absent ⇒ null so consumers see a stable `string | null`.
@@ -196,13 +197,14 @@ function toHistoryEntry(
  * - Never mutates the input `scans` (a shallow copy is sorted; downstream
  *   pipeline functions allocate new arrays — see module docs).
  *
- * @param scans       All scan results loaded for the technology catalog (order
- *                    is re-canonicalized here — callers need not pre-sort).
+ * @param scans       The lean scan projection loaded by the technology detail
+ *                    page via `GET /api/scans?technologyId=…` (order is
+ *                    re-canonicalized here — callers need not pre-sort).
  * @param technologyId The canonical technology id to project history for.
  * @returns            Chronological detection history (newest first).
  */
 export function technologyDetectionHistory(
-  scans: ScanResult[],
+  scans: TechnologyScanSummary[],
   technologyId: string,
 ): TechnologyDetectionHistoryEntry[] {
   const entries: TechnologyDetectionHistoryEntry[] = [];
@@ -212,7 +214,7 @@ export function technologyDetectionHistory(
     // Only completed scans carry detections (domain-model invariant — failed /
     // pending / running scans have empty detection arrays). Filtering here
     // mirrors the page's "completed-scan results" guarantee.
-    if (scanResult.scan.status.type !== 'completed') continue;
+    if (scanResult.scan.status !== 'completed') continue;
 
     // Reuse the exact scan-detail pipeline so provenance / integrity /
     // signal quality / explanation are identical to the detail view.

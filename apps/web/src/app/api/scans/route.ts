@@ -21,7 +21,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { handleCreateScan, handleGetScans } from './handler';
+import { handleCreateScan, handleGetScans, handleGetScansByTechnology } from './handler';
 import { createDatabaseClient, PostgresScanResultRepository } from '@devlens/database';
 import { HttpCrawler } from '@devlens/crawler';
 import { createProductionDetector } from '@devlens/detectors';
@@ -54,8 +54,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 /**
  * GET /api/scans — lists all scan results in deterministic order
  * (`createdAt DESC, scanId ASC`).
+ *
+ * When the `technologyId` query parameter is present, the request is routed to
+ * the technology-scoped bulk handler (`handleGetScansByTechnology`) which
+ * returns only the scans that detected the given technology — the single
+ * data source for the technology detail page (F-001 boundary fix). Otherwise
+ * the full scan list is returned.
  */
-export async function GET(): Promise<NextResponse> {
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const technologyId = request.nextUrl.searchParams.get('technologyId');
+  if (technologyId !== null) {
+    const result = await handleGetScansByTechnology(technologyId, createGetDependencies());
+    return NextResponse.json(result.body, { status: result.status });
+  }
   const result = await handleGetScans(createGetDependencies());
   return NextResponse.json(result.body, { status: result.status });
 }

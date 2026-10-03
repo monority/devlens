@@ -1,55 +1,37 @@
 /**
- * Server-side data-access helpers for scan results.
+ * Pure scan-result presentation mapper (no data access).
  *
- * This module bridges the web application's technology-detail page to the
- * existing scan persistence layer (`@devlens/application` + `@devlens/database`).
+ * Converts a domain `ScanResult` into the flat UI `ScanSummary` shape that the
+ * API serves (see `ScanResponse` / `ScanSummary` in `types.ts`).
  *
- * It reuses the existing `listScans` application-layer query — the same one
- * used by the `GET /api/scans` route handler — to fetch ALL persisted scan
- * results (including their detections) in a single database round-trip. This
- * avoids an N+1 pattern: rather than fetching scan summaries via the API and
- * then round-tripping per-scan for detail, we read the full results once.
+ * The technology detail page (`app/technologies/[id]/page.tsx`) no longer
+ * reads the persistence layer directly (F-001 boundary fix): it fetches its
+ * scan data through the `GET /api/scans?technologyId=...` endpoint (`lib/api.ts`),
+ * which loads scans in a single bulk call through the application layer and
+ * the repository abstraction. This module is consumed by the API handler to
+ * build the lean scan summary projection, so the page and the API share one
+ * mapper and one scan-summary shape.
  *
- * The conversion `scanResultToSummary` mirrors the mapping performed by
- * `resultToResponse` in the API handler, producing the same `ScanSummary`
- * shape that the UI consumes.
- *
- * Only completed scans carry detections (by domain-model design — the
- * in-memory and PostgreSQL repositories store detections only when a
- * snapshot exists). Therefore a scan appears in a technology's detection
- * list only when that technology is actually present in its detections.
+ * The conversion `scanResultToSummary` mirrors the scan mapping performed by
+ * `resultToResponse` in the API handler (`app/api/scans/handler.ts`),
+ * producing the same flat response the UI consumes.
  */
 
-import { listScans } from '@devlens/application';
-import { createDatabaseClient, PostgresScanResultRepository } from '@devlens/database';
 import type { ScanResult } from '@devlens/application';
 import type { ScanSummary } from './types.js';
 
 /**
- * Fetches all persisted scan results with full detection data.
- *
- * Uses the same repository construction as the API route handlers
- * (`apps/web/src/app/api/scans/route.ts`). Reuses the existing
- * `listScans` query from `@devlens/application` — no new query,
- * no new database table, no new API endpoint.
- *
- * @returns All scan results in deterministic order (`createdAt DESC, scanId ASC`)
- */
-export async function getAllScanResults(): Promise<ScanResult[]> {
-  const repository = new PostgresScanResultRepository(createDatabaseClient());
-  return listScans(repository);
-}
-
-/**
  * Converts a domain `ScanResult` into the UI `ScanSummary` shape.
  *
- * This mirrors the mapping in `apps/web/src/app/api/scans/handler.ts`
- * (`resultToResponse`), producing the same flat response that the
- * existing API returns. It is kept here so the technology detail page
- * can reuse `ScanCard` and other UI components that expect `ScanSummary`.
+ * This mirrors the scan mapping in `apps/web/src/app/api/scans/handler.ts`
+ * (`resultToResponse`), producing the same flat response that the existing
+ * API returns. It is shared by the API handler (for the technology-scoped
+ * endpoint) so the technology detail page and `GET /api/scans` use one
+ * consistent scan-summary projection.
  *
- * The `detections` field is intentionally NOT included — the caller
- * filters on the domain `ScanResult` before calling this function.
+ * The `detections` field is intentionally NOT included — the caller supplies
+ * detections only where needed (e.g. the technology endpoint attaches the
+ * scan's detections via a separate field).
  */
 export function scanResultToSummary(result: ScanResult): ScanSummary {
   const { scan } = result;

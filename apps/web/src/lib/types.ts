@@ -11,6 +11,7 @@
  */
 
 import type {
+  Detection,
   DetectionProvenance,
   DetectionIntegrity,
   ObservationCoverage,
@@ -440,6 +441,45 @@ export type CreateScanResponse = ScanDetailResponse;
  */
 export interface ScansListResponse {
   scans: ScanResponse[];
+}
+
+// ─── Technology-scoped scans (GET /api/scans?technologyId=…) ──────────
+
+/**
+ * A single scan's detection of a specific technology, served to the
+ * technology detail page by `GET /api/scans?technologyId=<id>`.
+ *
+ * This is the **minimal** projection the page needs: the lean `ScanResponse`
+ * summary (for the "Detected in scans" cards) plus the scan's raw domain
+ * detections for that technology. No `snapshot`, `observationCoverage`, or
+ * `resultQuality` are transferred — those are only needed on the scan-detail
+ * page, not the technology timeline.
+ *
+ * `detections` carries the **domain** `Detection` objects (not yet mapped to
+ * `DetectionResponse`): the technology detail page reuses its existing
+ * presentation pipeline (`technologyDetectionHistory` → `detectionToResponse`
+ * → `getScanDetectionResults`) to project the timeline, so the API only
+ * supplies the raw material. This keeps the endpoint's response lean while
+ * preserving the page's existing diagnostics computation (Step 73 API
+ * mapping) unchanged.
+ */
+export interface TechnologyScanSummary {
+  /** Lean scan summary — same flat shape as `ScansListResponse` items. */
+  scan: ScanResponse;
+  /** Raw domain detections carried by this scan (filtered to the requested technology by the handler). */
+  detections: Detection[];
+}
+
+/**
+ * Response body for `GET /api/scans?technologyId=<technologyId>`.
+ *
+ * Returns only the scans whose detections include the requested technology
+ * (server-side filtered), each reduced to the scan summary + detections the
+ * technology detail page actually renders. Ordering matches
+ * `listScans` (`createdAt DESC, scanId ASC`).
+ */
+export interface TechnologyScansResponse {
+  scans: TechnologyScanSummary[];
 }
 
 // ─── Error response ──────────────────────────────────────────────────

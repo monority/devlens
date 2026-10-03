@@ -9,42 +9,55 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { ScanResult } from '@devlens/application';
 import type { Detection } from '@devlens/core';
+import type { ScanSummary, TechnologyScanSummary } from './types.js';
 import { technologyDetectionHistory } from './technology-detection-history.js';
 
 // ─── Fixture builders ────────────────────────────────────────────────
 
+// A flat status descriptor matching the API `ScanSummary` projection
+// (the response shape the technology detail page now consumes).
+type StatusDesc = {
+  status: ScanSummary['status'];
+  completedAt: string | null;
+  failedAt: string | null;
+  error: { code: string; message: string } | null;
+};
+
 function makeScan(
   id: string,
   createdAt: string,
-  status: ScanResult['scan']['status'],
+  status: StatusDesc,
   detections: Detection[] = [],
-): ScanResult {
+): TechnologyScanSummary {
   return {
     scan: {
       id,
       createdAt,
-      target: { url: 'https://example.com/', hostname: 'example.com' },
-      status,
+      target: 'https://example.com/',
+      hostname: 'example.com',
+      status: status.status,
+      startedAt: null,
+      completedAt: status.completedAt,
+      failedAt: status.failedAt,
+      error: status.error,
     },
-    // The transformer only filters on `status.type`; snapshot contents are
-    // irrelevant to the projection, so a null snapshot is fine here.
-    snapshot: null,
     detections,
-  } as unknown as ScanResult;
+  };
 }
 
-// The domain `ScanStatus` carries branded `Timestamp` fields; cast the helper
-// returns through the indexed status type so fixtures are type-clean without a
-// live DB.
-const COMPLETED = (completedAt: string): ScanResult['scan']['status'] =>
-  ({ type: 'completed', completedAt }) as unknown as ScanResult['scan']['status'];
-const FAILED = (
-  failedAt: string,
-  err: { code: string; message: string },
-): ScanResult['scan']['status'] =>
-  ({ type: 'failed', failedAt, error: err }) as unknown as ScanResult['scan']['status'];
+const COMPLETED = (completedAt: string): StatusDesc => ({
+  status: 'completed',
+  completedAt,
+  failedAt: null,
+  error: null,
+});
+const FAILED = (failedAt: string, err: { code: string; message: string }): StatusDesc => ({
+  status: 'failed',
+  completedAt: null,
+  failedAt,
+  error: err,
+});
 
 function httpHeaderEvidence(value = 'nginx'): Detection['evidence'][number] {
   return { type: 'http_header', name: 'Server', value } as Detection['evidence'][number];

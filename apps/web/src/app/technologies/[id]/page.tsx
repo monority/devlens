@@ -10,10 +10,12 @@
  *
  * Data loading:
  * - Technology metadata is read from the in-memory catalog (`getTechnologyById`).
- * - Scan detection data is loaded server-side via `getAllScanResults()`,
- *   which reuses the existing `listScans` application-layer query. This
- *   fetches all scan results (including detections) in a single query —
- *   no N+1 pattern. Unknown IDs do not trigger a data fetch.
+ * - Scan detection data is loaded server-side via `fetchScansByTechnology`,
+ *   which calls the internal `GET /api/scans?technologyId=...` endpoint. The
+ *   endpoint fetches exactly the scans that detected this technology in a
+ *   single bulk retrieval (one repository `list()` call) — no N+1 pattern and
+ *   no direct database access from the page. Unknown technology IDs do not
+ *   trigger a data fetch (the page calls `notFound()` first via the catalog).
  *
  * Matching semantics:
  * A scan appears in the "Detected in scans" section only when that
@@ -26,14 +28,13 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { getTechnologyById } from '@/lib/technology-catalog';
-import { getAllScanResults, scanResultToSummary } from '@/lib/scan-data';
+import { fetchScansByTechnology } from '@/lib/api';
 import { technologyDetectionHistory } from '@/lib/technology-detection-history';
 import { technologyDetectionHistorySummary } from '@/lib/technology-detection-history-summary';
 import { TechnologyDetectedInScans } from '@/components/TechnologyDetectedInScans';
 import { TechnologyDetectionHistorySummary } from '@/components/TechnologyDetectionHistorySummary';
 import { TechnologyDetectionTimeline } from '@/components/TechnologyDetectionTimeline';
-import type { ScanResult } from '@devlens/application';
-import type { ScanSummary } from '@/lib/types';
+import type { ScanSummary, TechnologyScanSummary } from '@/lib/types';
 import styles from './page.module.css';
 
 /**
@@ -62,32 +63,28 @@ export async function generateMetadata({
 }
 
 /**
- * Fetches the full scan results that detected the given technology ID.
+ * Fetches the scans that detected the given technology ID.
  *
- * Reuses `getAllScanResults()` (which calls `listScans` from
- * `@devlens/application`) to fetch all scan results in a single query, then
- * filters in-memory by checking each scan's detections for the canonical
- * technology ID.
- *
- * Returns the **full** `ScanResult[]` (detections retained) so the page can:
- *   - derive `ScanSummary[]` via `scanResultToSummary` for the existing
- *     `TechnologyDetectedInScans` cards (in-memory mapping only — no
- *     per-detection API round-trip); and
- *   - project a `TechnologyDetectionHistoryEntry[]` via
- *     `technologyDetectionHistory`, which itself reuses the exact scan-detail
- *     pipeline (`detectionToResponse` → `getScanDetectionResults`).
+ * Calls the internal `GET /api/scans?technologyId=<id>` endpoint, which
+ * performs a single bulk retrieval (one `listScansByTechnology` query → one
+ * repository `list()` call) and returns only the scans whose detections
+ * include the requested technology. The returned `detections` are the raw
+ * domain `Detection` objects — the page's `technologyDetectionHistory`
+ * projection reuses the exact scan-detail pipeline (`detectionToResponse` →
+ * `getScanDetectionResults`) to derive provenance, integrity and signal
+ * quality, so no per-detection API round-trip is required.
  *
  * Only completed scans carry detections — failed, pending, and running scans
  * have empty detection arrays — so the result set is inherently restricted to
  * completed-scan results.
  *
- * Returns `null` on error (database/infrastructure failure), so the caller can
+ * Returns `null` on error (API/infrastructure failure), so the caller can
  * render an error state.
  */
-async function fetchDetectedScans(techId: string): Promise<ScanResult[] | null> {
+async function fetchDetectedScans(techId: string): Promise<TechnologyScanSummary[] | null> {
   try {
-    const results = await getAllScanResults();
-    return results.filter((result) => result.detections.some((d) => d.technology.id === techId));
+    const data = await fetchScansByTechnology(techId);
+    return data.scans;
   } catch {
     return null;
   }
@@ -107,11 +104,13 @@ export default async function TechnologyDetailPage({
 
   const detectedScans = await fetchDetectedScans(id);
 
-  // Derive compact summaries for the existing ScanCard-based "Detected in
-  // scans" section. The full `ScanResult[]` is retained for the timeline,
-  // which reuses the exact scan-detail pipeline (no per-detection N+1).
+  // The endpoint already returns the scans that detected this technology
+  // (filtered server-side). Derive compact scan summaries for the existing
+  // `TechnologyDetectedInScans` cards, and project the timeline history from
+  // the same response — reusing the scan-detail detection pipeline (no
+  // per-detection N+1) so provenance/integrity/signal-quality stay identical.
   const scanSummaries: ScanSummary[] | null = detectedScans
-    ? detectedScans.map(scanResultToSummary)
+    ? detectedScans.map((s) => s.scan)
     : null;
   const detectionHistory = detectedScans ? technologyDetectionHistory(detectedScans, id) : [];
   // Compact quality/stability summary (Step 89), derived from the same history.

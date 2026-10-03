@@ -2,11 +2,13 @@
  * Regression tests for the technology detail page (`app/technologies/[id]/page.tsx`).
  *
  * The page is an async server component. It only fetches via the mocked
- * `getAllScanResults` boundary; the rest of the pipeline (`scanResultToSummary`
- * for cards, `technologyDetectionHistory` + the timeline) runs for real, so
- * these tests lock the wiring (Step 88): full `ScanResult[]` retained,
- * `ScanSummary[]` derived for the "Detected in scans" cards, and the detection
- * timeline projected below it.
+ * `fetchScansByTechnology` boundary (the `GET /api/scans?technologyId=...`
+ * endpoint); the rest of the pipeline (`technologyDetectionHistory` +
+ * timeline, `TechnologyDetectedInScans` cards, Step 89 summary) runs for real,
+ * so these tests lock the wiring (Step 88): the API returns
+ * `TechnologyScanSummary[]` (flat scan + detections), `ScanSummary[]` is
+ * derived for the "Detected in scans" cards, and the detection timeline is
+ * projected below it.
  *
  * `next/link` is mocked to a plain `<a>` (no router context); the real
  * `next/navigation` `notFound` is never called because the catalog lookup
@@ -16,12 +18,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { renderToString } from 'react-dom/server';
-import type { ScanResult } from '@devlens/application';
 import type { Detection } from '@devlens/core';
+import type { TechnologyScanSummary } from '@/lib/types';
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
-const mockGetAllScanResults = vi.hoisted(() => vi.fn());
+const mockFetchScansByTechnology = vi.hoisted(() => vi.fn());
 const mockGetTechnologyById = vi.hoisted(() => vi.fn());
 
 vi.mock('next/link', () => ({
@@ -29,11 +31,10 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href }, children),
 }));
 
-// Keep `scanResultToSummary` real; only stub the database fetch boundary.
-vi.mock('@/lib/scan-data', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/scan-data')>();
-  return { ...actual, getAllScanResults: mockGetAllScanResults };
-});
+// Stub the API boundary so the page is exercised without a running server/DB.
+vi.mock('@/lib/api', () => ({
+  fetchScansByTechnology: mockFetchScansByTechnology,
+}));
 
 // Only stub the catalog lookup (returns a known technology).
 vi.mock('@/lib/technology-catalog', async (importOriginal) => {
@@ -46,22 +47,26 @@ import TechnologyDetailPage from '@/app/technologies/[id]/page.js';
 
 // ─── Fixtures ────────────────────────────────────────────────────────
 
-function makeScanResult(
+function makeTechnologyScanSummary(
   id: string,
   createdAt: string,
   completedAt: string,
   detections: Detection[],
-): ScanResult {
+): TechnologyScanSummary {
   return {
     scan: {
       id,
       createdAt,
-      target: { url: 'https://example.com/', hostname: 'example.com' },
-      status: { type: 'completed', completedAt },
+      target: 'https://example.com/',
+      hostname: 'example.com',
+      status: 'completed',
+      startedAt: null,
+      completedAt,
+      failedAt: null,
+      error: null,
     },
-    snapshot: null,
     detections,
-  } as unknown as ScanResult;
+  };
 }
 
 function makeDetection(id: string, confidence: number, evidence: Detection['evidence']): Detection {
@@ -82,11 +87,16 @@ describe('TechnologyDetailPage — wiring (Step 88)', () => {
       category: 'server',
       description: 'A high-performance web server.',
     });
-    mockGetAllScanResults.mockResolvedValue([
-      makeScanResult('scan_001', '2025-06-01T12:00:00.000Z', '2025-06-01T12:00:05.000Z', [
-        makeDetection('nginx', 80, [{ type: 'http_header', name: 'Server', value: 'nginx' }]),
-      ]),
-    ]);
+    mockFetchScansByTechnology.mockResolvedValue({
+      scans: [
+        makeTechnologyScanSummary(
+          'scan_001',
+          '2025-06-01T12:00:00.000Z',
+          '2025-06-01T12:00:05.000Z',
+          [makeDetection('nginx', 80, [{ type: 'http_header', name: 'Server', value: 'nginx' }])],
+        ),
+      ],
+    });
   });
 
   it('renders the technology header, the detected-in-scans cards, and the timeline', async () => {
@@ -121,11 +131,9 @@ describe('TechnologyDetailPage — wiring (Step 88)', () => {
   });
 
   it('renders nothing from the timeline when no scan detected the technology', async () => {
-    mockGetAllScanResults.mockResolvedValue([
-      makeScanResult('scan_001', '2025-06-01T12:00:00.000Z', '2025-06-01T12:00:05.000Z', [
-        makeDetection('react', 95, [{ type: 'http_header', name: 'Server', value: 'React' }]),
-      ]),
-    ]);
+    // The endpoint filters server-side; a technology with no detected scans
+    // yields an empty payload (the page never sees the non-matching scan).
+    mockFetchScansByTechnology.mockResolvedValue({ scans: [] });
 
     const element = await TechnologyDetailPage({
       params: Promise.resolve({ id: 'nginx' }),
@@ -142,7 +150,7 @@ describe('TechnologyDetailPage — wiring (Step 88)', () => {
   });
 
   it('renders an error state when scan data cannot be loaded', async () => {
-    mockGetAllScanResults.mockRejectedValue(new Error('db down'));
+    mockFetchScansByTechnology.mockRejectedValue(new Error('api unavailable'));
 
     const element = await TechnologyDetailPage({
       params: Promise.resolve({ id: 'nginx' }),

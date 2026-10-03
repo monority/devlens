@@ -13,4 +13,4 @@ export type { ScanResult } from './orchestrator.js';
 export { persistResult } from './repository.js';
 export type { ScanResultRepository } from './repository.js';
 export { executeScan } from './execute-scan.js';
-export { getScan, listScans } from './queries.js';
+export { getScan, listScans, listScansByTechnology } from './queries.js';

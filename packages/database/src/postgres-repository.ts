@@ -334,19 +334,31 @@ export class PostgresScanResultRepository implements ScanResultRepository {
    * Returns `null` when no scan with the given ID exists. A failed scan
    * is returned as a normal `ScanResult` with `snapshot: null` — it is
    * NOT treated as "not found".
+   *
+   * Uses a single `LEFT JOIN` (consistent with {@link list}) so that the
+   * scan and its at-most-one snapshot are retrieved in one round-trip.
+   * The 1:1 relationship (`snapshots.scan_id` is the primary key)
+   * guarantees the join produces at most one row.
    */
   async getById(scanId: ScanId): Promise<ScanResult | null> {
-    const scanRows = await this.db.select().from(scans).where(eq(scans.id, scanId));
+    const rows = await this.db
+      .select()
+      .from(scans)
+      .leftJoin(snapshots, eq(scans.id, snapshots.scanId))
+      .where(eq(scans.id, scanId));
 
-    if (scanRows.length === 0) {
+    if (rows.length === 0) {
       return null;
     }
 
-    const scanRow = scanRows[0]!;
-    const snapshotRows = await this.db.select().from(snapshots).where(eq(snapshots.scanId, scanId));
-
-    const snapshotRow = snapshotRows[0];
-    return rowsToResult(scanRow as ScanRow, snapshotRow as SnapshotRow | undefined);
+    const row = rows[0]!;
+    return rowsToResult(
+      row.scans as ScanRow,
+      // Drizzle returns `null` for the unmatched right-hand side of a
+      // LEFT JOIN. Convert to `undefined` to match rowToSnapshot's null
+      // contract (the same null→undefined conversion list() applies).
+      row.snapshots === null ? undefined : (row.snapshots as SnapshotRow),
+    );
   }
 
   /**

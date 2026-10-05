@@ -22,9 +22,23 @@ import {
   createHttpStatus,
   createTimestampFromString,
   createTechnologyVersion,
+  createScan,
+  createScanId,
+  startScan,
+  completeScan,
+  failScan,
 } from '@devlens/core';
-import { snapshotToRow, rowToSnapshot } from './postgres-repository.js';
-import type { Detection, LinkTag, MetaTag, Resource, ScriptTag, SiteSnapshot } from '@devlens/core';
+import { snapshotToRow, rowToSnapshot, rowsToResult, scanToRow } from './postgres-repository.js';
+import type {
+  Detection,
+  LinkTag,
+  MetaTag,
+  Resource,
+  ScriptTag,
+  SiteSnapshot,
+  ScanTarget,
+  ScanId,
+} from '@devlens/core';
 
 function makeSnapshot(): SiteSnapshot {
   return {
@@ -382,6 +396,121 @@ describe('PostgresScanResultRepository — snapshot mapper round-trip (no DB)', 
       expect(reconstructed[0]!.versionConflict).toBeUndefined();
       expect(reconstructed[0]!.versionSource).toBeUndefined();
       expect(reconstructed[0]!.versionEvidence).toBeUndefined();
+    });
+  });
+
+  // ─── Step 99 — rowsToResult invariant (no DB required) ──────────────
+  //
+  // Step 99 converts PostgresScanResultRepository.list() from an N+1
+  // (1 scan query + N per-scan snapshot queries) to a single LEFT JOIN.
+  // The join produces `null` for the snapshot-row when a scan has no
+  // snapshot (failed scans), whereas the old per-scan query produced
+  // `undefined` (empty array → [0]). rowsToResult / rowToSnapshot must
+  // handle BOTH identically — this is the correctness invariant that
+  // makes the JOIN safe.
+  //
+  // These tests prove the transformation invariant directly (no Drizzle
+  // / postgres I/O).  The SQL-level behaviour (join row-count == scan
+  // count, no duplicates, 1:1 guarantee) is validated only by the
+  // integration tests in postgres-repository.test.ts, which require
+  // DATABASE_URL and are skipped without it.
+  describe('rowsToResult — Step 99 LEFT JOIN invariant (no DB)', () => {
+    function makeTarget(): ScanTarget {
+      return {
+        url: createUrl('https://example.com'),
+        hostname: createHostname('example.com'),
+      };
+    }
+
+    function makeCompletedScanRow(id: string, createdAt: string = '2025-06-01T11:00:00.000Z') {
+      const pending = createScan(
+        createScanId(id) as ScanId,
+        makeTarget(),
+        createTimestampFromString(createdAt),
+      );
+      const running = startScan(pending, createTimestampFromString('2025-06-01T11:01:00.000Z'));
+      return scanToRow(
+        completeScan(running, createTimestampFromString('2025-06-01T11:02:00.000Z')),
+      );
+    }
+
+    function makeFailedScanRow(id: string, createdAt: string = '2025-06-01T11:00:00.000Z') {
+      const pending = createScan(
+        createScanId(id) as ScanId,
+        makeTarget(),
+        createTimestampFromString(createdAt),
+      );
+      const running = startScan(pending, createTimestampFromString('2025-06-01T11:01:00.000Z'));
+      return scanToRow(
+        failScan(
+          running,
+          { code: 'timeout', message: 'Request timed out' },
+          createTimestampFromString('2025-06-01T11:02:00.000Z'),
+        ),
+      );
+    }
+
+    it('produces null snapshot + empty detections for null (LEFT JOIN miss)', () => {
+      const scanRow = makeCompletedScanRow('scan_null');
+      const result = rowsToResult(scanRow, null);
+
+      expect(result.snapshot).toBeNull();
+      expect(result.detections).toEqual([]);
+      expect(result.scan.id).toBe('scan_null');
+      expect(result.scan.status.type).toBe('completed');
+    });
+
+    it('produces null snapshot + empty detections for undefined (per-scan query miss)', () => {
+      const scanRow = makeCompletedScanRow('scan_undef');
+      const result = rowsToResult(scanRow, undefined);
+
+      expect(result.snapshot).toBeNull();
+      expect(result.detections).toEqual([]);
+      expect(result.scan.id).toBe('scan_undef');
+    });
+
+    it('null and undefined produce identical results (the JOIN safety invariant)', () => {
+      const scanRow = makeFailedScanRow('scan_compare');
+
+      const withNull = rowsToResult(scanRow, null);
+      const withUndefined = rowsToResult(scanRow, undefined);
+
+      expect(withNull).toEqual(withUndefined);
+    });
+
+    it('reconstructs a snapshot + detections from a joined row (LEFT JOIN match)', () => {
+      const scanRow = makeCompletedScanRow('scan_match');
+      const snapshotRow = snapshotToRow('scan_match' as never, makeSnapshot(), makeDetections());
+
+      const result = rowsToResult(scanRow, snapshotRow);
+
+      expect(result.snapshot).not.toBeNull();
+      expect(result.snapshot!.url).toBe('https://example.com/');
+      expect(result.snapshot!.http.statusCode).toBe(200);
+      expect(result.detections).toHaveLength(1);
+      expect(result.detections[0]!.technology.id).toBe('nginx');
+      expect(result.scan.id).toBe('scan_match');
+    });
+
+    it('reconstructs a failed scan (completed-row, no snapshot) via LEFT JOIN miss', () => {
+      const scanRow = makeFailedScanRow('scan_failed');
+
+      const result = rowsToResult(scanRow, null);
+
+      expect(result.scan.status.type).toBe('failed');
+      expect(result.scan.status.error).toEqual({ code: 'timeout', message: 'Request timed out' });
+      expect(result.snapshot).toBeNull();
+      expect(result.detections).toEqual([]);
+    });
+
+    it('nullable snapshot fields are absent when snapshot is null (no field access)', () => {
+      const scanRow = makeCompletedScanRow('scan_nullable');
+
+      const result = rowsToResult(scanRow, null);
+
+      // No exception thrown, no fabricated snapshot — the null path is safe.
+      expect(result.snapshot).toBeNull();
+      expect(result.detections).toEqual([]);
     });
   });
 });

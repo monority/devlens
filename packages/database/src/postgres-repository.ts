@@ -90,7 +90,7 @@ function toDate(timestamp: Timestamp): Date {
  * `ScanStatus` is a discriminated union; we extract the timestamp
  * and error fields only for the relevant status variant.
  */
-function scanToRow(scan: Scan): ScanRow {
+export function scanToRow(scan: Scan): ScanRow {
   const status: ScanStatus = scan.status;
 
   let startedAt: Timestamp | null = null;
@@ -250,10 +250,15 @@ export function rowToSnapshot(row: SnapshotRow | undefined | null): {
 
 /**
  * Reassembles a complete {@link ScanResult} from a joined scan row +
- * optional snapshot row. The snapshot row is `undefined` or `null` for
- * failed scans (no snapshot was captured).
+ * optional snapshot row. The snapshot row is `undefined`, `null`, or
+ * missing for failed scans (no snapshot was captured). Both `null`
+ * (Drizzle LEFT JOIN with no match) and `undefined` (per-scan query
+ * returning an empty array) are handled identically by rowToSnapshot.
  */
-function rowsToResult(scanRow: ScanRow, snapshotRow: SnapshotRow | undefined | null): ScanResult {
+export function rowsToResult(
+  scanRow: ScanRow,
+  snapshotRow: SnapshotRow | undefined | null,
+): ScanResult {
   const { snapshot, detections } = rowToSnapshot(snapshotRow);
   return {
     scan: rowToScan(scanRow),
@@ -348,23 +353,33 @@ export class PostgresScanResultRepository implements ScanResultRepository {
    * Returns all scan results in deterministic order:
    * `createdAt DESC, scanId ASC`.
    *
-   * Uses a left join so that scans without snapshots (failed scans)
-   * are included. Empty repository returns `[]`.
+   * Uses a single `LEFT JOIN` so that scans without snapshots (failed
+   * scans) are included in one round-trip — no per-scan snapshot
+   * query (eliminates the N+1 that existed when this method issued a
+   * separate `SELECT FROM snapshots WHERE scan_id = ?` per scan).
+   * Empty repository returns `[]`.
+   *
+   * The 1:1 relationship (`snapshots.scan_id` is the primary key)
+   * guarantees the join produces at most one row per scan — no row
+   * multiplication, no duplicates.
    */
   async list(): Promise<ScanResult[]> {
-    const rows = await this.db.select().from(scans).orderBy(desc(scans.createdAt), asc(scans.id));
+    const rows = await this.db
+      .select()
+      .from(scans)
+      .leftJoin(snapshots, eq(scans.id, snapshots.scanId))
+      .orderBy(desc(scans.createdAt), asc(scans.id));
 
-    const results: ScanResult[] = [];
-    for (const scanRow of rows) {
-      const scanId = scanRow.id as ScanId;
-      const snapshotRows = await this.db
-        .select()
-        .from(snapshots)
-        .where(eq(snapshots.scanId, scanId));
-
-      const snapshotRow = snapshotRows[0];
-      results.push(rowsToResult(scanRow as ScanRow, snapshotRow as SnapshotRow | undefined));
-    }
-    return results;
+    return rows.map((row) =>
+      rowsToResult(
+        row.scans as ScanRow,
+        // Drizzle returns `null` for the unmatched right-hand side of a
+        // LEFT JOIN. Convert to `undefined` to match the old per-scan-query
+        // miss path (`snapshotRows[0]` → undefined). The non-null case is
+        // cast to SnapshotRow because Drizzle infers jsonb columns as
+        // `unknown` (the same cast getById already applies).
+        row.snapshots === null ? undefined : (row.snapshots as SnapshotRow),
+      ),
+    );
   }
 }

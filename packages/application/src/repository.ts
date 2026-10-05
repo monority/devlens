@@ -24,6 +24,10 @@ import type { ScanId } from '@devlens/core';
  * Read side:
  * - `getById` retrieves a single result by scan ID.
  * - `list` returns all results in deterministic order: `createdAt DESC, scanId ASC`.
+ *   When `technologyId` is provided, only scans whose detections include
+ *   that technology are returned — the filter is pushed to the database
+ *   (or applied in-memory for the in-memory adapter), avoiding a full
+ *   load-all-then-filter round-trip.
  *
  * The implementation decides whether the two writes (scan + snapshot) are
  * performed atomically or sequentially. The application layer delegates
@@ -32,7 +36,7 @@ import type { ScanId } from '@devlens/core';
 export interface ScanResultRepository {
   save(result: ScanResult): Promise<void>;
   getById(scanId: ScanId): Promise<ScanResult | null>;
-  list(): Promise<ScanResult[]>;
+  list(technologyId?: string): Promise<ScanResult[]>;
 }
 
 /**

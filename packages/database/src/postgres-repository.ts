@@ -18,7 +18,7 @@
  * `ScanResultRepository` interface only.
  */
 
-import { eq, desc, asc } from 'drizzle-orm';
+import { eq, desc, asc, sql } from 'drizzle-orm';
 import type { Database } from './client.js';
 import { scans, snapshots } from './schema.js';
 import type { ScanResult, ScanResultRepository } from '@devlens/application';
@@ -374,13 +374,29 @@ export class PostgresScanResultRepository implements ScanResultRepository {
    * The 1:1 relationship (`snapshots.scan_id` is the primary key)
    * guarantees the join produces at most one row per scan — no row
    * multiplication, no duplicates.
+   *
+   * When `technologyId` is provided, a `WHERE EXISTS` clause filters
+   * at the SQL level using a JSONB path scan of the `detections`
+   * column — only scans whose detections include a detection with a
+   * matching `technology.id` are returned. This replaces the
+   * load-all-then-filter pattern that previously lived in
+   * `listScansByTechnology` (now `list(technologyId)` delegates to this
+   * method), avoiding transfer of scan/snapshot data for scans that
+   * will be discarded by the filter.
    */
-  async list(): Promise<ScanResult[]> {
-    const rows = await this.db
-      .select()
-      .from(scans)
-      .leftJoin(snapshots, eq(scans.id, snapshots.scanId))
-      .orderBy(desc(scans.createdAt), asc(scans.id));
+  async list(technologyId?: string): Promise<ScanResult[]> {
+    const query = this.db.select().from(scans).leftJoin(snapshots, eq(scans.id, snapshots.scanId));
+
+    if (technologyId !== undefined) {
+      query.where(
+        sql`EXISTS (
+          SELECT 1 FROM jsonb_array_elements(${snapshots.detections}) AS d
+          WHERE d->'technology'->>'id' = ${technologyId}
+        )`,
+      );
+    }
+
+    const rows = await query.orderBy(desc(scans.createdAt), asc(scans.id));
 
     return rows.map((row) =>
       rowsToResult(

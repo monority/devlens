@@ -405,5 +405,68 @@ describe('InMemoryScanResultRepository', () => {
       const statuses = results.map((r) => r.scan.status.type).sort();
       expect(statuses).toEqual(['completed', 'failed']);
     });
+
+    it('filters by technologyId — returns only matching scans', async () => {
+      const nginxDetection: Detection = {
+        technology: { id: 'nginx' as never, name: 'nginx', category: 'server' as never },
+        confidence: 80 as never,
+        evidence: [{ type: 'http_header' as const, name: 'Server', value: 'nginx' }],
+      };
+      const reactDetection: Detection = {
+        technology: { id: 'react' as never, name: 'react', category: 'frontend' as never },
+        confidence: 90 as never,
+        evidence: [{ type: 'script_url' as const, url: createUrl('https://example.com/react.js') }],
+      };
+
+      await repo.save({
+        scan: makeCompletedScan('scan_nginx'),
+        snapshot: makeSnapshot(),
+        detections: [nginxDetection],
+      });
+      await repo.save({
+        scan: makeCompletedScan('scan_react'),
+        snapshot: makeSnapshot(),
+        detections: [reactDetection],
+      });
+
+      const results = await repo.list('nginx');
+      expect(results).toHaveLength(1);
+      expect(results[0]!.scan.id).toBe('scan_nginx');
+      expect(results[0]!.detections[0]!.technology.id).toBe('nginx');
+    });
+
+    it('filters by technologyId — returns empty when no match', async () => {
+      const nginxDetection: Detection = {
+        technology: { id: 'nginx' as never, name: 'nginx', category: 'server' as never },
+        confidence: 80 as never,
+        evidence: [],
+      };
+      await repo.save({
+        scan: makeCompletedScan('scan_nginx'),
+        snapshot: makeSnapshot(),
+        detections: [nginxDetection],
+      });
+
+      const results = await repo.list('vue');
+      expect(results).toEqual([]);
+    });
+
+    it('filters by technologyId — excludes failed scans', async () => {
+      const nginxDetection: Detection = {
+        technology: { id: 'nginx' as never, name: 'nginx', category: 'server' as never },
+        confidence: 80 as never,
+        evidence: [],
+      };
+      await repo.save({
+        scan: makeCompletedScan('scan_ok'),
+        snapshot: makeSnapshot(),
+        detections: [nginxDetection],
+      });
+      await repo.save({ scan: makeFailedScan('scan_fail'), snapshot: null, detections: [] });
+
+      const results = await repo.list('nginx');
+      expect(results).toHaveLength(1);
+      expect(results[0]!.scan.id).toBe('scan_ok');
+    });
   });
 });

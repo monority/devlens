@@ -71,9 +71,20 @@ export class InMemoryScanResultRepository implements ScanResultRepository {
    * - Scans with the same `createdAt` are tie-broken by `scanId`
    *   ascending, ensuring a stable, reproducible ordering.
    * - Empty repository returns `[]`.
+   *
+   * When `technologyId` is provided, the in-memory filter replicates the
+   * SQL-side `WHERE EXISTS` behaviour of the PostgreSQL adapter: only
+   * scans whose detections include a detection with a matching
+   * `technology.id` are returned. Failed/pending/running scans (which
+   * have no detections by domain-model design) are naturally excluded.
    */
-  async list(): Promise<ScanResult[]> {
+  async list(technologyId?: string): Promise<ScanResult[]> {
     return Array.from(this.scans.values())
+      .filter((scan) => {
+        if (technologyId === undefined) return true;
+        const detections = this.detections.get(scan.id) ?? [];
+        return detections.some((d) => d.technology.id === technologyId);
+      })
       .sort((a, b) => {
         // createdAt DESC
         if (a.createdAt < b.createdAt) return 1;

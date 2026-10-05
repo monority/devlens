@@ -445,4 +445,73 @@ integrationDescribe('PostgresScanResultRepository — PostgreSQL integration', (
       expect(results[0]!.detections[0]).toEqual(detection);
     });
   });
+
+  describe('list(technologyId) — technology filter (Step 101)', () => {
+    function makeDetection(tid: string): Detection {
+      return {
+        technology: { id: tid as never, name: tid, category: 'server' as never },
+        confidence: 80 as never,
+        evidence: [{ type: 'http_header' as const, name: 'Server', value: tid }],
+      };
+    }
+
+    it('returns only scans whose detections match the technology', async () => {
+      const r1 = makeCompletedResult('scan_filter_nginx');
+      const r2 = makeCompletedResult('scan_filter_react');
+      await repo.save({ ...r1, detections: [makeDetection('nginx')] });
+      await repo.save({ ...r2, detections: [makeDetection('react')] });
+
+      const results = await repo.list('nginx');
+      expect(results).toHaveLength(1);
+      expect(results[0]!.scan.id).toBe('scan_filter_nginx');
+      expect(results[0]!.detections[0]!.technology.id).toBe('nginx');
+    });
+
+    it('returns empty array when no scans match the technology', async () => {
+      const r1 = makeCompletedResult('scan_filter_no_vue_a');
+      const r2 = makeCompletedResult('scan_filter_no_vue_b');
+      await repo.save({ ...r1, detections: [makeDetection('nginx')] });
+      await repo.save({ ...r2, detections: [makeDetection('react')] });
+
+      const results = await repo.list('vue');
+      expect(results).toEqual([]);
+    });
+
+    it('preserves deterministic ordering in filtered results', async () => {
+      const r1 = makeCompletedResult('scan_filter_order_a');
+      const r2 = makeCompletedResult('scan_filter_order_b');
+      const r3 = makeCompletedResult('scan_filter_order_c');
+      await repo.save({ ...r1, detections: [makeDetection('nginx')] });
+      await repo.save({ ...r2, detections: [makeDetection('nginx')] });
+      await repo.save({ ...r3, detections: [makeDetection('nginx')] });
+
+      const results = await repo.list('nginx');
+      expect(results.map((r) => r.scan.id)).toEqual([
+        'scan_filter_order_a',
+        'scan_filter_order_b',
+        'scan_filter_order_c',
+      ]);
+    });
+
+    it('excludes failed scans (no detections) from filtered results', async () => {
+      const completed = makeCompletedResult('scan_filter_mixed_completed');
+      const failed = makeFailedResult('scan_filter_mixed_failed');
+      await repo.save({ ...completed, detections: [makeDetection('nginx')] });
+      await persistResult(failed, repo);
+
+      const results = await repo.list('nginx');
+      expect(results).toHaveLength(1);
+      expect(results[0]!.scan.id).toBe('scan_filter_mixed_completed');
+    });
+
+    it('returns all scans when technologyId is undefined', async () => {
+      const r1 = makeCompletedResult('scan_filter_all_a');
+      const r2 = makeFailedResult('scan_filter_all_b');
+      await repo.save({ ...r1, detections: [makeDetection('nginx')] });
+      await persistResult(r2, repo);
+
+      const results = await repo.list();
+      expect(results).toHaveLength(2);
+    });
+  });
 });

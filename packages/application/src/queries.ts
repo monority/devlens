@@ -34,12 +34,15 @@ export async function getScan(
  * Lists scan results whose detections include the given technology.
  *
  * This is the read query backing the technology detail page
- * (`GET /api/scans?technologyId=<id>`). It reuses {@link listScans} (one
- * repository `list()` call — a single bulk retrieval) and filters the
- * already-loaded results in memory by technology id, rather than issuing a
- * per-scan query (no DB N+1). Only completed scans carry detections by
- * domain-model design, so failed/pending/running scans are naturally
- * excluded by the predicate.
+ * (`GET /api/scans?technologyId=<id>`). It delegates to
+ * {@link listScans} with the technology filter, which pushes the
+ * filtering into the repository — a single bulk retrieval filtered at
+ * the data layer (PostgreSQL JSONB `EXISTS` / in-memory), rather than
+ * issuing a per-scan query (no DB N+1) and without loading all scans
+ * into memory only to discard most of them.
+ *
+ * Only completed scans carry detections by domain-model design, so
+ * failed/pending/running scans are naturally excluded by the predicate.
  *
  * @param technologyId — the canonical technology id to match against
  *                       (`Detection.technology.id`)
@@ -51,19 +54,30 @@ export async function listScansByTechnology(
   technologyId: string,
   repository: ScanResultRepository,
 ): Promise<ScanResult[]> {
-  const results = await listScans(repository);
-  return results.filter((result) =>
-    result.detections.some((detection) => detection.technology.id === technologyId),
-  );
+  return listScans(repository, technologyId);
 }
 
 /**
  * Lists all scan results in deterministic order
  * (`createdAt DESC, scanId ASC`).
  *
- * @param repository — the persistence implementation
- * @returns an array of all scan results, empty if none exist.
+ * When `technologyId` is provided, the filter is pushed to the
+ * repository's `list(technologyId)` — the PostgreSQL adapter filters at
+ * the SQL level via a JSONB `EXISTS` scan, and the in-memory adapter
+ * filters in-memory. This avoids the load-all-then-filter pattern that
+ * would transfer every scan/snapshot for an entire table just to
+ * discard most of it.
+ *
+ * @param repository    — the persistence implementation
+ * @param technologyId  — when provided, only scans whose detections
+ *                        include a detection with this technology id
+ *                        are returned
+ * @returns an array of scan results, empty if none exist or none match
+ *          the technology filter.
  */
-export async function listScans(repository: ScanResultRepository): Promise<ScanResult[]> {
-  return repository.list();
+export async function listScans(
+  repository: ScanResultRepository,
+  technologyId?: string,
+): Promise<ScanResult[]> {
+  return repository.list(technologyId);
 }

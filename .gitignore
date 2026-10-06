@@ -28,6 +28,9 @@ Thumbs.db
 # Local tooling (PostgreSQL portable, test scripts, etc.)
 .tmp/
 
+# Poolside local settings (environment-specific, never committed)
+.poolside/settings.local.yaml
+
 # IDE
 .idea/
 .vscode/

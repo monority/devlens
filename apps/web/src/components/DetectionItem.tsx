@@ -16,6 +16,7 @@
  */
 
 import type { DetectionResponse } from '../lib/types.js';
+import type { DetectionExplainability } from '../lib/detection-explainability.js';
 import { isKnownTechnology } from '../lib/technology-catalog';
 import { getDetectionExplainability } from '../lib/detection-explainability';
 import { evidenceFields, evidenceTypeLabel } from '../lib/evidence-presenter';
@@ -31,6 +32,100 @@ import styles from './ScanCard.module.css';
 export interface DetectionItemProps {
   detection: DetectionResponse;
   index: number;
+}
+
+// ─── Sub-components (extracted to reduce cognitive complexity) ──────
+
+/** Step 86 — per-detection integrity verdict. */
+function IntegrityNotice({
+  detection,
+}: {
+  detection: DetectionResponse;
+}): React.ReactElement | null {
+  if (!(detection.integrity && !detection.integrity.valid)) return null;
+  const { issues } = detection.integrity;
+  return (
+    <span
+      className={styles.detectionIntegrityNotice}
+      title={issues.map((issue) => integrityIssueDescription(issue)).join('; ')}
+    >
+      {issues.length === 1 ? 'Integrity issue' : 'Integrity issues'}
+      {': '}
+      {issues.map((issue) => integrityIssueLabel(issue)).join(', ')}
+    </span>
+  );
+}
+
+/** Explanation section: "Detected because" reasons + no-evidence fallback. */
+function ExplanationSection({
+  explainability,
+}: {
+  explainability: DetectionExplainability;
+}): React.ReactElement {
+  return (
+    <section className={styles.explanationReasons}>
+      <h3 className={styles.explanationReasonsHeading}>Detected because</h3>
+
+      {explainability.reasons.length > 0 ? (
+        <ul className={styles.evidenceSourceList}>
+          {explainability.reasons.map((reason, reasonIndex) => {
+            if (reason.kind === 'evidence') {
+              return (
+                <li
+                  key={`reason-${reasonIndex}`}
+                  className={styles.evidenceSourceItem}
+                  title={evidenceFields(reason.evidence)[0]?.value ?? ''}
+                >
+                  <span className={styles.evidenceSourceType}>{reason.evidenceType}</span>
+                  <span className={styles.evidenceSourceDesc}>{reason.summary}</span>
+                </li>
+              );
+            }
+            return (
+              <li key={`reason-${reasonIndex}`} className={styles.reasonRelationship}>
+                Derived from {reason.sourceName ?? reason.sourceTechnology} (
+                {reason.relationshipType})
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+
+      {explainability.noDirectEvidence ? (
+        <p className={styles.noEvidence}>No direct evidence available.</p>
+      ) : null}
+    </section>
+  );
+}
+
+/** Step 72 — version conflict detail: disagreeing evidence values. */
+function VersionConflictSection({
+  explainability,
+  versionConflict,
+}: {
+  explainability: DetectionExplainability;
+  versionConflict: boolean | undefined;
+}): React.ReactElement | null {
+  if (!versionConflict || !explainability.versionConflictDetail?.length) return null;
+  return (
+    <section className={styles.versionConflictDetail}>
+      <h3 className={styles.versionConflictHeading}>Version evidence is inconsistent</h3>
+      <ul className={styles.versionConflictEvidenceList}>
+        {explainability.versionConflictDetail.map((detail, detailIndex) => (
+          <li key={`vc-${detailIndex}`} className={styles.versionConflictEvidenceItem}>
+            <span className={styles.versionConflictSource}>{detail.source}</span>
+            <ul className={styles.versionConflictValues}>
+              {detail.evidence.map((ev, evIndex) => (
+                <li key={`vcv-${detailIndex}-${evIndex}`} title={ev.value}>
+                  {ev.value}
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }
 
 export function DetectionItem({ detection, index }: DetectionItemProps): React.ReactElement {
@@ -92,56 +187,14 @@ export function DetectionItem({ detection, index }: DetectionItemProps): React.R
             `integrity` is present only when the detection is structurally
             invalid; clean detections omit it, so no notice is rendered there.
             The existing provenance/signals footer below is preserved. */}
-        {detection.integrity && !detection.integrity.valid ? (
-          <span
-            className={styles.detectionIntegrityNotice}
-            title={detection.integrity.issues
-              .map((issue) => integrityIssueDescription(issue))
-              .join('; ')}
-          >
-            {detection.integrity.issues.length === 1 ? 'Integrity issue' : 'Integrity issues'}
-            {': '}
-            {detection.integrity.issues.map((issue) => integrityIssueLabel(issue)).join(', ')}
-          </span>
-        ) : null}
+        <IntegrityNotice detection={detection} />
       </header>
 
       {/* Explanation: structured "Detected because" reasons in deterministic
           order. Each reason line is a renderable explanation of WHY the
           detection is considered present — derived purely from existing data.
           This replaces the previous neutral summary paragraph. */}
-      <section className={styles.explanationReasons}>
-        <h3 className={styles.explanationReasonsHeading}>Detected because</h3>
-
-        {explainability.reasons.length > 0 ? (
-          <ul className={styles.evidenceSourceList}>
-            {explainability.reasons.map((reason, reasonIndex) => {
-              if (reason.kind === 'evidence') {
-                return (
-                  <li
-                    key={`reason-${reasonIndex}`}
-                    className={styles.evidenceSourceItem}
-                    title={evidenceFields(reason.evidence)[0]?.value ?? ''}
-                  >
-                    <span className={styles.evidenceSourceType}>{reason.evidenceType}</span>
-                    <span className={styles.evidenceSourceDesc}>{reason.summary}</span>
-                  </li>
-                );
-              }
-              return (
-                <li key={`reason-${reasonIndex}`} className={styles.reasonRelationship}>
-                  Derived from {reason.sourceName ?? reason.sourceTechnology} (
-                  {reason.relationshipType})
-                </li>
-              );
-            })}
-          </ul>
-        ) : null}
-
-        {explainability.noDirectEvidence ? (
-          <p className={styles.noEvidence}>No direct evidence available.</p>
-        ) : null}
-      </section>
+      <ExplanationSection explainability={explainability} />
 
       {explainability.evidenceCount > 0 && (
         <footer className={styles.detectionMeta}>
@@ -171,27 +224,7 @@ export function DetectionItem({ detection, index }: DetectionItemProps): React.R
           rather than a silent placeholder. NOTE: per-observation versions are
           not persisted on the detection, so we surface the disagreeing
           evidence's source modality + matched value (see §13 LIMITATIONS). */}
-      {versionConflict &&
-      explainability.versionConflictDetail &&
-      explainability.versionConflictDetail.length > 0 ? (
-        <section className={styles.versionConflictDetail}>
-          <h3 className={styles.versionConflictHeading}>Version evidence is inconsistent</h3>
-          <ul className={styles.versionConflictEvidenceList}>
-            {explainability.versionConflictDetail.map((detail, detailIndex) => (
-              <li key={`vc-${detailIndex}`} className={styles.versionConflictEvidenceItem}>
-                <span className={styles.versionConflictSource}>{detail.source}</span>
-                <ul className={styles.versionConflictValues}>
-                  {detail.evidence.map((ev, evIndex) => (
-                    <li key={`vcv-${detailIndex}-${evIndex}`} title={ev.value}>
-                      {ev.value}
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      <VersionConflictSection explainability={explainability} versionConflict={versionConflict} />
 
       <EvidenceList evidence={explainability.evidence} />
     </li>

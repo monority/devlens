@@ -38,7 +38,7 @@ export class InMemoryScanResultRepository implements ScanResultRepository {
    *   clears any previously stored snapshot and detections for that
    *   scan ID, so a failed re-attempt does not preserve stale data.
    */
-  async save(result: ScanResult): Promise<void> {
+  save(result: ScanResult): Promise<void> {
     this.scans.set(result.scan.id, result.scan);
     if (result.snapshot !== null) {
       this.snapshots.set(result.scan.id, result.snapshot);
@@ -47,6 +47,7 @@ export class InMemoryScanResultRepository implements ScanResultRepository {
       this.snapshots.delete(result.scan.id);
       this.detections.delete(result.scan.id);
     }
+    return Promise.resolve();
   }
 
   /**
@@ -56,12 +57,12 @@ export class InMemoryScanResultRepository implements ScanResultRepository {
    * A failed scan (status `failed`) is returned as a normal `ScanResult`
    * with `snapshot: null` — it is NOT treated as "not found".
    */
-  async getById(scanId: ScanId): Promise<ScanResult | null> {
+  getById(scanId: ScanId): Promise<ScanResult | null> {
     const scan = this.scans.get(scanId);
     if (scan === undefined) {
-      return null;
+      return Promise.resolve(null);
     }
-    return this.reconstruct(scan);
+    return Promise.resolve(this.reconstruct(scan));
   }
 
   /**
@@ -78,23 +79,25 @@ export class InMemoryScanResultRepository implements ScanResultRepository {
    * `technology.id` are returned. Failed/pending/running scans (which
    * have no detections by domain-model design) are naturally excluded.
    */
-  async list(technologyId?: string): Promise<ScanResult[]> {
-    return Array.from(this.scans.values())
-      .filter((scan) => {
-        if (technologyId === undefined) return true;
-        const detections = this.detections.get(scan.id) ?? [];
-        return detections.some((d) => d.technology.id === technologyId);
-      })
-      .sort((a, b) => {
-        // createdAt DESC
-        if (a.createdAt < b.createdAt) return 1;
-        if (a.createdAt > b.createdAt) return -1;
-        // scanId ASC (tie-breaker)
-        if (a.id < b.id) return -1;
-        if (a.id > b.id) return 1;
-        return 0;
-      })
-      .map((scan) => this.reconstruct(scan));
+  list(technologyId?: string): Promise<ScanResult[]> {
+    return Promise.resolve(
+      Array.from(this.scans.values())
+        .filter((scan) => {
+          if (technologyId === undefined) return true;
+          const detections = this.detections.get(scan.id) ?? [];
+          return detections.some((d) => d.technology.id === technologyId);
+        })
+        .sort((a, b) => {
+          // createdAt DESC
+          if (a.createdAt < b.createdAt) return 1;
+          if (a.createdAt > b.createdAt) return -1;
+          // scanId ASC (tie-breaker)
+          if (a.id < b.id) return -1;
+          if (a.id > b.id) return 1;
+          return 0;
+        })
+        .map((scan) => this.reconstruct(scan)),
+    );
   }
 
   /**

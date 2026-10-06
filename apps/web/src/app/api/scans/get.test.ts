@@ -395,7 +395,7 @@ describe('GET /api/scans — handler', () => {
 
   describe('error handling', () => {
     it('returns 500 when the repository throws on list', async () => {
-      const repo: { list: () => Promise<never> } = {
+      const repo: { list: (technologyId?: string) => Promise<never> } = {
         list: () => Promise.reject(new Error('Connection refused')),
       };
       const response = await handleGetScans({ repository: repo as never });
@@ -407,7 +407,7 @@ describe('GET /api/scans — handler', () => {
     });
 
     it('does not leak the database error message in the 500 response', async () => {
-      const repo: { list: () => Promise<never> } = {
+      const repo: { list: (technologyId?: string) => Promise<never> } = {
         list: () => Promise.reject(new Error('Connection to PostgreSQL failed: ECONNREFUSED')),
       };
       const response = await handleGetScans({ repository: repo as never });
@@ -467,7 +467,7 @@ describe('GET /api/scans — handler', () => {
     it('sanitizes console.error for list-scans repository failure', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
       try {
-        const repo: { list: () => Promise<never> } = {
+        const repo: { list: (technologyId?: string) => Promise<never> } = {
           list: () => Promise.reject(new Error('Database connection lost')),
         };
         const response = await handleGetScans({ repository: repo as never });
@@ -650,7 +650,7 @@ describe('GET /api/scans?technologyId — handler', () => {
 
   describe('error handling', () => {
     it('returns 500 when the repository throws on list', async () => {
-      const repo: { list: () => Promise<never> } = {
+      const repo: { list: (technologyId?: string) => Promise<never> } = {
         list: () => Promise.reject(new Error('Connection refused')),
       };
       const response = await handleGetScansByTechnology('nginx', { repository: repo as never });
@@ -662,7 +662,7 @@ describe('GET /api/scans?technologyId — handler', () => {
     });
 
     it('does not leak the database error message in the 500 response', async () => {
-      const repo: { list: () => Promise<never> } = {
+      const repo: { list: (technologyId?: string) => Promise<never> } = {
         list: () => Promise.reject(new Error('Connection to PostgreSQL failed: ECONNREFUSED')),
       };
       const response = await handleGetScansByTechnology('nginx', { repository: repo as never });
@@ -675,7 +675,7 @@ describe('GET /api/scans?technologyId — handler', () => {
     it('sanitizes console.error for repository failure', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
       try {
-        const repo: { list: () => Promise<never> } = {
+        const repo: { list: (technologyId?: string) => Promise<never> } = {
           list: () => Promise.reject(new Error('Connection to PostgreSQL failed: ECONNREFUSED')),
         };
         const response = await handleGetScansByTechnology('nginx', { repository: repo as never });

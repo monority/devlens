@@ -231,7 +231,7 @@ function toCanonicalIssues(
   }
   // Defensive: include any issue not in the canonical table (future extension).
   if (detected.size > 0) {
-    ordered.push(...[...detected].sort());
+    ordered.push(...[...detected].sort((a, b) => a.localeCompare(b)));
   }
   return ordered;
 }

@@ -11,34 +11,39 @@ import { DetectionItem } from './DetectionItem';
 import type { DetectionResponse, DetectionExplainability } from '../lib/types.js';
 import { getDetectionExplainability } from '../lib/detection-explainability';
 
-describe('DetectionItem', () => {
-  const makeDetection = (overrides: Partial<DetectionResponse> = {}): DetectionResponse => ({
-    technology: { id: 'react', name: 'React', category: 'frontend' },
-    confidence: 95,
-    evidence: [{ type: 'script_url', url: 'https://cdn.example.com/react.js' }],
-    ...overrides,
-  });
+// ─── Shared fixtures & render helper ───────────────────────────────
 
+const makeDetection = (overrides: Partial<DetectionResponse> = {}): DetectionResponse => ({
+  technology: { id: 'react', name: 'React', category: 'frontend' },
+  confidence: 95,
+  evidence: [{ type: 'script_url', url: 'https://cdn.example.com/react.js' }],
+  ...overrides,
+});
+
+function renderDetection(detection: DetectionResponse, index = 0) {
+  const html = renderToString(React.createElement(DetectionItem, { detection, index }));
+  return {
+    html,
+    cleaned: html.replace(/<!-- -->/g, ''),
+    decoded: html.replace(/&#x27;/g, "'"),
+  };
+}
+
+describe('DetectionItem', () => {
   it('renders technology name', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, { detection: makeDetection(), index: 0 }),
-    );
+    const { html } = renderDetection(makeDetection());
 
     expect(html).toContain('React');
   });
 
   it('renders technology category', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, { detection: makeDetection(), index: 0 }),
-    );
+    const { html } = renderDetection(makeDetection());
 
     expect(html).toContain('frontend');
   });
 
   it('renders confidence score exactly as returned by the API', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, { detection: makeDetection(), index: 0 }),
-    );
+    const { html } = renderDetection(makeDetection());
 
     expect(html).toContain('95');
     expect(html).toContain('Confidence');
@@ -48,12 +53,7 @@ describe('DetectionItem', () => {
   });
 
   it('never renders confidence as a probability (no "%" suffix)', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, {
-        detection: makeDetection({ confidence: 87 }),
-        index: 0,
-      }),
-    );
+    const { html } = renderDetection(makeDetection({ confidence: 87 }));
 
     // The raw score is present, but never as a percentage.
     expect(html).toContain('87');
@@ -70,24 +70,20 @@ describe('DetectionItem', () => {
         { type: 'meta_tag', name: 'generator', content: 'React 19' },
       ],
     };
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
-    const cleaned = html.replace(/<!-- -->/g, '');
+    const { cleaned } = renderDetection(detection);
 
     expect(cleaned).toContain('2 evidence items');
   });
 
   it('renders singular "item" for a single evidence entry', () => {
     const detection = makeDetection();
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
-    const cleaned = html.replace(/<!-- -->/g, '');
+    const { cleaned } = renderDetection(detection);
 
     expect(cleaned).toContain('1 evidence item');
   });
 
   it('renders evidence items inside the detection', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, { detection: makeDetection(), index: 0 }),
-    );
+    const { html } = renderDetection(makeDetection());
 
     expect(html).toContain('Script URL');
     expect(html).toContain('https://cdn.example.com/react.js');
@@ -95,14 +91,14 @@ describe('DetectionItem', () => {
 
   it('preserves exact confidence value without rounding', () => {
     const detection = makeDetection({ confidence: 87 });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const { html } = renderDetection(detection);
 
     expect(html).toContain('87');
   });
 
   it('does not introduce subjective labels', () => {
     const detection = makeDetection({ confidence: 30 });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const { html } = renderDetection(detection);
 
     // No subjective labels like "weak", "likely", "excellent"
     expect(html).not.toContain('weak');
@@ -114,13 +110,6 @@ describe('DetectionItem', () => {
 });
 
 describe('DetectionItem — Step 33 explanation', () => {
-  const makeDetection = (overrides: Partial<DetectionResponse> = {}): DetectionResponse => ({
-    technology: { id: 'react', name: 'React', category: 'frontend' },
-    confidence: 95,
-    evidence: [{ type: 'script_url', url: 'https://cdn.example.com/react.js' }],
-    ...overrides,
-  });
-
   it('renders the detected-because reasons list', () => {
     const detection = makeDetection({
       evidence: [
@@ -128,8 +117,7 @@ describe('DetectionItem — Step 33 explanation', () => {
         { type: 'meta_tag', name: 'generator', content: 'WordPress' },
       ],
     });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
-    const decoded = html.replace(/&#x27;/g, "'");
+    const { decoded } = renderDetection(detection);
 
     expect(decoded).toContain('Detected because');
     // Each evidence item is rendered as a reason line with its matched value.
@@ -140,7 +128,7 @@ describe('DetectionItem — Step 33 explanation', () => {
 
   it('preserves exact confidence value in the explanation', () => {
     const detection = makeDetection({ confidence: 87 });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const { html } = renderDetection(detection);
 
     // Confidence should still appear as-is
     expect(html).toContain('87');
@@ -154,7 +142,7 @@ describe('DetectionItem — Step 33 explanation', () => {
         { type: 'script_url', url: 'https://cdn.example.com/app.js' },
       ],
     });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const { html } = renderDetection(detection);
 
     expect(html).toContain('HTTP Header');
     expect(html).toContain('Meta Tag');
@@ -163,7 +151,7 @@ describe('DetectionItem — Step 33 explanation', () => {
 
   it('renders "No direct evidence available." for zero evidence', () => {
     const detection = makeDetection({ evidence: [] });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const { html } = renderDetection(detection);
 
     expect(html).toContain('No direct evidence available.');
   });
@@ -172,7 +160,7 @@ describe('DetectionItem — Step 33 explanation', () => {
     const detection = makeDetection({
       technology: { id: 'nginx', name: 'nginx', category: 'server' },
     });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const { html } = renderDetection(detection);
 
     // Known technology should link to /technologies/nginx
     expect(html).toContain('href="/technologies/nginx"');
@@ -183,7 +171,7 @@ describe('DetectionItem — Step 33 explanation', () => {
     const detection = makeDetection({
       technology: { id: 'unknown-tech', name: 'Unknown Tech', category: 'unknown' },
     });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const { html } = renderDetection(detection);
 
     // Should NOT link to /technologies/unknown-tech
     expect(html).not.toContain('/technologies/unknown-tech');
@@ -195,7 +183,7 @@ describe('DetectionItem — Step 33 explanation', () => {
     const detection = makeDetection({
       technology: { id: 'react', name: 'React.js', category: 'frontend' },
     });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const { html } = renderDetection(detection);
 
     // Link must use the canonical ID ('react'), not the display name
     expect(html).toContain('href="/technologies/react"');
@@ -213,8 +201,7 @@ describe('DetectionItem — Step 33 explanation', () => {
         { type: 'meta_tag', name: 'generator', content: 'WordPress' },
       ],
     });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
-    const cleaned = html.replace(/<!-- -->/g, '');
+    const { cleaned } = renderDetection(detection);
 
     // Technology name is rendered (as a link)
     expect(cleaned).toContain('nginx');
@@ -231,8 +218,7 @@ describe('DetectionItem — Step 33 explanation', () => {
     const detection = makeDetection({
       evidence: [{ type: 'script_url', url: 'https://cdn.example.com/react.js' }],
     });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
-    const cleaned = html.replace(/<!-- -->/g, '');
+    const { cleaned } = renderDetection(detection);
 
     // Evidence disclosure should still be present
     expect(cleaned).toContain('Evidence (1)');
@@ -251,7 +237,7 @@ describe('DetectionItem — Step 33 explanation', () => {
         { type: 'link', url: 'https://cdn.example.com/style.css' },
       ],
     });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const { html } = renderDetection(detection);
 
     expect(html).toContain('HTTP Header');
     expect(html).toContain('Meta Tag');
@@ -265,13 +251,6 @@ describe('DetectionItem — Step 33 explanation', () => {
 });
 
 describe('DetectionItem — Step 39 explainability', () => {
-  const makeDetection = (overrides: Partial<DetectionResponse> = {}): DetectionResponse => ({
-    technology: { id: 'react', name: 'React', category: 'frontend' },
-    confidence: 95,
-    evidence: [{ type: 'script_url', url: 'https://cdn.example.com/react.js' }],
-    ...overrides,
-  });
-
   it('renders evidence source descriptions', () => {
     const detection = makeDetection({
       evidence: [
@@ -279,10 +258,7 @@ describe('DetectionItem — Step 39 explainability', () => {
         { type: 'script_url', url: 'https://cdn.example.com/react.js' },
       ],
     });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
-    // React renderToString escapes single quotes as &#x27; in text content
-    const decoded = html.replace(/&#x27;/g, "'");
-
+    const { decoded } = renderDetection(detection);
     // Source descriptions derived from evidence fields
     expect(decoded).toContain("HTTP header 'Server'");
     expect(decoded).toContain("Script from 'https://cdn.example.com/react.js'");
@@ -292,8 +268,7 @@ describe('DetectionItem — Step 39 explainability', () => {
     const detection = makeDetection({
       evidence: [{ type: 'html', selector: '#app', snippet: '<div>' }],
     });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
-    const decoded = html.replace(/&#x27;/g, "'");
+    const { html, decoded } = renderDetection(detection);
 
     expect(html).toContain('HTML Element');
     expect(decoded).toContain("HTML element at '#app'");
@@ -304,7 +279,7 @@ describe('DetectionItem — Step 39 explainability', () => {
     const detection = makeDetection({
       evidence: [{ type: 'http_header', name: longValue, value: 'nginx' }],
     });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const { html } = renderDetection(detection);
 
     // Full value should be available in the title attribute
     expect(html).toContain(`title="${longValue}: nginx"`);
@@ -323,8 +298,7 @@ describe('DetectionItem — Step 39 explainability', () => {
         { type: 'link', url: 'https://cdn.example.com/style.css' },
       ],
     });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
-    const decoded = html.replace(/&#x27;/g, "'");
+    const { html, decoded } = renderDetection(detection);
 
     expect(decoded).toContain("HTTP header 'Server'");
     expect(decoded).toContain("Meta tag 'generator'");
@@ -338,7 +312,7 @@ describe('DetectionItem — Step 39 explainability', () => {
 
   it('preserves confidence in explainability rendering', () => {
     const detection = makeDetection({ confidence: 87 });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const { html } = renderDetection(detection);
 
     expect(html).toContain('87');
     expect(html).toContain('Confidence');
@@ -346,7 +320,7 @@ describe('DetectionItem — Step 39 explainability', () => {
 
   it('handles zero evidence (no source list, no crash)', () => {
     const detection = makeDetection({ evidence: [] });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const { html } = renderDetection(detection);
 
     // Should not contain evidence source items
     expect(html).not.toContain("HTTP header '");
@@ -361,8 +335,7 @@ describe('DetectionItem — Step 39 explainability', () => {
         { type: 'http_header', name: 'Server', value: 'Apache' },
       ],
     });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
-    const cleaned = html.replace(/<!-- -->/g, '');
+    const { cleaned } = renderDetection(detection);
 
     // The exact nginx duplicate collapses to one, but Server:Apache is a
     // distinct evidence item (canonical identity includes the value) → 2
@@ -380,8 +353,7 @@ describe('DetectionItem — Step 39 explainability', () => {
         { type: 'http_header', name: 'Server', value: 'nginx' },
       ],
     });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
-    const decoded = html.replace(/&#x27;/g, "'");
+    const { decoded } = renderDetection(detection);
 
     // Order: HTTP Header (Server) → HTTP Header (X-Powered-By) → Script URL
     const serverPos = decoded.indexOf("HTTP header 'Server'");
@@ -405,34 +377,19 @@ describe('DetectionItem — version rendering', () => {
   });
 
   it('renders the version when the detection carries one', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, {
-        detection: makeDetection({ version: '1.21.6' }),
-        index: 0,
-      }),
-    );
-    const cleaned = html.replace(/<!-- -->/g, '');
+    const { cleaned } = renderDetection(makeDetection({ version: '1.21.6' }));
 
     expect(cleaned).toContain('Version: 1.21.6');
   });
 
   it('omits the version entirely when the detection has no version', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, { detection: makeDetection(), index: 0 }),
-    );
-    const cleaned = html.replace(/<!-- -->/g, '');
+    const { cleaned } = renderDetection(makeDetection());
 
     expect(cleaned).not.toContain('Version:');
   });
 
   it('never renders a version with a percent suffix (version is not a probability)', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, {
-        detection: makeDetection({ version: '6.4.2' }),
-        index: 0,
-      }),
-    );
-    const cleaned = html.replace(/<!-- -->/g, '');
+    const { cleaned } = renderDetection(makeDetection({ version: '6.4.2' }));
 
     expect(cleaned).toContain('Version: 6.4.2');
     expect(cleaned).not.toContain('6.4.2%');
@@ -440,13 +397,7 @@ describe('DetectionItem — version rendering', () => {
   });
 
   it('version is subordinate to technology name, confidence, and evidence', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, {
-        detection: makeDetection({ version: '1.21.6' }),
-        index: 0,
-      }),
-    );
-    const cleaned = html.replace(/<!-- -->/g, '');
+    const { cleaned } = renderDetection(makeDetection({ version: '1.21.6' }));
 
     // Primary signals still render...
     expect(cleaned).toContain('nginx');
@@ -466,14 +417,11 @@ describe('DetectionItem — Step 69 derived & conflict rendering', () => {
   });
 
   it('renders a "Derived from … (implies)" banner for a relationship-derived detection', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, {
-        detection: makeDetection({
-          technology: { id: 'react', name: 'React', category: 'frontend' },
-          source: 'relationship',
-          derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
-        }),
-        index: 0,
+    const { html } = renderDetection(
+      makeDetection({
+        technology: { id: 'react', name: 'React', category: 'frontend' },
+        source: 'relationship',
+        derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
       }),
     );
 
@@ -482,13 +430,10 @@ describe('DetectionItem — Step 69 derived & conflict rendering', () => {
   });
 
   it('renders no derived banner for a direct (directly-observed) detection', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, {
-        detection: makeDetection({
-          confidence: 95,
-          evidence: [{ type: 'script_url', url: 'https://cdn.example.com/react.js' }],
-        }),
-        index: 0,
+    const { html } = renderDetection(
+      makeDetection({
+        confidence: 95,
+        evidence: [{ type: 'script_url', url: 'https://cdn.example.com/react.js' }],
       }),
     );
 
@@ -497,49 +442,38 @@ describe('DetectionItem — Step 69 derived & conflict rendering', () => {
   });
 
   it('renders a requires conflict banner', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, {
-        detection: makeDetection({
-          confidence: 85,
-          evidence: [{ type: 'script_url', url: 'https://example.com/wc/cart.min.js' }],
-          relationshipConflicts: [
-            { type: 'requires', other: 'wordpress', reason: 'missing_requirement' },
-          ],
-        }),
-        index: 0,
+    const { cleaned } = renderDetection(
+      makeDetection({
+        confidence: 85,
+        evidence: [{ type: 'script_url', url: 'https://example.com/wc/cart.min.js' }],
+        relationshipConflicts: [
+          { type: 'requires', other: 'wordpress', reason: 'missing_requirement' },
+        ],
       }),
     );
-    const cleaned = html.replace(/<!-- -->/g, '');
 
     expect(cleaned).toContain('Conflict: requires (wordpress)');
   });
 
   it('renders an excludes conflict banner', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, {
-        detection: makeDetection({
-          confidence: 90,
-          evidence: [{ type: 'http_header', name: 'Server', value: 'nginx' }],
-          relationshipConflicts: [
-            { type: 'excludes', other: 'vercel', reason: 'both_directly_observed' },
-          ],
-        }),
-        index: 0,
+    const { cleaned } = renderDetection(
+      makeDetection({
+        confidence: 90,
+        evidence: [{ type: 'http_header', name: 'Server', value: 'nginx' }],
+        relationshipConflicts: [
+          { type: 'excludes', other: 'vercel', reason: 'both_directly_observed' },
+        ],
       }),
     );
-    const cleaned = html.replace(/<!-- -->/g, '');
 
     expect(cleaned).toContain('Conflict: excludes (vercel)');
   });
 
   it('still renders the zero-evidence state for a derived detection', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, {
-        detection: makeDetection({
-          source: 'relationship',
-          derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
-        }),
-        index: 0,
+    const { html } = renderDetection(
+      makeDetection({
+        source: 'relationship',
+        derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
       }),
     );
 
@@ -553,28 +487,24 @@ describe('DetectionItem — Step 69 derived & conflict rendering', () => {
     // impossible (direct ⇒ no source), but it CAN carry a conflict. This
     // guards that a conflicted DIRECT detection never shows a derived
     // banner while still showing its conflict.
-    const html = renderToString(
-      React.createElement(DetectionItem, {
-        detection: makeDetection({
-          confidence: 85,
-          evidence: [{ type: 'script_url', url: 'https://example.com/wc/cart.min.js' }],
-          relationshipConflicts: [
-            { type: 'requires', other: 'wordpress', reason: 'missing_requirement' },
-          ],
-        }),
-        index: 0,
+    const { html, cleaned } = renderDetection(
+      makeDetection({
+        confidence: 85,
+        evidence: [{ type: 'script_url', url: 'https://example.com/wc/cart.min.js' }],
+        relationshipConflicts: [
+          { type: 'requires', other: 'wordpress', reason: 'missing_requirement' },
+        ],
       }),
     );
 
     expect(html).not.toContain('Derived from');
-    const cleaned = html.replace(/<!-- -->/g, '');
     expect(cleaned).toContain('Conflict: requires (wordpress)');
   });
 });
 
 describe('DetectionItem — Step 73 explainability rendering', () => {
-  // Local helper (mirrors the parent describe's makeDetection) so this block
-  // is self-contained and does not depend on the enclosing describe's scope.
+  // Local helper using nginx base — different technology/evidence from the
+  // module-level makeDetection (which uses react base).
   const makeDetection = (overrides: Partial<DetectionResponse> = {}): DetectionResponse => ({
     technology: { id: 'nginx', name: 'nginx', category: 'server' },
     confidence: 80,
@@ -583,17 +513,13 @@ describe('DetectionItem — Step 73 explainability rendering', () => {
   });
 
   it('renders a relationship-derived reason in the "Detected because" list', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, {
-        detection: makeDetection({
-          evidence: [],
-          source: 'relationship',
-          derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
-        }),
-        index: 0,
+    const { cleaned } = renderDetection(
+      makeDetection({
+        evidence: [],
+        source: 'relationship',
+        derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
       }),
     );
-    const cleaned = html.replace(/<!-- -->/g, '').replace(/&#x27;/g, "'");
 
     expect(cleaned).toContain('Detected because');
     expect(cleaned).toContain('Derived from Next.js');
@@ -601,21 +527,17 @@ describe('DetectionItem — Step 73 explainability rendering', () => {
   });
 
   it('renders version-conflict detail from disagreeing evidence', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, {
-        detection: makeDetection({
-          evidence: [{ type: 'http_header', name: 'Server', value: '18.2.0' }],
-          version: null,
-          versionConflict: true,
-          versionEvidence: [
-            { type: 'http_header', name: 'Server', value: '18.2.0' },
-            { type: 'http_header', name: 'Server', value: '18.3.1' },
-          ],
-        }),
-        index: 0,
+    const { cleaned } = renderDetection(
+      makeDetection({
+        evidence: [{ type: 'http_header', name: 'Server', value: '18.2.0' }],
+        version: null,
+        versionConflict: true,
+        versionEvidence: [
+          { type: 'http_header', name: 'Server', value: '18.2.0' },
+          { type: 'http_header', name: 'Server', value: '18.3.1' },
+        ],
       }),
     );
-    const cleaned = html.replace(/<!-- -->/g, '');
 
     expect(cleaned).toContain('Version evidence is inconsistent');
     expect(cleaned).toContain('HTTP Header');
@@ -626,23 +548,19 @@ describe('DetectionItem — Step 73 explainability rendering', () => {
   });
 
   it('renders resource_content evidence in the reasons list', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, {
-        detection: makeDetection({
-          evidence: [
-            {
-              type: 'resource_content',
-              url: 'https://cdn.example.com/main.js',
-              resourceType: 'script',
-              match: 'ng.version',
-              snippet: 'ng',
-            },
-          ],
-        }),
-        index: 0,
+    const { decoded } = renderDetection(
+      makeDetection({
+        evidence: [
+          {
+            type: 'resource_content',
+            url: 'https://cdn.example.com/main.js',
+            resourceType: 'script',
+            match: 'ng.version',
+            snippet: 'ng',
+          },
+        ],
       }),
     );
-    const decoded = html.replace(/&#x27;/g, "'");
 
     expect(decoded).toContain('Detected because');
     expect(decoded).toContain('Resource Content');
@@ -651,29 +569,15 @@ describe('DetectionItem — Step 73 explainability rendering', () => {
   });
 
   it('renders "No direct evidence available." for a direct detection with no evidence', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, {
-        detection: makeDetection({ evidence: [] }),
-        index: 0,
-      }),
-    );
+    const { html } = renderDetection(makeDetection({ evidence: [] }));
 
     expect(html).toContain('No direct evidence available.');
   });
 });
 
 describe('DetectionItem — Step 76 signal quality rendering', () => {
-  const makeDetection = (overrides: Partial<DetectionResponse> = {}): DetectionResponse => ({
-    technology: { id: 'react', name: 'React', category: 'frontend' },
-    confidence: 95,
-    evidence: [{ type: 'script_url', url: 'https://cdn.example.com/react.js' }],
-    ...overrides,
-  });
-
   it('renders a compact single-signal quality line (§10)', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, { detection: makeDetection(), index: 0 }),
-    );
+    const { html } = renderDetection(makeDetection());
 
     expect(html).toContain('Single signal');
     expect(html).toContain('1 source');
@@ -682,15 +586,12 @@ describe('DetectionItem — Step 76 signal quality rendering', () => {
   });
 
   it('renders a compact multi-source quality line (§10)', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, {
-        detection: makeDetection({
-          evidence: [
-            { type: 'http_header', name: 'X-Powered-By', value: 'React' },
-            { type: 'meta_tag', name: 'generator', content: 'React 19' },
-          ],
-        }),
-        index: 0,
+    const { html } = renderDetection(
+      makeDetection({
+        evidence: [
+          { type: 'http_header', name: 'X-Powered-By', value: 'React' },
+          { type: 'meta_tag', name: 'generator', content: 'React 19' },
+        ],
       }),
     );
 
@@ -700,14 +601,11 @@ describe('DetectionItem — Step 76 signal quality rendering', () => {
   });
 
   it('renders "Derived · no direct evidence" for a relationship-derived detection (§11)', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, {
-        detection: makeDetection({
-          evidence: [],
-          source: 'relationship',
-          derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
-        }),
-        index: 0,
+    const { html } = renderDetection(
+      makeDetection({
+        evidence: [],
+        source: 'relationship',
+        derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
       }),
     );
 
@@ -718,12 +616,6 @@ describe('DetectionItem — Step 76 signal quality rendering', () => {
 
 // Step 77 §14 — presentation of confidence · signal quality · provenance.
 describe('DetectionItem — Step 77 presentation (confidence · signal quality · provenance)', () => {
-  const mk = (overrides: Partial<DetectionResponse> = {}): DetectionResponse => ({
-    technology: { id: 'react', name: 'React', category: 'frontend' },
-    confidence: 95,
-    evidence: [{ type: 'script_url', url: 'https://cdn.example.com/react.js' }],
-    ...overrides,
-  });
   const explanationWithoutSq = (detection: DetectionResponse): DetectionExplainability => {
     const full = getDetectionExplainability(detection);
     const legacy: DetectionExplainability = { ...full };
@@ -734,17 +626,14 @@ describe('DetectionItem — Step 77 presentation (confidence · signal quality �
   };
 
   it('renders a combined confidence · signal-quality · provenance header (§6)', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, {
-        detection: mk({
-          confidence: 100,
-          evidence: [
-            { type: 'script_url', url: 'https://cdn.example.com/react.js' },
-            { type: 'http_header', name: 'X-Powered-By', value: 'React' },
-            { type: 'meta_tag', name: 'generator', content: 'React' },
-          ],
-        }),
-        index: 0,
+    const { html } = renderDetection(
+      makeDetection({
+        confidence: 100,
+        evidence: [
+          { type: 'script_url', url: 'https://cdn.example.com/react.js' },
+          { type: 'http_header', name: 'X-Powered-By', value: 'React' },
+          { type: 'meta_tag', name: 'generator', content: 'React' },
+        ],
       }),
     );
 
@@ -754,23 +643,18 @@ describe('DetectionItem — Step 77 presentation (confidence · signal quality �
   });
 
   it('renders a combined header for a single-signal direct detection', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, { detection: mk({ confidence: 95 }), index: 0 }),
-    );
+    const { html } = renderDetection(makeDetection({ confidence: 95 }));
 
     expect(html).toContain('Confidence: 95 · Single signal · 1 source · Direct');
   });
 
   it('renders "Derived · no direct evidence" in the combined header (§10)', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, {
-        detection: mk({
-          confidence: 0,
-          source: 'relationship',
-          derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
-          evidence: [],
-        }),
-        index: 0,
+    const { html } = renderDetection(
+      makeDetection({
+        confidence: 0,
+        source: 'relationship',
+        derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
+        evidence: [],
       }),
     );
 
@@ -781,15 +665,12 @@ describe('DetectionItem — Step 77 presentation (confidence · signal quality �
   });
 
   it('renders a "No direct evidence available." body for relationship-only detections', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, {
-        detection: mk({
-          confidence: 0,
-          source: 'relationship',
-          derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
-          evidence: [],
-        }),
-        index: 0,
+    const { html } = renderDetection(
+      makeDetection({
+        confidence: 0,
+        source: 'relationship',
+        derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
+        evidence: [],
       }),
     );
 
@@ -801,12 +682,7 @@ describe('DetectionItem — Step 77 presentation (confidence · signal quality �
   it('renders the version subordinate to the combined header (§6 version is secondary)', () => {
     // `renderToString` inserts `<!-- -->` between "Version:" and the value,
     // so assert them as separate substrings (comment-safe).
-    const html = renderToString(
-      React.createElement(DetectionItem, {
-        detection: mk({ confidence: 95, version: '6.4.2' }),
-        index: 0,
-      }),
-    );
+    const { html } = renderDetection(makeDetection({ confidence: 95, version: '6.4.2' }));
 
     expect(html).toContain('Confidence: 95 · Single signal · 1 source · Direct');
     expect(html).toContain('Version:');
@@ -815,8 +691,8 @@ describe('DetectionItem — Step 77 presentation (confidence · signal quality �
   });
 
   it('falls back to a provenance-only line when the API omits signalQuality (legacy)', () => {
-    const detection = mk({ explanation: explanationWithoutSq(mk()) });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const detection = makeDetection({ explanation: explanationWithoutSq(makeDetection()) });
+    const { html } = renderDetection(detection);
 
     expect(html).toContain('Confidence: 95 · Direct');
     expect(html).not.toContain('%');
@@ -835,24 +711,20 @@ describe('DetectionItem — Step 80 provenance (signals line)', () => {
     }) as DetectionResponse;
 
   it('renders the "N signals" line with type labels', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, {
-        detection: makeDetection({
-          evidence: [
-            { type: 'http_header', name: 'Server', value: 'nginx' },
-            { type: 'meta_tag', name: 'generator', content: 'nginx' },
-            { type: 'script_url', url: 'https://cdn.example.com/app.js' },
-          ],
-          provenance: {
-            evidenceCount: 3,
-            evidenceTypes: ['http_header', 'meta_tag', 'script_url'],
-            strongestEvidenceType: 'http_header',
-          },
-        }),
-        index: 0,
+    const { cleaned } = renderDetection(
+      makeDetection({
+        evidence: [
+          { type: 'http_header', name: 'Server', value: 'nginx' },
+          { type: 'meta_tag', name: 'generator', content: 'nginx' },
+          { type: 'script_url', url: 'https://cdn.example.com/app.js' },
+        ],
+        provenance: {
+          evidenceCount: 3,
+          evidenceTypes: ['http_header', 'meta_tag', 'script_url'],
+          strongestEvidenceType: 'http_header',
+        },
       }),
     );
-    const cleaned = html.replace(/<!-- -->/g, '');
 
     expect(cleaned).toContain('3 signals');
     expect(cleaned).toContain('HTTP Header');
@@ -861,28 +733,21 @@ describe('DetectionItem — Step 80 provenance (signals line)', () => {
   });
 
   it('renders the singular form for a single evidence type', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, {
-        detection: makeDetection({
-          provenance: {
-            evidenceCount: 1,
-            evidenceTypes: ['script_url'],
-            strongestEvidenceType: 'script_url',
-          },
-        }),
-        index: 0,
+    const { cleaned } = renderDetection(
+      makeDetection({
+        provenance: {
+          evidenceCount: 1,
+          evidenceTypes: ['script_url'],
+          strongestEvidenceType: 'script_url',
+        },
       }),
     );
-    const cleaned = html.replace(/<!-- -->/g, '');
 
     expect(cleaned).toContain('1 signal');
   });
 
   it('omits the signals line when provenance is absent', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, { detection: makeDetection(), index: 0 }),
-    );
-    const cleaned = html.replace(/<!-- -->/g, '');
+    const { cleaned } = renderDetection(makeDetection());
 
     expect(cleaned).not.toContain('signals');
   });
@@ -890,18 +755,8 @@ describe('DetectionItem — Step 80 provenance (signals line)', () => {
 
 // Step 86 §5/§6 — per-detection integrity verdict in the header.
 describe('DetectionItem — Step 86 integrity notice', () => {
-  const makeDetection = (overrides: Partial<DetectionResponse> = {}): DetectionResponse => ({
-    technology: { id: 'react', name: 'React', category: 'frontend' },
-    confidence: 95,
-    evidence: [{ type: 'script_url', url: 'https://cdn.example.com/react.js' }],
-    ...overrides,
-  });
-
   it('does not render an integrity notice for a clean detection (no integrity field)', () => {
-    const html = renderToString(
-      React.createElement(DetectionItem, { detection: makeDetection(), index: 0 }),
-    );
-    const cleaned = html.replace(/<!-- -->/g, '');
+    const { cleaned } = renderDetection(makeDetection());
 
     expect(cleaned).not.toContain('Integrity issue');
     expect(cleaned).not.toContain('Integrity issues');
@@ -909,7 +764,7 @@ describe('DetectionItem — Step 86 integrity notice', () => {
 
   it('does not render an integrity notice for a valid-but-present verdict', () => {
     const detection = makeDetection({ integrity: { valid: true, issues: [] } });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const { html } = renderDetection(detection);
 
     expect(html).not.toContain('Integrity issue');
   });
@@ -921,7 +776,7 @@ describe('DetectionItem — Step 86 integrity notice', () => {
         issues: ['DUPLICATE_EVIDENCE' as const],
       },
     });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const { html } = renderDetection(detection);
 
     expect(html).toContain('Integrity issue');
     expect(html).toContain('Duplicate evidence');
@@ -934,7 +789,7 @@ describe('DetectionItem — Step 86 integrity notice', () => {
         issues: ['DUPLICATE_EVIDENCE' as const, 'EMPTY_EVIDENCE' as const],
       },
     });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const { html } = renderDetection(detection);
 
     expect(html).toContain('Integrity issues');
     expect(html).toContain('Duplicate evidence');
@@ -954,7 +809,7 @@ describe('DetectionItem — Step 86 integrity notice', () => {
         ],
       },
     });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const { html } = renderDetection(detection);
 
     // Labels appear in canonical order
     const identityPos = html.indexOf('Invalid detection identity');
@@ -976,7 +831,7 @@ describe('DetectionItem — Step 86 integrity notice', () => {
         issues: ['DUPLICATE_EVIDENCE' as const],
       },
     });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
+    const { html } = renderDetection(detection);
 
     // The title attribute contains the longer description.
     expect(html).toContain('class=');
@@ -1000,8 +855,7 @@ describe('DetectionItem — Step 86 integrity notice', () => {
         issues: ['DUPLICATE_EVIDENCE' as const],
       },
     });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
-    const cleaned = html.replace(/<!-- -->/g, '');
+    const { cleaned } = renderDetection(detection);
 
     // Both the provenance "signals" line and the integrity notice coexist.
     expect(cleaned).toContain('2 signals');
@@ -1016,8 +870,7 @@ describe('DetectionItem — Step 86 integrity notice', () => {
         issues: ['EMPTY_EVIDENCE' as const],
       },
     });
-    const html = renderToString(React.createElement(DetectionItem, { detection, index: 0 }));
-    const cleaned = html.replace(/<!-- -->/g, '');
+    const { cleaned } = renderDetection(detection);
 
     // Normal rendering is intact alongside the integrity notice.
     expect(cleaned).toContain('React');

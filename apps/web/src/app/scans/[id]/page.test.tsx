@@ -63,6 +63,27 @@ function makeScan(target: string, status: string = 'completed', id: string = 'sc
   };
 }
 
+// ─── Render helper ───────────────────────────────────────────────────
+
+/**
+ * Renders ScanDetailPage with standard params/searchParams in one call.
+ * Returns raw HTML, comment-stripped, and HTML-entity-decoded variants.
+ * Collapses the repeated renderToString + replace boilerplate.
+ */
+async function renderPage(id = 'scan_001') {
+  const html = renderToString(
+    await ScanDetailPage({
+      params: Promise.resolve({ id }),
+      searchParams: Promise.resolve({}),
+    }),
+  );
+  return {
+    html,
+    cleaned: html.replace(/<!-- -->/g, ''),
+    decoded: html.replace(/&amp;/g, '&'),
+  };
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────
 
 describe('ScanDetailPage — Re-scan action', () => {
@@ -73,13 +94,7 @@ describe('ScanDetailPage — Re-scan action', () => {
       detections: [],
     });
 
-    const html = renderToString(
-      await ScanDetailPage({
-        params: Promise.resolve({ id: 'scan_001' }),
-        searchParams: Promise.resolve({}),
-      }),
-    );
-    const cleaned = html.replace(/<!-- -->/g, '');
+    const { cleaned } = await renderPage();
 
     // Re-scan link should point to /scans/new with target query param
     expect(cleaned).toContain('href="/scans/new?target=');
@@ -94,13 +109,7 @@ describe('ScanDetailPage — Re-scan action', () => {
       detections: [],
     });
 
-    const html = renderToString(
-      await ScanDetailPage({
-        params: Promise.resolve({ id: 'scan_001' }),
-        searchParams: Promise.resolve({}),
-      }),
-    );
-    const decoded = html.replace(/&amp;/g, '&');
+    const { decoded } = await renderPage();
 
     // Target should be URL-encoded in the href
     expect(decoded).toContain(
@@ -115,13 +124,7 @@ describe('ScanDetailPage — Re-scan action', () => {
       detections: [],
     });
 
-    const html = renderToString(
-      await ScanDetailPage({
-        params: Promise.resolve({ id: 'scan_001' }),
-        searchParams: Promise.resolve({}),
-      }),
-    );
-    const cleaned = html.replace(/<!-- -->/g, '');
+    const { cleaned } = await renderPage();
 
     expect(cleaned).not.toContain('Re-scan');
   });
@@ -133,13 +136,7 @@ describe('ScanDetailPage — Re-scan action', () => {
       detections: [],
     });
 
-    const html = renderToString(
-      await ScanDetailPage({
-        params: Promise.resolve({ id: 'scan_failed' }),
-        searchParams: Promise.resolve({}),
-      }),
-    );
-    const cleaned = html.replace(/<!-- -->/g, '');
+    const { cleaned } = await renderPage('scan_failed');
 
     expect(cleaned).toContain('Re-scan');
     expect(cleaned).toContain('href="/scans/new?target=');
@@ -148,13 +145,7 @@ describe('ScanDetailPage — Re-scan action', () => {
   it('does not render a Re-scan link when scan is not found (404)', async () => {
     mockFetchScanById.mockResolvedValue(null);
 
-    const html = renderToString(
-      await ScanDetailPage({
-        params: Promise.resolve({ id: 'nonexistent' }),
-        searchParams: Promise.resolve({}),
-      }),
-    );
-    const cleaned = html.replace(/<!-- -->/g, '');
+    const { cleaned } = await renderPage('nonexistent');
 
     expect(cleaned).not.toContain('Re-scan');
   });
@@ -162,13 +153,7 @@ describe('ScanDetailPage — Re-scan action', () => {
   it('does not render a Re-scan link on API error (500)', async () => {
     mockFetchScanById.mockRejectedValue(new Error('DB connection failed'));
 
-    const html = renderToString(
-      await ScanDetailPage({
-        params: Promise.resolve({ id: 'scan_001' }),
-        searchParams: Promise.resolve({}),
-      }),
-    );
-    const cleaned = html.replace(/<!-- -->/g, '');
+    const { cleaned } = await renderPage();
 
     expect(cleaned).not.toContain('Re-scan');
   });
@@ -180,13 +165,7 @@ describe('ScanDetailPage — Re-scan action', () => {
       detections: [],
     });
 
-    const html = renderToString(
-      await ScanDetailPage({
-        params: Promise.resolve({ id: 'scan_001' }),
-        searchParams: Promise.resolve({}),
-      }),
-    );
-    const cleaned = html.replace(/<!-- -->/g, '');
+    const { cleaned } = await renderPage();
 
     // Both "New scan" (blank form) and "Re-scan" (prefilled) should be present
     expect(cleaned).toContain('New scan');
@@ -200,13 +179,7 @@ describe('ScanDetailPage — Re-scan action', () => {
       detections: [],
     });
 
-    const html = renderToString(
-      await ScanDetailPage({
-        params: Promise.resolve({ id: 'scan_001' }),
-        searchParams: Promise.resolve({}),
-      }),
-    );
-    const cleaned = html.replace(/<!-- -->/g, '');
+    const { cleaned } = await renderPage();
 
     expect(cleaned).toContain('Compare with another scan');
     expect(cleaned).toContain('href="/scans/compare?left=scan_001"');
@@ -219,13 +192,7 @@ describe('ScanDetailPage — Re-scan action', () => {
       detections: [],
     });
 
-    const html = renderToString(
-      await ScanDetailPage({
-        params: Promise.resolve({ id: 'scan_001' }),
-        searchParams: Promise.resolve({}),
-      }),
-    );
-    const cleaned = html.replace(/<!-- -->/g, '');
+    const { cleaned } = await renderPage();
 
     // Comparisons require completed scans; the link must not offer a dead end.
     expect(cleaned).not.toContain('Compare with another scan');

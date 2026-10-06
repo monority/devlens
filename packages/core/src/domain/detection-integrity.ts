@@ -154,15 +154,13 @@ function evidenceIdentity(evidence: Evidence): string {
     case 'meta_tag':
       return `meta_tag|${evidence.name}|${evidence.content}`;
     case 'script_url':
-      return `script_url|${normalizeUrl(evidence.url)}`;
+    case 'resource':
+    case 'link':
+      return `${evidence.type}|${normalizeUrl(evidence.url)}`;
     case 'script_content':
       return `script_content|${evidence.snippet}`;
     case 'javascript_global':
       return `javascript_global|${evidence.globalName}`;
-    case 'resource':
-      return `resource|${normalizeUrl(evidence.url)}`;
-    case 'link':
-      return `link|${normalizeUrl(evidence.url)}`;
     case 'resource_content':
       return `resource_content|${normalizeUrl(evidence.url)}|${evidence.resourceType}|${evidence.match}`;
     case 'html':

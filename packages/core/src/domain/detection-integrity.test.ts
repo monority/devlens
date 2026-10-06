@@ -40,6 +40,31 @@ function makeTech(id = 'nginx'): Technology {
   };
 }
 
+/**
+ * Convenience: nginxEvidencePair() — the canonical
+ * two-evidence set used by ~14 tests. Replaces the repeated 4-line
+ * array literal across §1, §5.4, §5.2/§5.5, §5.3, §12, and §8 suites.
+ */
+function nginxEvidencePair(): Evidence[] {
+  return [httpEvidence(), metaEvidence()];
+}
+
+/**
+ * Compute integrity for a detection, auto-deriving provenance when
+ * not explicitly provided. Collapses the repeated
+ * ```
+ * const provenance = computeDetectionProvenance(detection);
+ * const result = checkIntegrity(detection, provenance);
+ * ```
+ * two-line sequence into one call across ~16 tests.
+ */
+function checkIntegrity(
+  detection: Detection,
+  provenance?: DetectionProvenance,
+): ReturnType<typeof computeDetectionIntegrity> {
+  return computeDetectionIntegrity(detection, provenance ?? computeDetectionProvenance(detection));
+}
+
 function httpEvidence(name = 'Server', value = 'nginx'): Evidence {
   return { type: 'http_header', name, value };
 }
@@ -56,13 +81,8 @@ function scriptContentEvidence(snippet = 'window.foo'): Evidence {
 
 describe('computeDetectionIntegrity — valid detection (§1)', () => {
   it('returns valid=true / empty issues for a direct detection with correct provenance', () => {
-    const detection = createDetection(makeTech(), createConfidence(95), [
-      httpEvidence(),
-      metaEvidence(),
-    ]);
-    const provenance = computeDetectionProvenance(detection);
-
-    const result = computeDetectionIntegrity(detection, provenance);
+    const detection = createDetection(makeTech(), createConfidence(95), nginxEvidencePair());
+    const result = checkIntegrity(detection);
 
     expect(result.valid).toBe(true);
     expect(result.issues).toEqual([]);
@@ -73,6 +93,10 @@ describe('computeDetectionIntegrity — valid detection (§1)', () => {
       { source: 'nextjs', sourceName: 'Next.js', type: 'implies' },
     ]);
 
+    // Explicitly calls computeDetectionIntegrity without provenance —
+    // this test verifies the "no provenance" code path (§101), which
+    // checkIntegrity(detection) would NOT exercise (it auto-derives
+    // provenance, which would trigger the §7 mismatch for derived detections).
     const result = computeDetectionIntegrity(detection);
 
     expect(result.valid).toBe(true);
@@ -82,7 +106,7 @@ describe('computeDetectionIntegrity — valid detection (§1)', () => {
   it('returns valid=true when no provenance is provided (only structural checks run)', () => {
     const detection = createDetection(makeTech(), createConfidence(90), [httpEvidence()]);
 
-    const result = computeDetectionIntegrity(detection);
+    const result = checkIntegrity(detection);
 
     expect(result.valid).toBe(true);
     expect(result.issues).toEqual([]);
@@ -101,7 +125,7 @@ describe('computeDetectionIntegrity — empty evidence (§6)', () => {
       evidence: [] as readonly Evidence[],
     } as unknown as Detection;
 
-    const result = computeDetectionIntegrity(detection);
+    const result = checkIntegrity(detection);
 
     expect(result.valid).toBe(false);
     expect(result.issues).toEqual(['EMPTY_EVIDENCE']);
@@ -116,6 +140,9 @@ describe('computeDetectionIntegrity — empty evidence (§6)', () => {
       derivedFrom: [{ source: 'nextjs', sourceName: 'Next.js', type: 'implies' }],
     } as unknown as Detection;
 
+    // Explicitly no provenance — checkIntegrity would auto-derive one,
+    // but this test verifies the "no provenance" path where derived
+    // detections with empty evidence are valid (§6/§7).
     const result = computeDetectionIntegrity(detection);
 
     expect(result.valid).toBe(true);
@@ -132,7 +159,7 @@ describe('computeDetectionIntegrity — duplicate evidence (§5.4)', () => {
       httpEvidence('Server', 'nginx'),
     ]);
 
-    const result = computeDetectionIntegrity(detection);
+    const result = checkIntegrity(detection);
 
     expect(result.valid).toBe(false);
     expect(result.issues).toEqual(['DUPLICATE_EVIDENCE']);
@@ -144,7 +171,7 @@ describe('computeDetectionIntegrity — duplicate evidence (§5.4)', () => {
       httpEvidence('Server', 'apache'),
     ]);
 
-    const result = computeDetectionIntegrity(detection);
+    const result = checkIntegrity(detection);
 
     expect(result.valid).toBe(true);
     expect(result.issues).toEqual([]);
@@ -153,7 +180,7 @@ describe('computeDetectionIntegrity — duplicate evidence (§5.4)', () => {
   it('does not flag duplicates for a single evidence item', () => {
     const detection = createDetection(makeTech(), createConfidence(95), [httpEvidence()]);
 
-    const result = computeDetectionIntegrity(detection);
+    const result = checkIntegrity(detection);
 
     expect(result.valid).toBe(true);
     expect(result.issues).toEqual([]);
@@ -166,7 +193,7 @@ describe('computeDetectionIntegrity — duplicate evidence (§5.4)', () => {
       { type: 'link', url: createUrl('https://cdn.example.com/logo.png') },
     ]);
 
-    const result = computeDetectionIntegrity(detection);
+    const result = checkIntegrity(detection);
 
     expect(result.valid).toBe(true);
     expect(result.issues).toEqual([]);
@@ -191,7 +218,7 @@ describe('computeDetectionIntegrity — duplicate evidence (§5.4)', () => {
     ]);
     // Same url + resourceType + match → canonical duplicate (snippet is not
     // part of the canonical identity, mirroring getEvidenceKey in detectors).
-    const result = computeDetectionIntegrity(detection);
+    const result = checkIntegrity(detection);
 
     expect(result.valid).toBe(false);
     expect(result.issues).toEqual(['DUPLICATE_EVIDENCE']);
@@ -203,7 +230,7 @@ describe('computeDetectionIntegrity — duplicate evidence (§5.4)', () => {
       { type: 'script_url', url: createUrl('https://cdn.example.com/app.js') },
     ]);
 
-    const result = computeDetectionIntegrity(detection);
+    const result = checkIntegrity(detection);
 
     expect(result.valid).toBe(false);
     expect(result.issues).toEqual(['DUPLICATE_EVIDENCE']);
@@ -214,34 +241,28 @@ describe('computeDetectionIntegrity — duplicate evidence (§5.4)', () => {
 
 describe('computeDetectionIntegrity — provenance consistency (§5.2, §5.5)', () => {
   it('flags PROVENANCE_MISMATCH when evidenceCount is wrong', () => {
-    const detection = createDetection(makeTech(), createConfidence(95), [
-      httpEvidence(),
-      metaEvidence(),
-    ]);
+    const detection = createDetection(makeTech(), createConfidence(95), nginxEvidencePair());
     const provenance: DetectionProvenance = {
       evidenceCount: 5, // wrong — should be 2
       evidenceTypes: ['http_header', 'meta_tag'],
       strongestEvidenceType: 'http_header',
     };
 
-    const result = computeDetectionIntegrity(detection, provenance);
+    const result = checkIntegrity(detection, provenance);
 
     expect(result.valid).toBe(false);
     expect(result.issues).toContain('PROVENANCE_MISMATCH');
   });
 
   it('flags PROVENANCE_MISMATCH when strongestEvidenceType is wrong', () => {
-    const detection = createDetection(makeTech(), createConfidence(95), [
-      httpEvidence(),
-      metaEvidence(),
-    ]);
+    const detection = createDetection(makeTech(), createConfidence(95), nginxEvidencePair());
     const provenance: DetectionProvenance = {
       evidenceCount: 2,
       evidenceTypes: ['http_header', 'meta_tag'],
       strongestEvidenceType: 'meta_tag', // wrong — should be 'http_header' (higher precedence)
     };
 
-    const result = computeDetectionIntegrity(detection, provenance);
+    const result = checkIntegrity(detection, provenance);
 
     expect(result.valid).toBe(false);
     expect(result.issues).toContain('PROVENANCE_MISMATCH');
@@ -260,7 +281,7 @@ describe('computeDetectionIntegrity — provenance consistency (§5.2, §5.5)', 
       strongestEvidenceType: 'meta_tag',
     };
 
-    const result = computeDetectionIntegrity(detection, provenance);
+    const result = checkIntegrity(detection, provenance);
 
     expect(result.valid).toBe(false);
     expect(result.issues).toContain('PROVENANCE_MISMATCH');
@@ -279,7 +300,7 @@ describe('computeDetectionIntegrity — evidence type consistency (§5.3)', () =
       strongestEvidenceType: 'http_header',
     };
 
-    const result = computeDetectionIntegrity(detection, provenance);
+    const result = checkIntegrity(detection, provenance);
 
     expect(result.valid).toBe(false);
     expect(result.issues).toContain('INVALID_EVIDENCE_TYPE');
@@ -295,7 +316,7 @@ describe('computeDetectionIntegrity — evidence type consistency (§5.3)', () =
       strongestEvidenceType: 'http_header',
     };
 
-    const result = computeDetectionIntegrity(detection, provenance);
+    const result = checkIntegrity(detection, provenance);
 
     expect(result.valid).toBe(false);
     expect(result.issues).toContain('INVALID_EVIDENCE_TYPE');
@@ -303,13 +324,8 @@ describe('computeDetectionIntegrity — evidence type consistency (§5.3)', () =
   });
 
   it('does not flag INVALID_EVIDENCE_TYPE when provenance types exactly match evidence', () => {
-    const detection = createDetection(makeTech(), createConfidence(95), [
-      httpEvidence(),
-      metaEvidence(),
-    ]);
-    const provenance = computeDetectionProvenance(detection);
-
-    const result = computeDetectionIntegrity(detection, provenance);
+    const detection = createDetection(makeTech(), createConfidence(95), nginxEvidencePair());
+    const result = checkIntegrity(detection);
 
     expect(result.issues).not.toContain('INVALID_EVIDENCE_TYPE');
   });
@@ -331,7 +347,7 @@ describe('computeDetectionIntegrity — derived detection provenance (§7)', () 
       evidenceTypes: [],
     };
 
-    const result = computeDetectionIntegrity(detection, provenance);
+    const result = checkIntegrity(detection, provenance);
 
     expect(result.valid).toBe(false);
     expect(result.issues).toEqual(['PROVENANCE_MISMATCH']);
@@ -348,7 +364,7 @@ describe('computeDetectionIntegrity — detection identity (§5.1)', () => {
       evidence: [httpEvidence()],
     } as unknown as Detection;
 
-    const result = computeDetectionIntegrity(detection);
+    const result = checkIntegrity(detection);
 
     expect(result.valid).toBe(false);
     expect(result.issues).toEqual(['INVALID_DETECTION_IDENTITY']);
@@ -361,7 +377,7 @@ describe('computeDetectionIntegrity — detection identity (§5.1)', () => {
       evidence: [httpEvidence()],
     } as unknown as Detection;
 
-    const result = computeDetectionIntegrity(detection);
+    const result = checkIntegrity(detection);
 
     expect(result.valid).toBe(false);
     expect(result.issues).toEqual(['INVALID_DETECTION_IDENTITY']);
@@ -374,7 +390,7 @@ describe('computeDetectionIntegrity — detection identity (§5.1)', () => {
       evidence: [httpEvidence()],
     } as unknown as Detection;
 
-    const result = computeDetectionIntegrity(detection);
+    const result = checkIntegrity(detection);
 
     expect(result.valid).toBe(false);
     expect(result.issues).toEqual(['INVALID_DETECTION_IDENTITY']);
@@ -385,14 +401,11 @@ describe('computeDetectionIntegrity — detection identity (§5.1)', () => {
 
 describe('computeDetectionIntegrity — determinism & ordering (§12)', () => {
   it('produces identical output for identical input across calls', () => {
-    const detection = createDetection(makeTech(), createConfidence(95), [
-      httpEvidence(),
-      metaEvidence(),
-    ]);
+    const detection = createDetection(makeTech(), createConfidence(95), nginxEvidencePair());
     const provenance = computeDetectionProvenance(detection);
 
-    const a = computeDetectionIntegrity(detection, provenance);
-    const b = computeDetectionIntegrity(detection, provenance);
+    const a = checkIntegrity(detection, provenance);
+    const b = checkIntegrity(detection, provenance);
 
     expect(a).toEqual(b);
   });
@@ -414,7 +427,7 @@ describe('computeDetectionIntegrity — determinism & ordering (§12)', () => {
       strongestEvidenceType: 'meta_tag',
     };
 
-    const result = computeDetectionIntegrity(detection, provenance);
+    const result = checkIntegrity(detection, provenance);
 
     // Issues must appear in INTEGRITY_ISSUE_ORDER, no duplicates.
     const expectedOrder = INTEGRITY_ISSUE_ORDER.filter((i) =>
@@ -442,7 +455,7 @@ describe('computeDetectionIntegrity — determinism & ordering (§12)', () => {
 
   it('produces a plain serializable object (no runtime class leakage)', () => {
     const detection = createDetection(makeTech(), createConfidence(95), [httpEvidence()]);
-    const result = computeDetectionIntegrity(detection);
+    const result = checkIntegrity(detection);
 
     expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
     if (result.issues.length > 0) {
@@ -459,9 +472,9 @@ describe('computeDetectionIntegrity — determinism & ordering (§12)', () => {
       scriptContentEvidence(),
     ]);
 
-    const r1 = computeDetectionIntegrity(detection);
-    const r2 = computeDetectionIntegrity(detection);
-    const r3 = computeDetectionIntegrity(detection);
+    const r1 = checkIntegrity(detection);
+    const r2 = checkIntegrity(detection);
+    const r3 = checkIntegrity(detection);
 
     expect(r1).toEqual(r2);
     expect(r2).toEqual(r3);
@@ -472,15 +485,12 @@ describe('computeDetectionIntegrity — determinism & ordering (§12)', () => {
 
 describe('computeDetectionIntegrity — no mutation (§8)', () => {
   it('does not mutate the input detection', () => {
-    const detection = createDetection(makeTech(), createConfidence(95), [
-      httpEvidence(),
-      metaEvidence(),
-    ]);
+    const detection = createDetection(makeTech(), createConfidence(95), nginxEvidencePair());
     const originalLength = detection.evidence.length;
     const originalEvidence = [...detection.evidence];
     const provenance = computeDetectionProvenance(detection);
 
-    computeDetectionIntegrity(detection, provenance);
+    checkIntegrity(detection, provenance);
 
     expect(detection.evidence.length).toBe(originalLength);
     expect(detection.evidence).toEqual(originalEvidence);
@@ -495,7 +505,7 @@ describe('computeDetectionIntegrity — no mutation (§8)', () => {
     };
     const provenanceSnapshot = JSON.parse(JSON.stringify(provenance));
 
-    computeDetectionIntegrity(detection, provenance);
+    checkIntegrity(detection, provenance);
 
     expect(provenance).toEqual(provenanceSnapshot);
   });
@@ -508,7 +518,7 @@ describe('computeDetectionIntegrity — no mutation (§8)', () => {
     ]);
     const original = JSON.parse(JSON.stringify(detection)) as Detection;
 
-    computeDetectionIntegrity(detection, computeDetectionProvenance(detection));
+    checkIntegrity(detection);
 
     expect(detection).toEqual(original);
   });
@@ -522,7 +532,7 @@ describe('computeDetectionIntegrity — edge cases', () => {
       { type: 'script_url', url: createUrl('https://cdn.example.com/app.js') },
     ]);
 
-    const result = computeDetectionIntegrity(detection, computeDetectionProvenance(detection));
+    const result = checkIntegrity(detection);
 
     expect(result.valid).toBe(true);
     expect(result.issues).toEqual([]);
@@ -548,7 +558,7 @@ describe('computeDetectionIntegrity — edge cases', () => {
     ];
     const detection = createDetection(makeTech(), createConfidence(100), evidence);
 
-    const result = computeDetectionIntegrity(detection, computeDetectionProvenance(detection));
+    const result = checkIntegrity(detection);
 
     expect(result.valid).toBe(true);
     expect(result.issues).toEqual([]);
@@ -568,7 +578,7 @@ describe('computeDetectionIntegrity — edge cases', () => {
       strongestEvidenceType: 'http_header',
     };
 
-    const result = computeDetectionIntegrity(detection, provenance);
+    const result = checkIntegrity(detection, provenance);
 
     expect(result.valid).toBe(false);
     // The provenance lists 'http_header' but the evidence is empty, so the
@@ -596,7 +606,7 @@ describe('computeDetectionIntegrity — edge cases', () => {
       evidenceTypes: [],
     };
 
-    const result = computeDetectionIntegrity(detection, provenance);
+    const result = checkIntegrity(detection, provenance);
 
     // §7: derived detections must not carry provenance → PROVENANCE_MISMATCH.
     expect(result.valid).toBe(false);

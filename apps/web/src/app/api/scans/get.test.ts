@@ -32,6 +32,20 @@ import type { Scan, SiteSnapshot, Detection } from '@devlens/core';
 
 const FIXED_DATE = '2025-06-01T12:00:00.000Z';
 
+// Canonical keys of ScanSummary (GET /api/scans list response shape).
+// Extracted to avoid duplicating this 9-element array across tests.
+const SCAN_SUMMARY_KEYS = [
+  'completedAt',
+  'createdAt',
+  'error',
+  'failedAt',
+  'hostname',
+  'id',
+  'startedAt',
+  'status',
+  'target',
+].sort();
+
 function makeTarget() {
   return {
     url: createUrl('https://example.com'),
@@ -199,21 +213,8 @@ describe('GET /api/scans/:id — handler', () => {
           'snapshot',
         ]);
 
-        // scan keys: only documented camelCase fields (no snake_case)
         const scanKeys = Object.keys(response.body.scan).sort();
-        expect(scanKeys).toEqual(
-          [
-            'completedAt',
-            'createdAt',
-            'error',
-            'failedAt',
-            'hostname',
-            'id',
-            'startedAt',
-            'status',
-            'target',
-          ].sort(),
-        );
+        expect(scanKeys).toEqual(SCAN_SUMMARY_KEYS);
 
         // snapshot keys
         expect(response.body.snapshot).not.toBeNull();
@@ -619,21 +620,8 @@ describe('GET /api/scans?technologyId — handler', () => {
         // Per item: only "scan" and "detections" — no snapshot / coverage / quality
         const item = response.body.scans[0]!;
         expect(Object.keys(item).sort()).toEqual(['detections', 'scan']);
-        // `scan` is the lean ScanSummary (same keys as GET /api/scans list)
         const scanKeys = Object.keys(item.scan).sort();
-        expect(scanKeys).toEqual(
-          [
-            'completedAt',
-            'createdAt',
-            'error',
-            'failedAt',
-            'hostname',
-            'id',
-            'startedAt',
-            'status',
-            'target',
-          ].sort(),
-        );
+        expect(scanKeys).toEqual(SCAN_SUMMARY_KEYS);
         // `detections` carry the raw domain Detection fields (the page maps
         // them to DetectionResponse via detectionToResponse) — no explanation /
         // provenance / integrity bloat on the wire.

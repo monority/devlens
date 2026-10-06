@@ -114,6 +114,75 @@ function canonicalSignalQualityKey(sq: SignalQuality): string {
 }
 
 /**
+ * Compares consecutive observations in the history (newest-first ordering)
+ * and flags which dimensions changed between any adjacent pair.
+ *
+ * Extracted from `technologyDetectionHistorySummary` to keep that function's
+ * cognitive complexity under the SonarQube threshold (S3005).
+ */
+interface HistoryChangeFlags {
+  confidenceChanged: boolean;
+  versionChanged: boolean;
+  provenanceChanged: boolean;
+  integrityChanged: boolean;
+  signalQualityChanged: boolean;
+}
+
+function compareConsecutive(
+  history: readonly TechnologyDetectionHistoryEntry[],
+): HistoryChangeFlags {
+  const flags: HistoryChangeFlags = {
+    confidenceChanged: false,
+    versionChanged: false,
+    provenanceChanged: false,
+    integrityChanged: false,
+    signalQualityChanged: false,
+  };
+
+  const n = history.length;
+  // Compare consecutive observations. Equality is symmetric, so the newest-first
+  // direction is irrelevant to the boolean result — it is deterministic because
+  // the input ordering is deterministic (§10).
+  for (let i = 0; i < n - 1; i++) {
+    const a = history[i]!;
+    const b = history[i + 1]!;
+
+    // §5: exact value comparison — no rounding (confidence is never recalculated).
+    if (a.confidence !== b.confidence) {
+      flags.confidenceChanged = true;
+    }
+    // §4 / Step 74 §5 + Step 72: a `versionConflict` on either side forbids a
+    // version transition (the consensus is refused, so no transition is
+    // reported). This mirrors `computeVersionChange` in `comparison.ts` so the
+    // history-summary's stability signal agrees with scan comparison. Only a
+    // present↔different-present transition counts; a resolved↔conflict pair
+    // (conflict normalizes `version` to `null`) is NOT a version change.
+    if (!a.versionConflict && !b.versionConflict && a.version !== b.version) {
+      flags.versionChanged = true;
+    }
+    if (canonicalProvenanceKey(a.provenance) !== canonicalProvenanceKey(b.provenance)) {
+      flags.provenanceChanged = true;
+    }
+    if (canonicalIntegrityKey(a.integrity) !== canonicalIntegrityKey(b.integrity)) {
+      flags.integrityChanged = true;
+    }
+    if (canonicalSignalQualityKey(a.signalQuality) !== canonicalSignalQualityKey(b.signalQuality)) {
+      flags.signalQualityChanged = true;
+    }
+  }
+
+  return flags;
+}
+
+/** Computes the stability verdict from the change flags (§8/§6). */
+function computeStability(n: number, anyChanged: boolean): HistoryStability {
+  if (n < 2) {
+    return 'indeterminate';
+  }
+  return anyChanged ? 'changed' : 'stable';
+}
+
+/**
  * Derives a compact quality/stability summary from a technology's detection
  * history.
  *
@@ -133,46 +202,17 @@ export function technologyDetectionHistorySummary(
   }
 
   const n = history.length;
+  const {
+    confidenceChanged,
+    versionChanged,
+    provenanceChanged,
+    integrityChanged,
+    signalQualityChanged,
+  } = compareConsecutive(history);
+
   // Newest-first ordering ⇒ entries[0] is most recent, entries[n-1] earliest.
   const newest = history[0]!;
   const oldest = history[n - 1]!;
-
-  let confidenceChanged = false;
-  let versionChanged = false;
-  let provenanceChanged = false;
-  let integrityChanged = false;
-  let signalQualityChanged = false;
-
-  // Compare consecutive observations. Equality is symmetric, so the newest-first
-  // direction is irrelevant to the boolean result — it is deterministic because
-  // the input ordering is deterministic (§10).
-  for (let i = 0; i < n - 1; i++) {
-    const a = history[i]!;
-    const b = history[i + 1]!;
-
-    // §5: exact value comparison — no rounding (confidence is never recalculated).
-    if (a.confidence !== b.confidence) {
-      confidenceChanged = true;
-    }
-    // §4 / Step 74 §5 + Step 72: a `versionConflict` on either side forbids a
-    // version transition (the consensus is refused, so no transition is
-    // reported). This mirrors `computeVersionChange` in `comparison.ts` so the
-    // history-summary's stability signal agrees with scan comparison. Only a
-    // present↔different-present transition counts; a resolved↔conflict pair
-    // (conflict normalizes `version` to `null`) is NOT a version change.
-    if (!a.versionConflict && !b.versionConflict && a.version !== b.version) {
-      versionChanged = true;
-    }
-    if (canonicalProvenanceKey(a.provenance) !== canonicalProvenanceKey(b.provenance)) {
-      provenanceChanged = true;
-    }
-    if (canonicalIntegrityKey(a.integrity) !== canonicalIntegrityKey(b.integrity)) {
-      integrityChanged = true;
-    }
-    if (canonicalSignalQualityKey(a.signalQuality) !== canonicalSignalQualityKey(b.signalQuality)) {
-      signalQualityChanged = true;
-    }
-  }
 
   const anyChanged =
     confidenceChanged ||
@@ -180,9 +220,6 @@ export function technologyDetectionHistorySummary(
     provenanceChanged ||
     integrityChanged ||
     signalQualityChanged;
-
-  // < 2 observations ⇒ indeterminate (no consecutive pair to compare).
-  const stability: HistoryStability = n < 2 ? 'indeterminate' : anyChanged ? 'changed' : 'stable';
 
   return {
     scanCount: n,
@@ -194,6 +231,6 @@ export function technologyDetectionHistorySummary(
     provenanceChanged,
     integrityChanged,
     signalQualityChanged,
-    stability,
+    stability: computeStability(n, anyChanged),
   };
 }

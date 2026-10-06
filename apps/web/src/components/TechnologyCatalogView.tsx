@@ -51,7 +51,7 @@ function extractCategories(technologies: TechnologyPresentation[]): string[] {
       cats.push(tech.category);
     }
   }
-  return cats.sort();
+  return cats.sort((a, b) => a.localeCompare(b));
 }
 
 export function TechnologyCatalogView({

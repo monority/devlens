@@ -456,7 +456,11 @@ function detectRelationshipCycles(defs: readonly TechnologyDefinition[]): string
   const visit = (start: string) => {
     // Iterative DFS with explicit colour + stack tracking.
     const work: Array<{ node: string; edges: string[]; i: number }> = [
-      { node: start, edges: (graph.get(start) ?? []).slice().sort(), i: 0 },
+      {
+        node: start,
+        edges: (graph.get(start) ?? []).slice().sort((a, b) => a.localeCompare(b)),
+        i: 0,
+      },
     ];
     color.set(start, GRAY);
     stack.push(start);
@@ -479,7 +483,7 @@ function detectRelationshipCycles(defs: readonly TechnologyDefinition[]): string
           stack.push(next);
           work.push({
             node: next,
-            edges: (graph.get(next) ?? []).slice().sort(),
+            edges: (graph.get(next) ?? []).slice().sort((a, b) => a.localeCompare(b)),
             i: 0,
           });
         }
@@ -493,7 +497,7 @@ function detectRelationshipCycles(defs: readonly TechnologyDefinition[]): string
     }
   };
 
-  for (const id of [...ids].sort()) {
+  for (const id of [...ids].sort((a, b) => a.localeCompare(b))) {
     if ((color.get(id) ?? WHITE) === WHITE) {
       visit(id);
     }

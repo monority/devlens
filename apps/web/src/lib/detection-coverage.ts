@@ -95,7 +95,7 @@ export function getDetectionCoverage(detections: DetectionResponse[]): Detection
   for (const item of uniqueEvidence) {
     evidenceTypeSet.add(evidenceTypeLabel(item.type));
   }
-  const evidenceTypes = [...evidenceTypeSet].sort();
+  const evidenceTypes = [...evidenceTypeSet].sort((a, b) => a.localeCompare(b));
 
   return {
     technologyCount: uniqueTechIds.size,

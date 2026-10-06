@@ -389,7 +389,7 @@ export function getDetectionExplainability(detection: DetectionResponse): Detect
   // Collect unique evidence type labels, sorted alphabetically.
   const evidenceTypes = Array.from(
     new Set(uniqueEvidence.map((item) => evidenceTypeLabel(item.type))),
-  ).sort();
+  ).sort((a, b) => a.localeCompare(b));
 
   // Per-evidence origin descriptions with canonical identity.
   const evidenceSources: EvidenceSource[] = uniqueEvidence.map(toEvidenceSource);

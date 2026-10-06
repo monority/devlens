@@ -209,7 +209,7 @@ function resourceSource(
     skipped,
   };
   if (reasons.size > 0) {
-    return { ...base, failureReasons: [...reasons].sort() };
+    return { ...base, failureReasons: [...reasons].sort((a, b) => a.localeCompare(b)) };
   }
   return base;
 }

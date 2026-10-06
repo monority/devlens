@@ -148,7 +148,7 @@ export function resolveRelationships(
 
   // Seed the worklist with the directly-observed ids, id-sorted so the
   // derivation result is independent of input ordering.
-  const worklist: string[] = [...directById.keys()].sort();
+  const worklist: string[] = [...directById.keys()].sort((a, b) => a.localeCompare(b));
   // A naive FIFO queue; `visited` prevents reprocessing even if the queue
   // holds duplicates.
   let head = 0;
@@ -243,7 +243,7 @@ export function resolveRelationships(
 
   // 2) Derived detections: sorted by technology id ASC (deterministic),
   //    each carrying provenance and no evidence/version.
-  for (const targetId of [...derived.keys()].sort()) {
+  for (const targetId of [...derived.keys()].sort((a, b) => a.localeCompare(b))) {
     const technology = index.techById.get(targetId);
     if (!technology) {
       // Defensive: a derived target whose Technology is absent from the

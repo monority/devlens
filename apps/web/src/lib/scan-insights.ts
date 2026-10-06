@@ -271,7 +271,9 @@ export function getTechnologyEvidenceMatrix(
   const items: TechnologyEvidenceMatrixItem[] = [];
   for (const [id, { name, evidence }] of techMap) {
     const uniqueEvidence = deduplicateEvidence(evidence);
-    const evidenceTypes = [...new Set(uniqueEvidence.map((e) => evidenceTypeLabel(e.type)))].sort();
+    const evidenceTypes = [...new Set(uniqueEvidence.map((e) => evidenceTypeLabel(e.type)))].sort(
+      (a, b) => a.localeCompare(b),
+    );
 
     items.push({
       id,

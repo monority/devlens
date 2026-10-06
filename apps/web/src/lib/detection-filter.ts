@@ -54,7 +54,7 @@ export function getDetectionCategories(): string[] {
       categories.push(tech.category);
     }
   }
-  return categories.sort();
+  return categories.sort((a, b) => a.localeCompare(b));
 }
 
 /**

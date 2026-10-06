@@ -48,7 +48,7 @@ export function getTechnologyCategories(technologies: TechnologyPresentation[]):
       categories.push(tech.category);
     }
   }
-  return categories.sort();
+  return categories.sort((a, b) => a.localeCompare(b));
 }
 
 /**

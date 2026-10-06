@@ -58,7 +58,7 @@ function uniqueEvidenceTypes(detection: DetectionResponse): string[] {
       types.push(label);
     }
   }
-  return types.sort();
+  return types.sort((a, b) => a.localeCompare(b));
 }
 
 /**

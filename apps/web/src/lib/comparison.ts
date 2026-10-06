@@ -282,7 +282,7 @@ function provenanceKey(d: DetectionResponse | null): string {
     ':' +
     [...prov]
       .map((p) => `${p.source}|${p.type}`)
-      .sort()
+      .sort((a, b) => a.localeCompare(b))
       .join(',')
   );
 }

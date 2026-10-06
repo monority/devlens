@@ -102,7 +102,9 @@ export function computeSignalQuality(evidence: readonly EvidenceResponse[]): Sig
   }
 
   // §6.D/§3: group by source family, then count distinct families.
-  const families = Array.from(new Set(unique.map((e) => evidenceSourceFamily(e.type)))).sort();
+  const families = Array.from(new Set(unique.map((e) => evidenceSourceFamily(e.type)))).sort(
+    (a, b) => a.localeCompare(b),
+  );
   const sourceCount = families.length;
   const level: SignalQualityLevel =
     sourceCount === 1 ? 'single_signal' : sourceCount === 2 ? 'corroborated' : 'strong';

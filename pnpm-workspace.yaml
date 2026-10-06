@@ -9,3 +9,6 @@ overrides:
   # bundles a patched postcss. Vite already uses 8.5.26, so this aligns
   # the tree to a single safe version without affecting vite.
   postcss: 8.5.26
+  # GHSA-68fv-2mgg-jv7q: source-map-js <1.2.2 allows event-loop DoS via
+  # indexed source-map section offsets. Forced to patched version.
+  source-map-js: 1.2.2

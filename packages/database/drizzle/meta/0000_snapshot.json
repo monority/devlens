@@ -146,6 +146,30 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true
+        },
+        "html_meta_tags": {
+          "name": "html_meta_tags",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "html_scripts": {
+          "name": "html_scripts",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "html_links": {
+          "name": "html_links",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "detections": {
+          "name": "detections",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
         }
       },
       "indexes": {},

@@ -236,6 +236,78 @@ function toCanonicalIssues(
   return ordered;
 }
 
+// ─── Extracted checks (§5.4 / §5.2 / §5.3 / §5.5 / §7) ──────────────
+
+/**
+ * Checks for canonical-duplicate evidence items (§5.4).
+ *
+ * Returns `true` when two or more evidence items produce the same
+ * canonical identity key. Does NOT remove duplicates — the detection
+ * is returned unchanged.
+ */
+function hasDuplicateEvidence(evidence: readonly Evidence[]): boolean {
+  if (evidence.length <= 1) return false;
+  const seen = new Set<string>();
+  for (const item of evidence) {
+    const key = evidenceIdentity(item);
+    if (seen.has(key)) return true;
+    seen.add(key);
+  }
+  return false;
+}
+
+/**
+ * Collects provenance-consistency issues (§5.2 / §5.3 / §5.5 / §7).
+ *
+ * When `isDerived` is true, a relationship-derived detection must not
+ * carry provenance (§7). Otherwise, every provenance field is
+ * re-derived from `detection.evidence` and compared for consistency.
+ */
+function checkProvenanceIssues(
+  detection: Detection,
+  evidence: readonly Evidence[],
+  provenance: DetectionProvenance,
+  isDerived: boolean,
+): DetectionIntegrityIssue[] {
+  if (isDerived) {
+    // §7: a relationship-derived detection must not carry provenance.
+    // If it does, the provenance is a mismatch regardless of its contents.
+    return ['PROVENANCE_MISMATCH'];
+  }
+
+  const expected = computeDetectionProvenance(detection);
+  const issues: DetectionIntegrityIssue[] = [];
+
+  // §5.2: evidence count must match the actual finalized evidence length.
+  if (provenance.evidenceCount !== evidence.length) {
+    issues.push('PROVENANCE_MISMATCH');
+  }
+
+  // §5.3: every type in provenance.evidenceTypes must correspond to an
+  // actual evidence object's type — no fabricated, stale, or
+  // deduplicated-away types.
+  const actualTypes = evidenceTypeSet(evidence);
+  for (const t of provenance.evidenceTypes) {
+    if (!actualTypes.has(t)) {
+      issues.push('INVALID_EVIDENCE_TYPE');
+      break;
+    }
+  }
+
+  // §5.5: all provenance fields must be derivable from the same
+  // `detection.evidence`. Re-derive the expected provenance and compare
+  // each field. The provenance re-use is the single source of truth
+  // (§5.5: "Import and reuse the existing provenance computation").
+  if (!arraysEqual(provenance.evidenceTypes, expected.evidenceTypes)) {
+    issues.push('PROVENANCE_MISMATCH');
+  }
+  if ((provenance.strongestEvidenceType ?? null) !== (expected.strongestEvidenceType ?? null)) {
+    issues.push('PROVENANCE_MISMATCH');
+  }
+
+  return issues;
+}
+
 // ─── Pure integrity function ─────────────────────────────────────────
 
 /**
@@ -271,12 +343,12 @@ export function computeDetectionIntegrity(
   const evidence = detection.evidence;
   const isDerived = detection.source === 'relationship';
 
-  // ── §5.1 Detection identity ─────────────────────────────────────────
+  // ── §5.1 Detection identity ──
   if (!hasValidTechnologyIdentity(detection.technology)) {
     issues.add('INVALID_DETECTION_IDENTITY');
   }
 
-  // ── §6 Empty-evidence semantics ─────────────────────────────────────
+  // ── §6 Empty-evidence semantics ──
   // A directly-observed detection (source absent / 'direct') MUST carry
   // evidence. createDetection() enforces this at construction time, but the
   // integrity layer also guards against manually-constructed or deserialized
@@ -287,59 +359,17 @@ export function computeDetectionIntegrity(
     issues.add('EMPTY_EVIDENCE');
   }
 
-  // ── §5.4 Duplicate evidence ─────────────────────────────────────────
-  // Uses the canonical evidence identity (mirroring getEvidenceKey in
-  // detectors / getEvidenceIdentity in web). Only flags duplicates; does
-  // NOT remove them — the detection is returned unchanged.
-  if (evidence.length > 1) {
-    const seen = new Set<string>();
-    for (const item of evidence) {
-      const key = evidenceIdentity(item);
-      if (seen.has(key)) {
-        issues.add('DUPLICATE_EVIDENCE');
-        break;
-      }
-      seen.add(key);
-    }
+  // ── §5.4 Duplicate evidence ──
+  if (hasDuplicateEvidence(evidence)) {
+    issues.add('DUPLICATE_EVIDENCE');
   }
 
-  // ── §5.2 / §5.3 / §5.5 Provenance consistency ───────────────────────
+  // ── §5.2 / §5.3 / §5.5 Provenance consistency ──
   // Only when provenance is attached. All provenance fields must be
   // derivable from the same `detection.evidence`.
   if (provenance !== undefined) {
-    if (isDerived) {
-      // §7: a relationship-derived detection must not carry provenance.
-      // If it does, the provenance is a mismatch regardless of its contents.
-      issues.add('PROVENANCE_MISMATCH');
-    } else {
-      const expected = computeDetectionProvenance(detection);
-
-      // §5.2: evidence count must match the actual finalized evidence length.
-      if (provenance.evidenceCount !== evidence.length) {
-        issues.add('PROVENANCE_MISMATCH');
-      }
-
-      // §5.3: every type in provenance.evidenceTypes must correspond to an
-      // actual evidence object's type — no fabricated, stale, or
-      // deduplicated-away types.
-      const actualTypes = evidenceTypeSet(evidence);
-      for (const t of provenance.evidenceTypes) {
-        if (!actualTypes.has(t)) {
-          issues.add('INVALID_EVIDENCE_TYPE');
-          break;
-        }
-      }
-
-      // §5.5: all provenance fields must be derivable from the same
-      // `detection.evidence`. Re-derive the expected provenance and compare
-      // each field. The provenance re-use is the single source of truth
-      // (§5.5: "Import and reuse the existing provenance computation").
-      if (!arraysEqual(provenance.evidenceTypes, expected.evidenceTypes)) {
-        issues.add('PROVENANCE_MISMATCH');
-      }
-      if ((provenance.strongestEvidenceType ?? null) !== (expected.strongestEvidenceType ?? null)) {
-        issues.add('PROVENANCE_MISMATCH');
-      }
+    for (const issue of checkProvenanceIssues(detection, evidence, provenance, isDerived)) {
+      issues.add(issue);
     }
   }
 

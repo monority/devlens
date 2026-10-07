@@ -12,7 +12,7 @@ export { HttpCrawler } from './http-crawler.js';
 export type { HttpCrawlerOptions } from './http-crawler.js';
 export { CrawlError } from './crawl-error.js';
 export type { CrawlErrorCode } from './crawl-error.js';
-export { isResourceUrlAllowed, isResourceFetchable } from './ssrf-guard.js';
+export { isResourceUrlAllowed, isResourceFetchable, verifyHostnameDNS } from './ssrf-guard.js';
 export {
   discoverResources,
   selectResources,

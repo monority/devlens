@@ -39,7 +39,7 @@ import type { Crawler } from './crawler.js';
 import type { HttpHeader, Resource, ResourceType, ScanTarget, SiteSnapshot } from '@devlens/core';
 import { createUrl, createHostname, createTimestamp, createHttpStatus } from '@devlens/core';
 import { CrawlError } from './crawl-error.js';
-import { isBlockedHostname, isResourceUrlAllowed, isResourceFetchable } from './ssrf-guard.js';
+import { isBlockedHostname, isResourceUrlAllowed, isResourceFetchable, verifyHostnameDNS } from './ssrf-guard.js';
 import { extractHtml, type HtmlExtract } from './html-parser.js';
 import {
   discoverResources,
@@ -388,6 +388,19 @@ export class HttpCrawler implements Crawler {
       );
     }
 
+    // ── 1b. DNS rebinding check ───────────────────────────────────────
+    // Resolve the hostname and verify all resolved IPs are public.
+    // This prevents DNS rebinding attacks where a hostname resolves
+    // to a public IP initially (passing the hostname check) but a
+    // private IP on a cached/stale DNS response.
+    const dnsVerified = await verifyHostnameDNS(parsedUrl.hostname);
+    if (!dnsVerified) {
+      throw new CrawlError(
+        'invalid_target',
+        `DNS resolution for ${parsedUrl.hostname} returned private/internal addresses or failed`,
+      );
+    }
+
     // ── 2. Set up timeout ─────────────────────────────────────────────
     const abortController = new AbortController();
     const timeoutId = setTimeout(() => abortController.abort(), this.timeoutMs);
@@ -429,6 +442,15 @@ export class HttpCrawler implements Crawler {
             throw new CrawlError(
               'invalid_target',
               `Blocked redirect to private/internal host: ${redirectHost}`,
+            );
+          }
+
+          // DNS rebinding check on redirect target.
+          const redirectDNSVerified = await verifyHostnameDNS(redirectHost);
+          if (!redirectDNSVerified) {
+            throw new CrawlError(
+              'invalid_target',
+              `Redirect to ${redirectHost} resolved to private/internal addresses or failed`,
             );
           }
 

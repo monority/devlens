@@ -19,10 +19,11 @@
  * See docs/architecture/api.md for the full API contract.
  */
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { handleGetScanById } from '../handler';
 import { createDatabaseClient, PostgresScanResultRepository } from '@devlens/database';
 import type { HandleGetOptions } from '../handler';
+import { rateLimitedResponse } from '@/lib/rate-limiter';
 
 /** Constructs the real dependencies for the GET handler. */
 function createDependencies(): HandleGetOptions {
@@ -32,9 +33,14 @@ function createDependencies(): HandleGetOptions {
 }
 
 export async function GET(
-  _request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  // Rate limit: 60 reads per minute per IP.
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? request.headers.get('x-real-ip') ?? 'unknown';
+  const limited = rateLimitedResponse('read', ip);
+  if (limited) return limited;
+
   const { id } = await params;
   const result = await handleGetScanById(id, createDependencies());
   return NextResponse.json(result.body, { status: result.status });

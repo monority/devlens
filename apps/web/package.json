@@ -19,6 +19,7 @@
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.4.0",
     "drizzle-orm": "^0.45.2",
     "vitest": "^4.1.11"
   }

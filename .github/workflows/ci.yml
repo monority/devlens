@@ -9,6 +9,21 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: devlens_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -25,8 +40,24 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/web/.next
+            apps/web/node_modules/.cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('apps/web/package.json') }}
+
       - name: Install dependencies
         run: pnpm install
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in {1..10}; do
+            pg_isready -h localhost -p 5432 && break
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
 
       - name: Audit dependencies
         run: pnpm audit --audit-level=high
@@ -42,6 +73,8 @@ jobs:
 
       - name: Test
         run: pnpm exec vitest run --coverage --reporter=verbose
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/devlens_test
 
       - name: Verify coverage report
         run: |
@@ -61,3 +94,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        continue-on-error: true

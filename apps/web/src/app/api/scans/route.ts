@@ -26,6 +26,7 @@ import { createDatabaseClient, PostgresScanResultRepository } from '@devlens/dat
 import { HttpCrawler } from '@devlens/crawler';
 import { createProductionDetector } from '@devlens/detectors';
 import type { HandleCreateScanOptions, HandleGetOptions } from './handler';
+import { rateLimitedResponse } from '@/lib/rate-limiter';
 
 /** Constructs the real dependencies for the POST handler. */
 function createDependencies(): HandleCreateScanOptions {
@@ -46,6 +47,11 @@ function createGetDependencies(): HandleGetOptions {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  // Rate limit: 10 scan creations per minute per IP (crawling is expensive).
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? request.headers.get('x-real-ip') ?? 'unknown';
+  const limited = rateLimitedResponse('scan', ip);
+  if (limited) return limited;
+
   const body = await request.text();
   const result = await handleCreateScan(body, createDependencies());
   return NextResponse.json(result.body, { status: result.status });
@@ -55,6 +61,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
  * GET /api/scans — lists all scan results in deterministic order
  * (`createdAt DESC, scanId ASC`).
  *
+ * Rate limit: 60 reads per minute per IP.
+ *
  * When the `technologyId` query parameter is present, the request is routed to
  * the technology-scoped bulk handler (`handleGetScansByTechnology`) which
  * returns only the scans that detected the given technology — the single
@@ -62,6 +70,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
  * the full scan list is returned.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? request.headers.get('x-real-ip') ?? 'unknown';
+  const limited = rateLimitedResponse('read', ip);
+  if (limited) return limited;
+
   const technologyId = request.nextUrl.searchParams.get('technologyId');
   if (technologyId !== null) {
     const result = await handleGetScansByTechnology(technologyId, createGetDependencies());

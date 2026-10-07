@@ -11,23 +11,33 @@
  * - Link-local addresses (169.254.0.0/16)
  * - IPv6 loopback, unique-local, and link-local
  *
+ * **DNS rebinding protection:**
+ * In addition to the hostname-level blocklist above, {@link resolveAndVerifyHostname}
+ * resolves the hostname via DNS and checks every resolved IP address against
+ * the same private/internal ranges. This prevents DNS rebinding attacks where
+ * an attacker returns a public IP on the first DNS resolution (passing the
+ * hostname check) and a private IP on the second (after the check passes).
+ *
  * **Known limitations:**
  *
- * This is a hostname-and-IP-level check only. It does NOT protect against:
- *
- * - **DNS rebinding**: An attacker can return a public IP on the first DNS
- *   resolution and a private IP on the second, after the check passes.
- *   Full protection requires DNS-level validation at the socket layer.
- * - **DNS-based metadata services**: Cloud metadata endpoints (e.g.
+ * - Time-of-check-to-time-of-use (TOCTOU): DNS can change between our
+ *   resolution and the actual TCP connection. Full protection requires
+ *   connecting to a specific resolved IP rather than re-resolving. With
+ *   native `fetch`, this is mitigated by resolving before every request
+ *   hop (including redirects).
+ * - DNS-based metadata services: Cloud metadata endpoints (e.g.
  *   `169.254.169.254`) are blocked by IP, but domain-based metadata
  *   endpoints are not.
- * - **IPv6 non-Private ranges**: Only well-known IPv6 private ranges are
+ * - IPv6 non-Private ranges: Only well-known IPv6 private ranges are
  *   blocked. Other link-local or reserved IPv6 addresses may not be caught.
  *
  * For a production deployment, SSRF protection should be enforced at the
  * application boundary (network policy or dedicated proxy), not solely
  * at the crawler level.
  */
+import dns from 'node:dns';
+
+const dnsPromises = dns.promises;
 
 /**
  * Returns `true` if the given hostname should be blocked due to SSRF risk.
@@ -64,6 +74,51 @@ export function isBlockedHostname(hostname: string): boolean {
   }
 
   return false;
+}
+
+/**
+ * Resolves a hostname via DNS and verifies that **all** returned IP addresses
+ * are public (i.e., none resolve to a private/internal range).
+ *
+ * This is the DNS-rebinding defense: if a hostname resolves to *any* private
+ * IP — even if it also resolves to public IPs — the request is blocked.
+ * This prevents an attacker from returning a public IP on the first DNS
+ * resolution (passing the hostname check) and a private IP on a stale
+ * cached response.
+ *
+ * @param hostname The hostname to resolve and verify.
+ * @returns `true` if **all** resolved IPs are safe (public), `false` if any
+ *          IP is private/internal or DNS resolution fails.
+ */
+export async function verifyHostnameDNS(hostname: string): Promise<boolean> {
+  // Already blocked by hostname-level check — double-block for safety.
+  if (isBlockedHostname(hostname)) {
+    return false;
+  }
+
+  // If the hostname is already an IP literal, isBlockedHostname already
+  // handled it — no DNS resolution needed.
+  if (parseIPv4(hostname) !== null) {
+    return true;
+  }
+
+  let addresses: string[];
+  try {
+    // Resolve to both IPv4 and IPv6 addresses.
+    addresses = await dnsPromises.resolve(hostname);
+  } catch {
+    // DNS resolution failure — reject to fail-closed.
+    return false;
+  }
+
+  // Check every resolved address. Reject if ANY is private.
+  for (const addr of addresses) {
+    if (isBlockedHostname(addr)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /**

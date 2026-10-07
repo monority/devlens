@@ -43,6 +43,10 @@ jobs:
       - name: Test
         run: pnpm test -- --coverage
 
+      # NOTE: SonarCloud CI analysis conflicts with "Automatic Analysis" (GitHub
+      # App).  To use the CI scanner (which supports coverage reports), disable
+      # Automatic Analysis in the SonarCloud project settings first:
+      #   https://sonarcloud.io/organizations/monority/projects/monority_devlens/settings
       - name: SonarCloud Scan
         uses: sonarsource/sonarcloud-github-action@ffc3010689be73b8e5ae0c57ce35968afd7909e8 # v5.0.0
         env:

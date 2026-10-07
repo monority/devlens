@@ -91,6 +91,9 @@ const EXPECTED_TECHNOLOGIES: Record<string, { name: string; category: string }> 
 
   // ── SvelteKit (Svelte meta-framework) ──────────────────────
   sveltekit: { name: 'SvelteKit', category: 'framework' },
+
+  // ── Supabase BaaS ──────────────────────────────────────────
+  supabase: { name: 'Supabase', category: 'service_worker' },
 };
 
 // ─── Tests ─────────────────────────────────────────────────────────
@@ -106,8 +109,8 @@ describe('TechnologyCatalog', () => {
       }
     });
 
-    it('contains exactly 57 technologies (32 Step-67 + 25 Step-68)', () => {
-      expect(Object.keys(TECHNOLOGY_CATALOG)).toHaveLength(57);
+    it('contains exactly 58 technologies (32 Step-67 + 26 Step-68)', () => {
+      expect(Object.keys(TECHNOLOGY_CATALOG)).toHaveLength(58);
     });
 
     it('every expected technology is present with correct metadata', () => {

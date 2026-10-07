@@ -740,6 +740,34 @@ export const FIXTURES: readonly Fixture[] = [
     forbidden: ['google-analytics', 'shopify', 'wordpress'],
   },
 
+  {
+    name: 'supabase',
+    description:
+      'Supabase BaaS: x-supabase-api header + @supabase/supabase-js import + supabase.co CDN link',
+    category: 'service_worker',
+    snapshot: makeSnapshot({
+      headers: [{ name: 'x-supabase-api', value: 'https://project.supabase.co/rest/v1' }],
+      scripts: [
+        {
+          src: null,
+          content:
+            'import { createClient } from "@supabase/supabase-js";\n' +
+            'const supabase = createClient("https://project.supabase.co", "anon-key");\n' +
+            'const { data } = await supabase.from("users").select("*");',
+        },
+      ],
+      links: [
+        {
+          rel: 'stylesheet',
+          href: 'https://project.supabase.co/storage/v1/object/public/styles.css',
+          content: '<link rel="stylesheet" href="/styles.css">',
+        },
+      ],
+    }),
+    expected: ['supabase'],
+    forbidden: ['firebase', 'wordpress', 'shopify'],
+  },
+
   // ── Bootstrap ────────────────────────────────────────────────────
 
   {

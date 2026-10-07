@@ -92,6 +92,7 @@ import { fastly } from './technologies/fastly.js';
 import { vercel } from './technologies/vercel.js';
 import { bun } from './technologies/bun.js';
 import { vite } from './technologies/vite.js';
+import { supabase } from './technologies/supabase.js';
 
 /**
  * The canonical, ordered list of every technology definition.
@@ -166,6 +167,8 @@ export const TECHNOLOGY_DEFINITIONS: readonly TechnologyDefinition[] = [
   bun,
   // ── Build tools ────────────────────────────────────────────
   vite,
+  // ── Backend / BaaS ─────────────────────────────────────────
+  supabase,
 ];
 
 /**

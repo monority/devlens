@@ -225,7 +225,7 @@ export function compareChanges(a: DetectionChange, b: DetectionChange): number {
 
 /** Absent (`undefined`/`null`) normalizes to `null`; a resolved version stays a string. */
 function normalizeVersion(v: string | null | undefined): string | null {
-  return v === undefined || v === null ? null : v;
+  return v ?? null;
 }
 
 /**
@@ -343,6 +343,23 @@ function classifyChange(
   return 'unchanged';
 }
 
+/**
+ * Determines the single, deduplicated `DetectionChangeKind` for a technology,
+ * handling the added/removed cases before delegating to `classifyChange`.
+ * (S3358: extracted from a nested ternary.)
+ */
+function classifyDetectionKind(
+  leftD: DetectionResponse | null,
+  rightD: DetectionResponse | null,
+  version: VersionChange,
+  provenanceChanged: boolean,
+  scoreChanged: boolean,
+): DetectionChangeKind {
+  if (leftD === null) return 'added';
+  if (rightD === null) return 'removed';
+  return classifyChange(version, provenanceChanged, scoreChanged);
+}
+
 // ─── Pure comparison function ────────────────────────────────────────
 
 /**
@@ -407,12 +424,7 @@ function compareSingleDetection(
   const provenanceChanged = computeProvenanceChange(leftD, rightD);
   const integrityChanged = computeIntegrityChange(leftD, rightD);
 
-  const kind: DetectionChangeKind =
-    leftD === null
-      ? 'added'
-      : rightD === null
-        ? 'removed'
-        : classifyChange(version, provenanceChanged, scoreChanged);
+  const kind = classifyDetectionKind(leftD, rightD, version, provenanceChanged, scoreChanged);
 
   return {
     id,

@@ -145,10 +145,16 @@ describe('ScanCard', () => {
     expect(html).toContain('Completed');
   });
 
-  it('renders the scan status as "Failed" for failed scans', () => {
-    const html = renderToString(React.createElement(ScanCard, { scan: makeFailedScan() }));
+  // S5976: parameterized test for all non-completed statuses.
+  const otherStatusCases: [string, () => ScanSummary][] = [
+    ['Failed', makeFailedScan],
+    ['Pending', makePendingScan],
+    ['Running', makeRunningScan],
+  ];
 
-    expect(html).toContain('Failed');
+  it.each(otherStatusCases)('renders the scan status as "%s" for %s scans', (label, makeScan) => {
+    const html = renderToString(React.createElement(ScanCard, { scan: makeScan() }));
+    expect(html).toContain(label);
   });
 
   it('renders a link to the detail page', () => {
@@ -163,18 +169,6 @@ describe('ScanCard', () => {
     const html = renderToString(React.createElement(ScanCard, { scan: makeCompletedScan() }));
 
     expect(html).toContain('2025-06-01T12:00:00.000Z');
-  });
-
-  it('renders the scan status as "Pending" for pending scans', () => {
-    const html = renderToString(React.createElement(ScanCard, { scan: makePendingScan() }));
-
-    expect(html).toContain('Pending');
-  });
-
-  it('renders the scan status as "Running" for running scans', () => {
-    const html = renderToString(React.createElement(ScanCard, { scan: makeRunningScan() }));
-
-    expect(html).toContain('Running');
   });
 
   it('does not show same-target count when sameTargetCount is not provided', () => {

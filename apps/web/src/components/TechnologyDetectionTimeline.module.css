@@ -100,7 +100,7 @@
   font-size: 0.75rem;
   font-weight: 400;
   color: #9ca3af;
-  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .confidence {

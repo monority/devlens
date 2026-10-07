@@ -30,8 +30,8 @@ import Link from 'next/link';
 import styles from './ScanCard.module.css';
 
 export interface DetectionItemProps {
-  detection: DetectionResponse;
-  index: number;
+  readonly detection: DetectionResponse;
+  readonly index: number;
 }
 
 // ─── Sub-components (extracted to reduce cognitive complexity) ──────
@@ -40,7 +40,7 @@ export interface DetectionItemProps {
 function IntegrityNotice({
   detection,
 }: {
-  detection: DetectionResponse;
+  readonly detection: DetectionResponse;
 }): React.ReactElement | null {
   if (!(detection.integrity && !detection.integrity.valid)) return null;
   const { issues } = detection.integrity;
@@ -60,7 +60,7 @@ function IntegrityNotice({
 function ExplanationSection({
   explainability,
 }: {
-  explainability: DetectionExplainability;
+  readonly explainability: DetectionExplainability;
 }): React.ReactElement {
   return (
     <section className={styles.explanationReasons}>
@@ -105,8 +105,8 @@ function VersionConflictSection({
   explainability,
   versionConflict,
 }: {
-  explainability: DetectionExplainability;
-  versionConflict: boolean | undefined;
+  readonly explainability: DetectionExplainability;
+  readonly versionConflict: boolean | undefined;
 }): React.ReactElement | null {
   if (!versionConflict || !explainability.versionConflictDetail?.length) return null;
   return (

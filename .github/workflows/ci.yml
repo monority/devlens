@@ -41,7 +41,16 @@ jobs:
         run: pnpm typecheck
 
       - name: Test
-        run: pnpm test -- --coverage
+        run: pnpm exec vitest run --coverage --reporter=verbose
+
+      - name: Verify coverage report
+        run: |
+          if [ ! -f coverage/lcov.info ]; then
+            echo "ERROR: coverage/lcov.info not found!"
+            exit 1
+          fi
+          echo "Coverage report found:"
+          wc -l coverage/lcov.info
 
       # NOTE: SonarCloud CI analysis conflicts with "Automatic Analysis" (GitHub
       # App).  To use the CI scanner (which supports coverage reports), disable

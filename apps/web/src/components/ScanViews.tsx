@@ -46,8 +46,10 @@ import { ScanDetectionResults } from './ScanDetectionResults';
 import { ObservationCoverageSummary } from './ObservationCoverageSummary';
 import { ResultQualitySummary } from './ResultQualitySummary';
 import { DetectionIntegritySummary } from './DetectionIntegritySummary';
+import { ScanStatusBadge } from './ScanStatusBadge';
 import { EMPTY_OBSERVATION_COVERAGE, EMPTY_SCAN_RESULT_QUALITY } from '@devlens/core';
 import styles from './ScanCard.module.css';
+import detailStyles from '../app/scans/[id]/page.module.css';
 
 // ─── Scan status badge helpers ────────────────────────────────────────
 
@@ -377,48 +379,93 @@ export function ScanDetailView({
   initialCategory,
 }: ScanDetailViewProps): React.ReactElement {
   const { scan, snapshot, detections } = result;
+  const isCompleted = scan.status === 'completed';
 
   return (
-    <article className={styles.detail}>
+    <article className={detailStyles.detailContent}>
       {/* ── Scan overview / summary ── */}
-      {scan.status === 'completed' ? (
-        <ScanOverview overview={getScanOverview(result)} />
+      {isCompleted ? (
+        <section className={detailStyles.section}>
+          <h2 className={detailStyles.sectionTitle}>Overview</h2>
+          <ScanOverview overview={getScanOverview(result)} />
+        </section>
       ) : (
-        <ScanSummarySection scan={scan} />
+        <section className={detailStyles.section}>
+          <h2 className={detailStyles.sectionTitle}>Scan Status</h2>
+          <div className={detailStyles.scanMeta}>
+            <ScanStatusBadge
+              status={scan.status as 'pending' | 'running' | 'completed' | 'failed'}
+            />
+            <span className={detailStyles.detectionCount}>
+              {detections.length} technologies detected
+            </span>
+          </div>
+          <ScanSummarySection scan={scan} />
+        </section>
       )}
 
       {/* ── Observation coverage / blind-spots (completed scans only) ── */}
-      {scan.status === 'completed' && (
-        <ObservationCoverageSummary
-          coverage={result.observationCoverage ?? EMPTY_OBSERVATION_COVERAGE}
-        />
+      {isCompleted && (
+        <section className={detailStyles.section}>
+          <h2 className={detailStyles.sectionTitle}>Observation Coverage</h2>
+          <ObservationCoverageSummary
+            coverage={result.observationCoverage ?? EMPTY_OBSERVATION_COVERAGE}
+          />
+        </section>
       )}
 
-      {/* ── Scan-level result quality (Step 79; completed scans only) ── */}
-      {scan.status === 'completed' && (
-        <ResultQualitySummary resultQuality={result.resultQuality ?? EMPTY_SCAN_RESULT_QUALITY} />
+      {/* ── Scan-level result quality (Step 79) ── */}
+      {isCompleted && (
+        <section className={detailStyles.section}>
+          <h2 className={detailStyles.sectionTitle}>Result Quality</h2>
+          <ResultQualitySummary resultQuality={result.resultQuality ?? EMPTY_SCAN_RESULT_QUALITY} />
+        </section>
       )}
 
-      {/* ── Detection integrity (Step 86; completed scans only) ── */}
-      {scan.status === 'completed' && (
-        <DetectionIntegritySummary summary={summarizeIntegrity(result.detections)} />
+      {/* ── Detection integrity (Step 86) ── */}
+      {isCompleted && (
+        <section className={detailStyles.section}>
+          <h2 className={detailStyles.sectionTitle}>Detection Integrity</h2>
+          <DetectionIntegritySummary summary={summarizeIntegrity(result.detections)} />
+        </section>
       )}
 
       {/* ── Technology insights (completed scans only) ── */}
-      {scan.status === 'completed' && <ScanInsights result={result} />}
+      {isCompleted && (
+        <section className={detailStyles.section}>
+          <h2 className={detailStyles.sectionTitle}>Technology Insights</h2>
+          <ScanInsights result={result} />
+        </section>
+      )}
 
       {/* ── Detection coverage (completed scans only) ── */}
-      {scan.status === 'completed' && <DetectionCoverage detections={detections} />}
+      {isCompleted && (
+        <section className={detailStyles.section}>
+          <h2 className={detailStyles.sectionTitle}>Detection Coverage</h2>
+          <DetectionCoverage detections={detections} />
+        </section>
+      )}
 
       {/* ── Snapshot / scanning state ── */}
       {isScanning(scan.status) ? (
-        <ScanningState scan={scan} />
+        <section className={detailStyles.section}>
+          <h2 className={detailStyles.sectionTitle}>Scanning in progress</h2>
+          <ScanningState scan={scan} />
+        </section>
       ) : (
-        snapshot && <Snapshot snapshot={snapshot} />
+        snapshot && (
+          <section className={detailStyles.section}>
+            <h2 className={detailStyles.sectionTitle}>Snapshot</h2>
+            <Snapshot snapshot={snapshot} />
+          </section>
+        )
       )}
 
       {/* ── Detections ── */}
-      <section className={styles.detections}>
+      <section className={detailStyles.section}>
+        <h2 className={detailStyles.sectionTitle}>
+          {isCompleted ? 'Detected Technologies' : 'Preliminary Results'}
+        </h2>
         {renderDetections(
           scan.status,
           detections,

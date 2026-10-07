@@ -10,13 +10,6 @@
  * - Scan not found (404): renders ScanNotFound component
  * - API/Infrastructure error (500): renders ScansError component
  *
- * Navigation: a "back" link and a "New scan" link are available in all
- * states, so users can return to scan history or start another scan
- * without extra clicks. A "Compare" link is available when a scan is found
- * and completed (comparisons require completed scans). A "Re-scan" link (pointing to `/scans/new?target=...`) is
- * available when a found scan has a usable target, allowing the user to
- * quickly re-scan the same target.
- *
  * Metadata: page `<title>` and `<meta name="description">` are derived
  * from the scan target via `generateMetadata`. Only the target URL
  * (already present in the API response) is used — no internal errors,
@@ -37,6 +30,7 @@ import { ScanNotFound, ScansError } from '@/components/ScanViews';
 import { ScanLifecycle } from '@/components/ScanLifecycle';
 import { CopyReportLink } from '@/components/CopyReportLink';
 import { ExportScanButton } from '@/components/ExportScanButton';
+import { ScanStatusBadge } from '@/components/ScanStatusBadge';
 import { generateDetailMetadata } from '@/lib/report-metadata';
 import { isTerminal } from '@/lib/scan-utils';
 import styles from './page.module.css';
@@ -83,78 +77,121 @@ export default async function ScanDetailPage({
     if (result === null) {
       return (
         <main className={styles.main}>
-          <div className={styles.detailHeader}>
-            <h1 className={styles.title}>DevLens</h1>
-            <p className={styles.subtitle}>Scan Detail</p>
-            <Link href="/scans" className={styles.backLink}>
-              ← Back to scan history
-            </Link>
-            <Link href="/scans/new" className={styles.newScanLink}>
-              New scan →
-            </Link>
+          <div className={styles.container}>
+            <div className={styles.detailHeader}>
+              <div className={styles.headerTop}>
+                <h1 className={styles.brandTitle}>DevLens</h1>
+                <nav aria-label="Actions">
+                  <Link href="/scans" className={`${styles.actionBtn} ${styles.actionPrimary}`}>
+                    ← Back to scan history
+                  </Link>
+                </nav>
+              </div>
+              <p className={styles.scanMeta}>
+                <span className={styles.scanId}>{id}</span>
+              </p>
+            </div>
+            <ScanNotFound id={id} />
           </div>
-          <ScanNotFound id={id} />
         </main>
       );
     }
 
+    const isCompleted = result.scan.status === 'completed';
+
     return (
       <main className={styles.main}>
-        <div className={styles.detailHeader}>
-          <h1 className={styles.title}>DevLens</h1>
-          <p className={styles.subtitle}>
-            Scan <code className={styles.scanId}>{result.scan.id}</code>
-            {isTerminal(result.scan.status) && (
-              <span className={styles.detectionCount}>· {result.detections.length} detections</span>
+        <div className={styles.container}>
+          <div className={styles.detailHeader}>
+            <div className={styles.headerTop}>
+              <h1 className={styles.brandTitle}>DevLens</h1>
+              <div className={styles.actions}>
+                <Link href="/scans" className={styles.actionBtn}>
+                  ← Back to history
+                </Link>
+                {isCompleted && (
+                  <Link
+                    href={`/scans/compare?left=${encodeURIComponent(id)}`}
+                    className={`${styles.actionBtn} ${styles.actionSecondary}`}
+                  >
+                    Compare
+                  </Link>
+                )}
+                {result.scan.target ? (
+                  <Link
+                    href={`/scans/new?target=${encodeURIComponent(result.scan.target)}`}
+                    className={styles.actionBtn}
+                  >
+                    Re-scan
+                  </Link>
+                ) : null}
+                <Link href="/scans/new" className={styles.actionBtn}>
+                  New scan
+                </Link>
+              </div>
+            </div>
+
+            <div className={styles.scanMeta}>
+              <ScanStatusBadge
+                status={
+                  result.scan.status as 'pending' | 'running' | 'completed' | 'failed'
+                }
+              />
+              {isTerminal(result.scan.status) && (
+                <span className={styles.detectionCount}>
+                  · {result.detections.length} detections
+                </span>
+              )}
+              <span className={styles.scanId}>{result.scan.id}</span>
+            </div>
+
+            {result.scan.target && (
+              <div className={styles.targetUrl}>
+                {result.scan.target}
+                {result.snapshot?.hostname && (
+                  <span className={styles.targetHostname}>
+                    {' '}
+                    ↗ {result.snapshot.hostname}
+                  </span>
+                )}
+              </div>
             )}
-          </p>
-          <Link href="/scans" className={styles.backLink}>
-            ← Back to scan history
-          </Link>
-          <Link href="/scans/new" className={styles.newScanLink}>
-            New scan →
-          </Link>
-          {result.scan.target ? (
-            <Link
-              href={`/scans/new?target=${encodeURIComponent(result.scan.target)}`}
-              className={styles.rescanLink}
-            >
-              Re-scan
-            </Link>
-          ) : null}
-          {result.scan.status === 'completed' && (
-            <Link
-              href={`/scans/compare?left=${encodeURIComponent(id)}`}
-              className={styles.compareLink}
-            >
-              Compare with another scan
-            </Link>
-          )}
-          <CopyReportLink scanId={result.scan.id} />
-          <ExportScanButton result={result} />
+
+            <CopyReportLink scanId={result.scan.id} />
+            <ExportScanButton result={result} />
+          </div>
+
+          <ScanLifecycle
+            scanId={id}
+            initialResult={result}
+            initialQuery={query}
+            initialCategory={category}
+          />
         </div>
-        <ScanLifecycle
-          scanId={id}
-          initialResult={result}
-          initialQuery={query}
-          initialCategory={category}
-        />
       </main>
     );
   } catch {
     return (
       <main className={styles.main}>
-        <div className={styles.detailHeader}>
-          <h1 className={styles.title}>DevLens</h1>
-          <p className={styles.subtitle}>Scan Detail</p>
-          <Link href="/scans" className={styles.backLink}>
-            ← Back to scan history
-          </Link>
-          <Link href="/scans/new" className={styles.newScanLink}>
-            New scan →
-          </Link>
+        <div className={styles.container}>
+          <div className={styles.detailHeader}>
+            <div className={styles.headerTop}>
+              <h1 className={styles.brandTitle}>DevLens</h1>
+              <nav aria-label="Actions">
+                <Link href="/scans" className={`${styles.actionBtn} ${styles.actionPrimary}`}>
+                  ← Back to scan history
+                </Link>
+                <Link href="/scans/new" className={styles.actionBtn}>
+                  New scan
+                </Link>
+              </nav>
+            </div>
+            <div className={styles.scanMeta}>
+              <span className={styles.scanId}>{id}</span>
+            </div>
+          </div>
+          <ScansError />
         </div>
-        <ScansError />
       </main>
     );
   }

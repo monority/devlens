@@ -43,6 +43,10 @@ vi.mock('@/components/CopyReportLink', () => ({
 vi.mock('@/components/ExportScanButton', () => ({
   ExportScanButton: () => React.createElement('div', { 'data-testid': 'export' }, 'Export'),
 }));
+vi.mock('@/components/ScanStatusBadge', () => ({
+  ScanStatusBadge: ({ status }: { status: string }) =>
+    React.createElement('span', { 'data-testid': 'status-badge' }, status),
+}));
 
 // Must import after mocks
 import ScanDetailPage from '@/app/scans/[id]/page.js';
@@ -181,7 +185,7 @@ describe('ScanDetailPage — Re-scan action', () => {
 
     const { cleaned } = await renderPage();
 
-    expect(cleaned).toContain('Compare with another scan');
+    expect(cleaned).toContain('Compare');
     expect(cleaned).toContain('href="/scans/compare?left=scan_001"');
   });
 
@@ -195,6 +199,6 @@ describe('ScanDetailPage — Re-scan action', () => {
     const { cleaned } = await renderPage();
 
     // Comparisons require completed scans; the link must not offer a dead end.
-    expect(cleaned).not.toContain('Compare with another scan');
+    expect(cleaned).not.toContain('Compare');
   });
 });

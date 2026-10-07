@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import { GlobalNav } from '@/components/GlobalNav';
+import { ThemeProvider } from '@/providers/theme-provider';
+import '@/app/globals.css';
 
 export const metadata = {
   title: 'DevLens',
@@ -10,8 +12,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <GlobalNav />
-        {children}
+        <ThemeProvider>
+          <GlobalNav />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

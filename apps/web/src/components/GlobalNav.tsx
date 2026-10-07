@@ -1,18 +1,16 @@
 /**
  * GlobalNav — persistent application navigation header.
  *
- * A small, isolated client component that renders a semantic `<header>`
- * with a primary `<nav>` containing:
+ * A client component that renders a semantic `<header>` with:
  *
  * - DevLens brand link → `/`
  * - Scans → `/scans`
  * - New Scan → `/scans/new`
  * - Technologies → `/technologies`
+ * - Theme toggle (dark/light/system)
  *
  * Active-section state is computed via `usePathname` (from next/navigation)
- * and exposed semantically via `aria-current="page"`. This component is
- * the ONLY client boundary introduced for navigation — the layout itself
- * remains a server component.
+ * and exposed semantically via `aria-current="page"`.
  *
  * Navigation sections:
  * - `/`             → Home
@@ -24,6 +22,8 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { useTheme } from 'next-themes';
+import { SunIcon, MoonIcon } from './icons';
 import styles from './GlobalNav.module.css';
 
 const navItems: { label: string; href: string }[] = [
@@ -49,6 +49,9 @@ function isSectionActive(pathname: string, href: string): boolean {
 
 export function GlobalNav(): React.ReactElement {
   const pathname = usePathname();
+  const { theme, setTheme, systemTheme } = useTheme();
+
+  const resolvedTheme = theme === 'system' ? systemTheme : theme;
 
   return (
     <header className={styles.navContainer}>
@@ -77,6 +80,21 @@ export function GlobalNav(): React.ReactElement {
           })}
         </ul>
       </nav>
+
+      {/* Theme toggle — cycles: light → dark → system */}
+      <button
+        type="button"
+        onClick={() => {
+          if (resolvedTheme === 'dark') setTheme('system');
+          else if (resolvedTheme === 'light') setTheme('dark');
+          else setTheme('light');
+        }}
+        className={styles.themeToggle}
+        aria-label="Toggle theme"
+        title="Toggle theme"
+      >
+        {resolvedTheme === 'dark' ? <MoonIcon /> : <SunIcon />}
+      </button>
     </header>
   );
 }

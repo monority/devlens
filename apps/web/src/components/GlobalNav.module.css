@@ -7,21 +7,24 @@
   max-width: 960px;
   margin: 0 auto;
   padding: 0.5rem 2rem;
-  border-bottom: 1px solid #e5e7eb;
-  background: #ffffff;
+  border-bottom: 1px solid var(--color-surface-border);
+  background: var(--color-background);
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease;
 }
 
-/* Brand */
+/* Brand (logo / app name) */
 .brand {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
   text-decoration: none;
   transition: color 0.15s ease;
 }
 
 .brand:hover {
-  color: #2563eb;
+  color: var(--color-primary);
 }
 
 /* Navigation list */
@@ -36,7 +39,7 @@
 .navLink {
   font-size: 0.9rem;
   font-weight: 500;
-  color: #374151;
+  color: var(--color-text-secondary);
   text-decoration: none;
   padding: 0.4rem 0.75rem;
   border-radius: 0.25rem;
@@ -46,20 +49,47 @@
 }
 
 .navLink:hover {
-  color: #111827;
-  background-color: #f3f4f6;
+  color: var(--color-text);
+  background-color: var(--color-surface-hover);
 }
 
 .navLink:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--color-primary);
   outline-offset: 1px;
 }
 
 /* Active state */
 .navLinkActive {
-  color: #2563eb;
-  background-color: #f0f9ff;
+  color: var(--color-primary);
+  background-color: var(--color-primary-100);
   font-weight: 600;
+}
+
+/* Theme toggle button */
+.themeToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.4rem;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-surface-border);
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.themeToggle:hover {
+  color: var(--color-text);
+  background: var(--color-surface-hover);
+}
+
+.themeToggle:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
 }
 
 /* Responsive */

@@ -1,10 +1,10 @@
 /* Scan card styles */
 .card {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-surface-border);
   border-radius: 0.5rem;
   padding: 1rem;
-  background: #ffffff;
-  transition: box-shadow 0.15s ease;
+  background: var(--color-background-card);
+  transition: box-shadow 0.15s ease, background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .card:hover {
@@ -30,7 +30,7 @@
 }
 
 .hostname {
-  color: #6b7280;
+  color: var(--color-text-secondary);
   font-size: 0.8rem;
   margin: 0;
 }
@@ -70,7 +70,7 @@
 }
 
 .cardFooter a {
-  color: #2563eb;
+  color: var(--color-primary);
   text-decoration: none;
 }
 
@@ -90,23 +90,23 @@
 }
 
 .statusCompleted {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--color-status-completed-bg);
+  color: var(--color-status-completed-text);
 }
 
 .statusFailed {
-  background: #fee2e2;
-  color: #991b2b;
+  background: var(--color-status-failed-bg);
+  color: var(--color-status-failed-text);
 }
 
 .statusRunning {
-  background: #dbeafe;
-  color: #1e40af;
+  background: var(--color-status-running-bg);
+  color: var(--color-status-running-text);
 }
 
 .statusPending {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--color-status-pending-bg);
+  color: var(--color-status-pending-text);
 }
 
 /* List layout */

@@ -63,6 +63,7 @@ import { react } from './technologies/react.js';
 import { vue } from './technologies/vue.js';
 import { angular } from './technologies/angular.js';
 import { svelte } from './technologies/svelte.js';
+import { sveltekit } from './technologies/sveltekit.js';
 import { astro } from './technologies/astro.js';
 import { ember } from './technologies/ember.js';
 import { backbone } from './technologies/backbone.js';
@@ -89,6 +90,8 @@ import { segment } from './technologies/segment.js';
 import { cloudflare } from './technologies/cloudflare.js';
 import { fastly } from './technologies/fastly.js';
 import { vercel } from './technologies/vercel.js';
+import { bun } from './technologies/bun.js';
+import { vite } from './technologies/vite.js';
 
 /**
  * The canonical, ordered list of every technology definition.
@@ -128,6 +131,7 @@ export const TECHNOLOGY_DEFINITIONS: readonly TechnologyDefinition[] = [
   react,
   vue,
   angular,
+  sveltekit,
   svelte,
   astro,
   ember,
@@ -158,6 +162,10 @@ export const TECHNOLOGY_DEFINITIONS: readonly TechnologyDefinition[] = [
   cloudflare,
   fastly,
   vercel,
+  // ── Runtimes ───────────────────────────────────────────────
+  bun,
+  // ── Build tools ────────────────────────────────────────────
+  vite,
 ];
 
 /**

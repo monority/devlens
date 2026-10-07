@@ -304,6 +304,28 @@ export const FIXTURES: readonly Fixture[] = [
   },
 
   {
+    name: 'sveltekit',
+    description:
+      'SvelteKit app: /_app/immutable/ script URL + $lib/ import specifier + SvelteComponent compile marker',
+    category: 'framework',
+    snapshot: makeSnapshot({
+      scripts: [
+        {
+          src: 'https://example.com/_app/immutable/pages/index-abc123.js',
+          content: '',
+        },
+        {
+          src: null,
+          content:
+            'import { goto } from "$lib/utils.js"; import.meta.env.BASE_URL; __data.json;\nwindow.__SVELTE__ = { version: "4.2" };',
+        },
+      ],
+    }),
+    expected: ['sveltekit', 'svelte'],
+    forbidden: ['nextjs', 'nuxtjs', 'vue', 'angular', 'react'],
+  },
+
+  {
     name: 'astro',
     description: 'Astro site with astro-island web component',
     category: 'framework',
@@ -554,6 +576,23 @@ export const FIXTURES: readonly Fixture[] = [
     }),
     expected: ['tailwind'],
     forbidden: ['bootstrap', 'jekyll', 'hugo'],
+  },
+
+  {
+    name: 'vite',
+    description: 'Vite-built app: import.meta.env.DEV + /assets/ script URL + __vite__ HMR marker',
+    category: 'build_tool',
+    snapshot: makeSnapshot({
+      scripts: [
+        { src: 'https://example.com/assets/entry-abc123.js', content: '' },
+        {
+          src: null,
+          content: 'import.meta.env.DEV; __vite_client__ && console.log("vite");',
+        },
+      ],
+    }),
+    expected: ['vite'],
+    forbidden: ['webpack', 'rollup', 'nextjs'],
   },
 
   // ── E-commerce ───────────────────────────────────────────────────
@@ -1405,6 +1444,32 @@ export const FIXTURES: readonly Fixture[] = [
       'litespeed',
       'tomcat',
     ],
+  },
+
+  {
+    name: 'bun',
+    description: 'Bun runtime: Server header + Bun.serve/Bun.file inline content',
+    category: 'runtime',
+    snapshot: makeSnapshot({
+      headers: [{ name: 'Server', value: 'bun/1.1.0' }],
+      scripts: [
+        {
+          src: null,
+          content:
+            'const server = Bun.serve({ port: 3000, fetch(req) { return new Response("Hello"); } });\nconst file = Bun.file("index.html");',
+        },
+      ],
+      resources: [
+        {
+          url: 'https://example.com/app.js',
+          type: 'script',
+          content:
+            'import { db } from "bun:sqlite"; const { readFileSync } = Bun; const { FFI } = "bun:ffi";',
+        },
+      ],
+    }),
+    expected: ['bun'],
+    forbidden: ['express', 'laravel', 'nextjs', 'react'],
   },
 
   {

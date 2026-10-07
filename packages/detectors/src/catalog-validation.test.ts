@@ -36,12 +36,12 @@ describe('validateCatalog — real catalog', () => {
     expect(validateCatalog()).toEqual([]);
   });
 
-  it('has exactly 54 technology definitions (32 Step-67 + 22 Step-68)', () => {
-    expect(TECHNOLOGY_DEFINITIONS).toHaveLength(54);
+  it('has exactly 57 technology definitions (32 Step-67 + 25 Step-68)', () => {
+    expect(TECHNOLOGY_DEFINITIONS).toHaveLength(57);
   });
 
-  it('exposes 54 unique ids', () => {
-    expect(TECHNOLOGY_IDS.size).toBe(54);
+  it('exposes 57 unique ids', () => {
+    expect(TECHNOLOGY_IDS.size).toBe(57);
     expect(Array.from(TECHNOLOGY_IDS).sort()).toEqual(
       Array.from(new Set(Array.from(TECHNOLOGY_IDS))).sort(),
     );

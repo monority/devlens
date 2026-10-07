@@ -84,6 +84,13 @@ const EXPECTED_TECHNOLOGIES: Record<string, { name: string; category: string }> 
   // ContentScriptDetector
   ember: { name: 'Ember', category: 'framework' },
   backbone: { name: 'Backbone', category: 'framework' },
+
+  // ── Runtimes & Build tools ───────────────────────────────
+  bun: { name: 'Bun', category: 'runtime' },
+  vite: { name: 'Vite', category: 'build_tool' },
+
+  // ── SvelteKit (Svelte meta-framework) ──────────────────────
+  sveltekit: { name: 'SvelteKit', category: 'framework' },
 };
 
 // ─── Tests ─────────────────────────────────────────────────────────
@@ -99,8 +106,8 @@ describe('TechnologyCatalog', () => {
       }
     });
 
-    it('contains exactly 54 technologies', () => {
-      expect(Object.keys(TECHNOLOGY_CATALOG)).toHaveLength(54);
+    it('contains exactly 57 technologies (32 Step-67 + 25 Step-68)', () => {
+      expect(Object.keys(TECHNOLOGY_CATALOG)).toHaveLength(57);
     });
 
     it('every expected technology is present with correct metadata', () => {

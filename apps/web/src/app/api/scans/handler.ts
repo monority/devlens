@@ -156,6 +156,16 @@ function validateUrl(rawUrl: string): URL {
     throw { code: 'EMPTY_URL' as const, message: 'The url field must not be empty.' };
   }
 
+  // Reject pathologically long URLs to prevent DoS. RFC 9110 recommends
+  // servers accept at least 8 KiB; browsers typically cap at ~2 KiB.
+  // We accept up to 8 KiB (8192 chars) — generous for any legitimate URL.
+  if (rawUrl.length > 8192) {
+    throw {
+      code: 'URL_TOO_LONG' as const,
+      message: 'The url must not exceed 8192 characters.',
+    };
+  }
+
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);

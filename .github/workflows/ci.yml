@@ -8,6 +8,14 @@ on:
 
 jobs:
   ci:
+    # SECURITY: restrict GITHUB_TOKEN permissions to least-privilege.
+    # - contents: read — needed for checkout only.
+    # - pull-requests: read — needed to post PR comments (if used).
+    # Write permissions (issues, pull-requests write, deployments, etc.)
+    # are NOT granted, preventing supply-chain privilege escalation.
+    permissions:
+      contents: read
+      pull-requests: read
     runs-on: ubuntu-latest
     services:
       postgres:

@@ -28,6 +28,9 @@ import { createProductionDetector } from '@devlens/detectors';
 import type { HandleCreateScanOptions, HandleGetOptions } from './handler';
 import { rateLimitedResponse } from '@/lib/rate-limiter';
 
+/** Maximum request body size: 16 KiB — a scan request only needs a URL. */
+const MAX_BODY_BYTES = 16 * 1024;
+
 /**
  * Applies API-only security headers to a response:
  * - `X-Robots-Tag: noindex` prevents search engines from indexing API endpoints.
@@ -68,7 +71,30 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const limited = rateLimitedResponse('scan', ip);
   if (limited) return limited;
 
+  // Body size limit: reject oversized payloads before reading/parsing.
+  // A scan request body only contains a URL (~100 bytes), so 16 KiB is
+  // more than generous and prevents OOM from malicious payloads.
+  const contentLength = Number(request.headers.get('content-length') ?? 0);
+  if (contentLength > MAX_BODY_BYTES) {
+    return withApiHeaders(
+      NextResponse.json(
+        { error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body exceeds maximum size.' } },
+        { status: 413 },
+      ),
+    );
+  }
+
   const body = await request.text();
+  // Double-check actual body size (content-length can be missing/spoofed).
+  if (Buffer.byteLength(body, 'utf8') > MAX_BODY_BYTES) {
+    return withApiHeaders(
+      NextResponse.json(
+        { error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body exceeds maximum size.' } },
+        { status: 413 },
+      ),
+    );
+  }
+
   const result = await handleCreateScan(body, createDependencies());
   return withApiHeaders(NextResponse.json(result.body, { status: result.status }));
 }

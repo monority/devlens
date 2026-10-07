@@ -162,6 +162,12 @@ function toEvidenceReason(item: EvidenceResponse): EvidenceReason {
   };
 }
 
+/** Deterministic string comparator: ascending lexicographic order. */
+function compareStrings(a: string, b: string): number {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
 /**
  * Builds relationship reason(s) for a derived detection, one per
  * `implies` provenance edge, in deterministic order (sourceTechnology ASC).
@@ -172,10 +178,10 @@ function buildRelationshipReasons(detection: DetectionResponse): RelationshipRea
   }
   return [...detection.derivedFrom]
     .sort((a, b) => {
-      if (a.source !== b.source) return a.source < b.source ? -1 : 1;
+      if (a.source !== b.source) return compareStrings(a.source, b.source);
       const na = a.sourceName ?? a.source;
       const nb = b.sourceName ?? b.source;
-      return na === nb ? 0 : na < nb ? -1 : 1;
+      return compareStrings(na, nb);
     })
     .map((prov) => ({
       kind: 'relationship' as const,
@@ -222,7 +228,7 @@ function buildVersionConflictDetail(
   }
 
   return Array.from(grouped.keys())
-    .sort((a, b) => (a === b ? 0 : a < b ? -1 : 1))
+    .sort(compareStrings)
     .map((source) => ({
       source,
       evidence: grouped.get(source) as EvidenceSource[],
@@ -272,8 +278,8 @@ function buildGraph(
   // Conflicting-technology nodes (conflicts_with edges).
   if (relationshipConflicts) {
     for (const c of [...relationshipConflicts].sort((a, b) => {
-      if (a.type !== b.type) return a.type < b.type ? -1 : 1;
-      return a.other === b.other ? 0 : a.other < b.other ? -1 : 1;
+      if (a.type !== b.type) return compareStrings(a.type, b.type);
+      return compareStrings(a.other, b.other);
     })) {
       nodes.push({
         id: `tech:${c.other}`,
@@ -287,7 +293,8 @@ function buildGraph(
   const edges: ExplanationEdge[] = [];
 
   // detection → evidence (supported_by), sorted by identity ASC.
-  for (const item of evidenceSources.sort(compareEvidenceSources)) {
+  const sortedSources = [...evidenceSources].sort(compareEvidenceSources);
+  for (const item of sortedSources) {
     edges.push({
       from: `detection:${techId}`,
       to: `evidence:${item.identity}`,
@@ -297,9 +304,7 @@ function buildGraph(
 
   // detection → source technology (derived_from).
   if (isDerived && derivedFrom) {
-    for (const prov of [...derivedFrom].sort((a, b) =>
-      a.source === b.source ? 0 : a.source < b.source ? -1 : 1,
-    )) {
+    for (const prov of [...derivedFrom].sort((a, b) => compareStrings(a.source, b.source))) {
       edges.push({
         from: `detection:${techId}`,
         to: `tech:${prov.source}`,
@@ -324,13 +329,13 @@ function buildGraph(
 
   // Deterministic ordering (no object-key insertion-order reliance).
   nodes.sort((a, b) => {
-    if (a.kind !== b.kind) return a.kind < b.kind ? -1 : 1;
-    return a.id === b.id ? 0 : a.id < b.id ? -1 : 1;
+    if (a.kind !== b.kind) return compareStrings(a.kind, b.kind);
+    return compareStrings(a.id, b.id);
   });
   edges.sort((a, b) => {
-    if (a.type !== b.type) return a.type < b.type ? -1 : 1;
-    if (a.from !== b.from) return a.from < b.from ? -1 : 1;
-    return a.to === b.to ? 0 : a.to < b.to ? -1 : 1;
+    if (a.type !== b.type) return compareStrings(a.type, b.type);
+    if (a.from !== b.from) return compareStrings(a.from, b.from);
+    return compareStrings(a.to, b.to);
   });
 
   return { nodes, edges };
@@ -338,18 +343,18 @@ function buildGraph(
 
 /** Deterministic comparator for evidence sources (type-label ASC → identity ASC). */
 function compareEvidenceSources(a: EvidenceSource, b: EvidenceSource): number {
-  if (a.type !== b.type) return a.type < b.type ? -1 : 1;
-  return a.identity === b.identity ? 0 : a.identity < b.identity ? -1 : 1;
+  if (a.type !== b.type) return compareStrings(a.type, b.type);
+  return compareStrings(a.identity, b.identity);
 }
 
 /** Deterministic comparator for raw evidence (type-label ASC → identity ASC). */
 function compareEvidence(a: EvidenceResponse, b: EvidenceResponse): number {
   const labelA = evidenceTypeLabel(a.type);
   const labelB = evidenceTypeLabel(b.type);
-  if (labelA !== labelB) return labelA < labelB ? -1 : 1;
+  if (labelA !== labelB) return compareStrings(labelA, labelB);
   const idA = getEvidenceIdentity(a);
   const idB = getEvidenceIdentity(b);
-  return idA === idB ? 0 : idA < idB ? -1 : 1;
+  return compareStrings(idA, idB);
 }
 
 // ─── Public API ──────────────────────────────────────────────────────

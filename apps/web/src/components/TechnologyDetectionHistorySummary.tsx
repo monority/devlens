@@ -46,13 +46,15 @@ const STABILITY_LABEL: Record<HistoryStability, string> = {
  * so a `string | undefined` CSS-module token is coerced to `string`, matching
  * the pattern used by `TechnologyDetectionTimeline`). */
 function stabilityClassName(stability: HistoryStability): string {
-  const mod =
-    stability === 'stable'
-      ? styles.stabilityStable
-      : stability === 'changed'
-        ? styles.stabilityChanged
-        : styles.stabilityIndeterminate;
+  const mod = stabilityClass(stability);
   return `${styles.stability} ${mod}`;
+}
+
+/** Resolves the CSS module class for a stability state (S3358: extracted from nested ternary). */
+function stabilityClass(stability: HistoryStability): string | undefined {
+  if (stability === 'stable') return styles.stabilityStable;
+  if (stability === 'changed') return styles.stabilityChanged;
+  return styles.stabilityIndeterminate;
 }
 
 /**

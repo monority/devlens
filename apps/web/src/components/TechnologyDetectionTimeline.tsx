@@ -37,6 +37,35 @@ import styles from './TechnologyDetectionTimeline.module.css';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /**
+ * Renders the version cell for a timeline entry.
+ * Conflict, resolved version, or absent placeholder — never fabricated
+ * (Step 72 §5). Extracted from a nested ternary (S3358).
+ */
+function renderVersionCell(
+  versionConflict: boolean,
+  version: string | null,
+  versionSource: string | undefined,
+): React.ReactNode {
+  if (versionConflict) {
+    return (
+      <>
+        <span className={styles.versionConflict}>Conflict</span>
+        {versionSource && <span className={styles.versionSource}>{versionSource}</span>}
+      </>
+    );
+  }
+  if (version) {
+    return (
+      <>
+        <span className={styles.version}>{version}</span>
+        {versionSource && <span className={styles.versionSource}>{versionSource}</span>}
+      </>
+    );
+  }
+  return <span className={styles.versionAbsent}>—</span>;
+}
+
+/**
  * Compact, locale-free UTC timestamp formatter (`Sep 16, 2025 at 14:30 UTC`).
  * Deterministic — no `Intl` so output is stable across timezones/localed runtimes.
  */
@@ -125,16 +154,7 @@ export function TechnologyDetectionTimeline({
               </td>
 
               <td className={`${styles.td} ${styles.colVersion}`}>
-                {entry.versionConflict ? (
-                  <span className={styles.versionConflict}>Conflict</span>
-                ) : entry.version ? (
-                  <span className={styles.version}>{entry.version}</span>
-                ) : (
-                  <span className={styles.versionAbsent}>—</span>
-                )}
-                {entry.versionSource && (
-                  <span className={styles.versionSource}>{entry.versionSource}</span>
-                )}
+                {renderVersionCell(entry.versionConflict, entry.version, entry.versionSource)}
               </td>
 
               <td className={`${styles.td} ${styles.colEvidence}`}>

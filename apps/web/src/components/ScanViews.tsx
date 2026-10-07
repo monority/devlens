@@ -30,7 +30,12 @@ import Link from 'next/link';
 import { isScanning } from '../lib/scan-utils';
 import { getScanOverview } from '../lib/scan-overview';
 import { summarizeIntegrity } from '../lib/detection-integrity-presenter';
-import type { ScanSummary, ScanDetailResponse, SnapshotResponse } from '../lib/types.js';
+import type {
+  ScanSummary,
+  ScanDetailResponse,
+  SnapshotResponse,
+  DetectionResponse,
+} from '../lib/types.js';
 import { ScanSummary as ScanSummarySection } from './ScanSummary';
 import { ScanOverview } from './ScanOverview';
 import { ScanInsights } from './ScanInsights';
@@ -288,7 +293,54 @@ export function ScanningState({ scan }: { scan: ScanDetailResponse['scan'] }): R
   );
 }
 
-// ─── Scan detail view (orchestrator) ──────────────────────────────────
+// ─── Detections rendering (S3358: extracted from nested ternary) ──────
+
+/**
+ * Renders the detections section based on scan status and available filters.
+ * Handles: scanning, completed-with-query, completed-without-query, failed,
+ * and fallback states (S3358: extracted from a 4-level nested ternary).
+ */
+function renderDetections(
+  status: ScanDetailResponse['scan']['status'],
+  detections: DetectionResponse[],
+  scanId: string,
+  initialQuery: string | undefined,
+  initialCategory: string | undefined,
+  observationCoverage: ScanDetailResponse['observationCoverage'],
+): React.ReactNode {
+  if (isScanning(status)) {
+    return (
+      <>
+        <h2>Detections (pending)</h2>
+        <p>Detection results will appear after the scan completes.</p>
+      </>
+    );
+  }
+  if (status === 'completed' && initialQuery !== undefined) {
+    return (
+      <DetectionFilterView
+        detections={detections}
+        scanId={scanId}
+        initialQuery={initialQuery}
+        initialCategory={initialCategory ?? ''}
+      />
+    );
+  }
+  if (status === 'completed') {
+    return (
+      <ScanDetectionResults detections={detections} observationCoverage={observationCoverage} />
+    );
+  }
+  if (status === 'failed') {
+    return (
+      <>
+        <h2>Detections (0)</h2>
+        <p>Detection results are not available because the scan failed.</p>
+      </>
+    );
+  }
+  return <DetectionList detections={detections} observationCoverage={observationCoverage} />;
+}
 
 /**
  * Renders the full detail view of a single scan result.
@@ -367,30 +419,13 @@ export function ScanDetailView({
 
       {/* ── Detections ── */}
       <section className={styles.detections}>
-        {isScanning(scan.status) ? (
-          <>
-            <h2>Detections (pending)</h2>
-            <p>Detection results will appear after the scan completes.</p>
-          </>
-        ) : scan.status === 'completed' && initialQuery !== undefined ? (
-          <DetectionFilterView
-            detections={detections}
-            scanId={scan.id}
-            initialQuery={initialQuery}
-            initialCategory={initialCategory ?? ''}
-          />
-        ) : scan.status === 'completed' ? (
-          <ScanDetectionResults
-            detections={detections}
-            observationCoverage={result.observationCoverage}
-          />
-        ) : scan.status === 'failed' ? (
-          <>
-            <h2>Detections (0)</h2>
-            <p>Detection results are not available because the scan failed.</p>
-          </>
-        ) : (
-          <DetectionList detections={detections} observationCoverage={result.observationCoverage} />
+        {renderDetections(
+          scan.status,
+          detections,
+          scan.id,
+          initialQuery,
+          initialCategory,
+          result.observationCoverage,
         )}
       </section>
     </article>

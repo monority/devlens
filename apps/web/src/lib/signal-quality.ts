@@ -106,8 +106,14 @@ export function computeSignalQuality(evidence: readonly EvidenceResponse[]): Sig
     (a, b) => a.localeCompare(b),
   );
   const sourceCount = families.length;
-  const level: SignalQualityLevel =
-    sourceCount === 1 ? 'single_signal' : sourceCount === 2 ? 'corroborated' : 'strong';
+
+  // Resolve signal-quality level from distinct source-family count (S3358: extracted helper).
+  function resolveLevel(count: number): SignalQualityLevel {
+    if (count === 1) return 'single_signal';
+    if (count === 2) return 'corroborated';
+    return 'strong';
+  }
+  const level: SignalQualityLevel = resolveLevel(sourceCount);
 
   return {
     level,

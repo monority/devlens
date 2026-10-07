@@ -163,7 +163,7 @@ export function computeDetectionProvenance(detection: Detection): DetectionProve
   const types = Array.from(new Set(evidence.map((e) => e.type))).sort((a, b) => {
     const pa = typePrecedence(a);
     const pb = typePrecedence(b);
-    return pa === pb ? 0 : pa < pb ? -1 : 1;
+    return pa - pb;
   });
 
   // §7 (fallback): strongest = single type when unambiguous, else the

@@ -68,11 +68,12 @@ function ExplanationSection({
 
       {explainability.reasons.length > 0 ? (
         <ul className={styles.evidenceSourceList}>
-          {explainability.reasons.map((reason, reasonIndex) => {
+          {explainability.reasons.map((reason) => {
             if (reason.kind === 'evidence') {
+              const key = `reason-ev-${reason.summary}`;
               return (
                 <li
-                  key={`reason-${reasonIndex}`}
+                  key={key}
                   className={styles.evidenceSourceItem}
                   title={evidenceFields(reason.evidence)[0]?.value ?? ''}
                 >
@@ -81,8 +82,9 @@ function ExplanationSection({
                 </li>
               );
             }
+            const key = `reason-rel-${reason.sourceName ?? reason.sourceTechnology}`;
             return (
-              <li key={`reason-${reasonIndex}`} className={styles.reasonRelationship}>
+              <li key={key} className={styles.reasonRelationship}>
                 Derived from {reason.sourceName ?? reason.sourceTechnology} (
                 {reason.relationshipType})
               </li>
@@ -111,12 +113,12 @@ function VersionConflictSection({
     <section className={styles.versionConflictDetail}>
       <h3 className={styles.versionConflictHeading}>Version evidence is inconsistent</h3>
       <ul className={styles.versionConflictEvidenceList}>
-        {explainability.versionConflictDetail.map((detail, detailIndex) => (
-          <li key={`vc-${detailIndex}`} className={styles.versionConflictEvidenceItem}>
+        {explainability.versionConflictDetail.map((detail) => (
+          <li key={`vc-${detail.source}`} className={styles.versionConflictEvidenceItem}>
             <span className={styles.versionConflictSource}>{detail.source}</span>
             <ul className={styles.versionConflictValues}>
-              {detail.evidence.map((ev, evIndex) => (
-                <li key={`vcv-${detailIndex}-${evIndex}`} title={ev.value}>
+              {detail.evidence.map((ev) => (
+                <li key={`vcv-${detail.source}-${ev.value}`} title={ev.value}>
                   {ev.value}
                 </li>
               ))}

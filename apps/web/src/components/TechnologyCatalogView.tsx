@@ -36,7 +36,7 @@ import type { TechnologyPresentation } from '../lib/technology-catalog.js';
 
 export interface TechnologyCatalogViewProps {
   /** All technologies from the catalog (unfiltered) */
-  technologies: TechnologyPresentation[];
+  readonly technologies: TechnologyPresentation[];
 }
 
 /**

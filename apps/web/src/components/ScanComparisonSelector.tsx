@@ -34,7 +34,7 @@ import cardStyles from './ScanCard.module.css';
 
 export interface ScanComparisonSelectorProps {
   /** All scans from the server (unfiltered; includes non-completed) */
-  scans: ScanSummary[];
+  readonly scans: ScanSummary[];
   /**
    * When provided, pre-selects and locks this scan as "Previous" (left) and
    * opens the selector expanded — used by the compare page when only `left`
@@ -42,7 +42,7 @@ export interface ScanComparisonSelectorProps {
    * the user only needs to choose the scan to compare it against. The locked
    * scan's "Previous" checkbox is checked and disabled.
    */
-  defaultLeft?: string;
+  readonly defaultLeft?: string;
 }
 
 export function ScanComparisonSelector({

@@ -26,9 +26,9 @@ import { DetectionList } from './DetectionList';
 
 export interface ScanDetectionResultsProps {
   /** Already-filtered detection results from the API */
-  detections: DetectionResponse[];
+  readonly detections: DetectionResponse[];
   /** Observation coverage (Step 78) — forwarded to the detection list */
-  observationCoverage?: ObservationCoverage | undefined;
+  readonly observationCoverage?: ObservationCoverage | undefined;
 }
 
 export function ScanDetectionResults({

@@ -21,7 +21,7 @@ export interface EmptyDetectionsProps {
    * Observation coverage for the scan (Step 78). When omitted, the
    * blind-spot warning is suppressed — no gap information is available.
    */
-  observationCoverage?: ObservationCoverage | undefined;
+  readonly observationCoverage?: ObservationCoverage | undefined;
 }
 
 export function EmptyDetections({ observationCoverage }: EmptyDetectionsProps): React.ReactElement {

@@ -26,7 +26,7 @@ import type { ScanResultQualitySummary } from '@devlens/core';
 import styles from './ScanCard.module.css';
 
 export interface ResultQualitySummaryProps {
-  resultQuality: ScanResultQualitySummary;
+  readonly resultQuality: ScanResultQualitySummary;
 }
 
 const QUALITY_LABELS: Readonly<Record<ScanResultQualitySummary['quality'], string>> = {

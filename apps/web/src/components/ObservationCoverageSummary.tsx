@@ -21,7 +21,7 @@ import type {
 import styles from './ScanCard.module.css';
 
 export interface ObservationCoverageSummaryProps {
-  coverage: ObservationCoverage;
+  readonly coverage: ObservationCoverage;
 }
 
 const FAMILY_LABELS: Readonly<Record<ObservationFamily, string>> = {

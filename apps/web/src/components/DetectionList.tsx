@@ -15,9 +15,9 @@ import { EmptyDetections } from './EmptyDetections';
 import styles from './ScanCard.module.css';
 
 export interface DetectionListProps {
-  detections: DetectionResponse[];
+  readonly detections: DetectionResponse[];
   /** Observation coverage (Step 78) — forwarded to the zero-detection state */
-  observationCoverage?: ObservationCoverage | undefined;
+  readonly observationCoverage?: ObservationCoverage | undefined;
 }
 
 export function DetectionList({

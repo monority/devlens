@@ -28,7 +28,7 @@ import Link from 'next/link';
 import styles from './ScanCard.module.css';
 
 export interface ScanComparisonProps {
-  result: ComparisonResult;
+  readonly result: ComparisonResult;
 }
 
 // ─── Main component ──────────────────────────────────────────────────
@@ -98,7 +98,7 @@ export function ScanComparison({ result }: ScanComparisonProps): React.ReactElem
 
 // ─── Comparison header ───────────────────────────────────────────────
 
-function ComparisonHeader({ result }: { result: ComparisonResult }): React.ReactElement {
+function ComparisonHeader({ result }: { readonly result: ComparisonResult }): React.ReactElement {
   const leftOverview = getScanOverview(result.left!);
   const rightOverview = getScanOverview(result.right!);
 
@@ -124,7 +124,7 @@ function ComparisonHeader({ result }: { result: ComparisonResult }): React.React
 
 // ─── Comparison error (missing scan) ─────────────────────────────────
 
-function ComparisonError({ result }: { result: ComparisonResult }): React.ReactElement {
+function ComparisonError({ result }: { readonly result: ComparisonResult }): React.ReactElement {
   const missingIds: string[] = [];
   if (result.leftNotFound) missingIds.push('left');
   if (result.rightNotFound) missingIds.push('right');
@@ -154,7 +154,7 @@ function ComparisonError({ result }: { result: ComparisonResult }): React.ReactE
  * Shows: Added, Removed, Version changes, Score changes, Evidence changes,
  * Integrity changes, Overall.
  */
-function ComparisonSummary({ result }: { result: ComparisonResult }): React.ReactElement {
+function ComparisonSummary({ result }: { readonly result: ComparisonResult }): React.ReactElement {
   const evidenceChangeCount = result.evidenceChanges.filter((e) => e.status !== 'unchanged').length;
 
   return (
@@ -211,7 +211,7 @@ function findDetectionById(
   return detections.find((d) => d.technology.id === techId) ?? null;
 }
 
-function TechnologyChanges({ result }: { result: ComparisonResult }): React.ReactElement {
+function TechnologyChanges({ result }: { readonly result: ComparisonResult }): React.ReactElement {
   if (!result.hasChanges) {
     return (
       <section className={styles.noChanges}>
@@ -448,10 +448,10 @@ function TechnologyComparisonItem({
   detection,
   fullDetection,
 }: {
-  detection: TechnologyComparison;
+  readonly detection: TechnologyComparison;
   /** Full detection from the source scan (re-resolved by id at render time).
    *  Present for added/removed technologies; undefined for unchanged. */
-  fullDetection?: DetectionResponse | null;
+  readonly fullDetection?: DetectionResponse | null;
 }): React.ReactElement {
   const badgeClass = getBadgeClass(detection.status);
 
@@ -506,7 +506,11 @@ function TechnologyComparisonItem({
 /** Renders a `version_changed` technology: "before → after".
  *  Conflict sides (Step 72) are surfaced honestly — never a fabricated
  *  transition — via the existing `versionConflict` notice. */
-function VersionChangeItem({ detection }: { detection: TechnologyComparison }): React.ReactElement {
+function VersionChangeItem({
+  detection,
+}: {
+  readonly detection: TechnologyComparison;
+}): React.ReactElement {
   const vc = detection.version;
   const from = typeof vc.before === 'string' ? vc.before : '—';
   const to = typeof vc.after === 'string' ? vc.after : '—';
@@ -539,7 +543,7 @@ function VersionChangeItem({ detection }: { detection: TechnologyComparison }): 
 function IntegrityChangeItem({
   detection,
 }: {
-  detection: TechnologyComparison;
+  readonly detection: TechnologyComparison;
 }): React.ReactElement {
   const before = detection.before;
   const after = detection.after;
@@ -564,7 +568,11 @@ function IntegrityChangeItem({
 
 // ─── Score change row ────────────────────────────────────────────────
 
-function ScoreChangeRow({ detection }: { detection: TechnologyComparison }): React.ReactElement {
+function ScoreChangeRow({
+  detection,
+}: {
+  readonly detection: TechnologyComparison;
+}): React.ReactElement {
   const delta = detection.scoreDelta ?? 0;
   const deltaStr = delta >= 0 ? `+${delta}` : `${delta}`;
 
@@ -580,7 +588,11 @@ function ScoreChangeRow({ detection }: { detection: TechnologyComparison }): Rea
 
 // ─── Evidence change list ────────────────────────────────────────────
 
-function EvidenceChangeList({ changes }: { changes: EvidenceComparison[] }): React.ReactElement {
+function EvidenceChangeList({
+  changes,
+}: {
+  readonly changes: EvidenceComparison[];
+}): React.ReactElement {
   const visibleChanges = changes.filter((e) => e.status !== 'unchanged');
 
   if (visibleChanges.length === 0) {
@@ -607,7 +619,11 @@ function EvidenceChangeList({ changes }: { changes: EvidenceComparison[] }): Rea
 
 // ─── Evidence change row ─────────────────────────────────────────────
 
-function EvidenceChangeRow({ change }: { change: EvidenceComparison }): React.ReactElement {
+function EvidenceChangeRow({
+  change,
+}: {
+  readonly change: EvidenceComparison;
+}): React.ReactElement {
   const item: EvidenceResponse | null = change.right ?? change.left;
   const label = item !== null ? evidenceTypeLabel(item.type) : 'Unknown';
   const fields = item !== null ? evidenceFields(item) : [];

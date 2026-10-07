@@ -13,6 +13,7 @@ export default ts.config(
       '**/test-results/**',
       '**/coverage/**',
       '**/.pnpm/**',
+      '**/.tmp/**',
     ],
   },
   js.configs.recommended,

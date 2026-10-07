@@ -1,4 +1,4 @@
-/** Next.js — framework (meta generator + _next/ script URL + __NEXT_DATA__ inline). Step 68 declarative catalog. */
+/** Next.js — framework (meta generator + _next/ script URL + __NEXT_DATA__/App Router RSC fingerprints). Step 68 declarative catalog. */
 import type { TechnologyDefinition } from '../types.js';
 
 export const nextjs: TechnologyDefinition = {
@@ -11,9 +11,14 @@ export const nextjs: TechnologyDefinition = {
   scriptUrlSignatures: [{ matchUrl: '/_next/', technologyId: 'nextjs', confidence: 90 }],
   // highest-confidence fingerprint first (evidence-preference order)
   contentSignatures: [
+    // Pages Router (legacy) fingerprints
     { matchContent: '__NEXT_DATA__', technologyId: 'nextjs', confidence: 95 },
     { matchContent: 'next/router', technologyId: 'nextjs', confidence: 90 },
+    // App Router (Next.js 13+) fingerprints — not present in Pages Router
     { matchContent: 'next/navigation', technologyId: 'nextjs', confidence: 90 },
+    { matchContent: 'next/font', technologyId: 'nextjs', confidence: 85 },
+    { matchContent: 'ReactServerComponents', technologyId: 'nextjs', confidence: 85 },
+    { matchContent: 'next/image', technologyId: 'nextjs', confidence: 75 },
   ],
   // Step 69: Next.js is built on React. Observing Next.js *implies* React,
   // so React is derived (as a relationship-derived Detection) when Next.js

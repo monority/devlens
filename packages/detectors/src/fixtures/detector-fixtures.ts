@@ -234,6 +234,36 @@ export const FIXTURES: readonly Fixture[] = [
   },
 
   {
+    name: 'nextjs-app-router',
+    description:
+      'Next.js 13+ App Router: ReactServerComponents + next/navigation + next/font + use client directive',
+    category: 'realworld',
+    snapshot: makeSnapshot({
+      headers: [{ name: 'Server', value: 'vercel' }],
+      metaTags: [{ name: 'generator', content: 'Next.js' }],
+      scripts: [
+        { src: 'https://example.com/_next/static/chunks/webpack.js', content: '' },
+        {
+          src: null,
+          content:
+            'import { useRouter } from "next/navigation"; import { Inter } from "next/font/google";\n' +
+            'const serverAction = async () => { "use server"; return "ok"; };\n' +
+            'window.ReactServerComponents = true;',
+        },
+      ],
+      links: [
+        {
+          rel: 'stylesheet',
+          href: 'https://example.com/_next/static/css/app/styles.css',
+          content: '<link rel="stylesheet" href="/_next/static/css/app/styles.css">',
+        },
+      ],
+    }),
+    expected: ['nextjs', 'vercel'],
+    forbidden: ['vue', 'angular', 'svelte', 'astro', 'nuxtjs'],
+  },
+
+  {
     name: 'react',
     description: 'React SPA: react-dom inline, createRoot inline, no Next.js traces',
     category: 'framework',

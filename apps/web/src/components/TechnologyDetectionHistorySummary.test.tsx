@@ -62,7 +62,7 @@ describe('TechnologyDetectionHistorySummary', () => {
   it('falls back to — when first/last detected are null', () => {
     const html = render(makeSummary({ firstDetectedAt: null, lastDetectedAt: null }));
     // Two "—" cells (first + last).
-    expect((html.match(/—/g) ?? []).length).toBe(2);
+    expect(html.match(/—/g) ?? []).toHaveLength(2);
   });
 
   it('renders the indeterminate state for a single observation', () => {
@@ -80,7 +80,7 @@ describe('TechnologyDetectionHistorySummary', () => {
     // Count text nodes only — CSS-module class names (e.g.
     // `indicatorUnchanged_<hash>`) also contain these tokens, so strip classes.
     const textOnly = html.replace(/\sclass="[^"]*"/g, '');
-    expect((textOnly.match(/Unchanged/g) ?? []).length).toBe(4);
+    expect(textOnly.match(/Unchanged/g) ?? []).toHaveLength(4);
     expect(textOnly).not.toContain('Changed');
   });
 
@@ -99,7 +99,7 @@ describe('TechnologyDetectionHistorySummary', () => {
     const textOnly = html.replace(/\sclass="[^"]*"/g, '');
     expect(textOnly).toContain('Changed');
     // Only the Version indicator changed; the other three remain Unchanged.
-    expect((textOnly.match(/Unchanged/g) ?? []).length).toBe(3);
+    expect(textOnly.match(/Unchanged/g) ?? []).toHaveLength(3);
   });
 
   it('exposes status text to assistive tech (not color-only)', () => {

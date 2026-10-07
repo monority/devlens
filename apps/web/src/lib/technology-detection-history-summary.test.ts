@@ -598,7 +598,7 @@ describe('technologyDetectionHistorySummary', () => {
 
       expect(s.integrityChanged).toBe(false); // canonicalized ⇒ no change
       // input array length/order unchanged
-      expect(history.length).toBe(refsBefore.length);
+      expect(history).toHaveLength(refsBefore.length);
       // element references preserved (transformer reads, never rebuilds entries)
       expect(history[0]).toBe(refsBefore[0]);
       expect(history[1]).toBe(refsBefore[1]);

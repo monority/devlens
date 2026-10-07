@@ -376,7 +376,7 @@ describe('technologyDetectionHistory — invariants', () => {
     expect(originalOrder[1]).toBe(capturedRefs[1]);
     // Detection evidence untouched.
     expect(detection.evidence).toEqual(originalEvidence);
-    expect(detection.evidence.length).toBe(2);
+    expect(detection.evidence).toHaveLength(2);
   });
 
   it('is deterministic — same input yields stable output', () => {

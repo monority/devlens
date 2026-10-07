@@ -492,7 +492,7 @@ describe('computeDetectionIntegrity — no mutation (§8)', () => {
 
     checkIntegrity(detection, provenance);
 
-    expect(detection.evidence.length).toBe(originalLength);
+    expect(detection.evidence).toHaveLength(originalLength);
     expect(detection.evidence).toEqual(originalEvidence);
   });
 

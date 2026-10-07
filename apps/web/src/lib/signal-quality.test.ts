@@ -64,8 +64,8 @@ describe('evidenceSourceFamily (§3)', () => {
   });
 
   it('collapses script_content/html/javascript_global onto a single content family (§3/§6.D)', () => {
-    expect(evidenceSourceFamily('script_content') === evidenceSourceFamily('html')).toBe(true);
-    expect(evidenceSourceFamily('html') === evidenceSourceFamily('javascript_global')).toBe(true);
+    expect(evidenceSourceFamily('script_content')).toBe(evidenceSourceFamily('html'));
+    expect(evidenceSourceFamily('html')).toBe(evidenceSourceFamily('javascript_global'));
   });
 });
 

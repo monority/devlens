@@ -247,7 +247,7 @@ describe('detectionToResponse — determinism & immutability', () => {
 
     detectionToResponse(detection);
 
-    expect(detection.evidence.length).toBe(originalEvidenceLength);
+    expect(detection.evidence).toHaveLength(originalEvidenceLength);
   });
 });
 
@@ -307,7 +307,7 @@ describe('detectionToResponse — Step 81 integrity', () => {
 
     const response = detectionToResponse(detection);
 
-    expect(detection.evidence.length).toBe(originalEvidenceLength);
+    expect(detection.evidence).toHaveLength(originalEvidenceLength);
     expect(response.integrity).toBeDefined();
   });
 

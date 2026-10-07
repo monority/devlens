@@ -344,6 +344,106 @@ function TechnologyChanges({ result }: { result: ComparisonResult }): React.Reac
 
 // ─── Technology comparison item ───────────────────────────────────────
 
+/** Badge CSS class for a technology's change status. */
+function getBadgeClass(status: TechnologyComparison['status']): string | undefined {
+  if (status === 'added') return styles.addedBadge;
+  if (status === 'removed') return styles.removedBadge;
+  return styles.unchangedBadge;
+}
+
+/** Renders the technology name as a catalog link or plain span. */
+function getTechNameElement(
+  detection: TechnologyComparison,
+  fullDetection?: DetectionResponse | null,
+): React.ReactNode {
+  if (fullDetection && isKnownTechnology(detection.id)) {
+    return (
+      <Link
+        href={`/technologies/${encodeURIComponent(detection.id)}`}
+        className={styles.techNameLink}
+      >
+        {detection.name}
+      </Link>
+    );
+  }
+  return <span className={styles.techName}>{detection.name}</span>;
+}
+
+/** Renders the version display for a technology comparison.
+ *  Conflict sides (Step 72) surface a notice — never a fabricated value. */
+function getVersionElement(detection: TechnologyComparison): React.ReactNode {
+  if (detection.version.beforeConflict || detection.version.afterConflict) {
+    return <span className={styles.versionConflict}>Version: unavailable — conflict detected</span>;
+  }
+  if (typeof detection.version.after === 'string') {
+    return <span className={styles.version}>Version: {detection.version.after}</span>;
+  }
+  if (typeof detection.version.before === 'string') {
+    return <span className={styles.version}>Version: {detection.version.before}</span>;
+  }
+  return null;
+}
+
+/** Renders the confidence score for added/removed technologies. */
+function getConfidenceElement(detection: TechnologyComparison): React.ReactNode {
+  if (detection.status === 'added' && detection.rightConfidence !== null) {
+    return <span className={styles.score}>Confidence: {detection.rightConfidence}</span>;
+  }
+  if (detection.status === 'removed' && detection.leftConfidence !== null) {
+    return <span className={styles.score}>Confidence: {detection.leftConfidence}</span>;
+  }
+  return null;
+}
+
+/** Renders the score-delta for unchanged technologies with changed confidence. */
+function getScoreDeltaElement(detection: TechnologyComparison): React.ReactNode {
+  if (detection.status === 'unchanged' && detection.scoreChanged) {
+    return (
+      <span className={styles.scoreChange}>
+        {detection.leftConfidence} → {detection.rightConfidence}
+        {(detection.scoreDelta ?? 0) > 0 ? ' ↑' : ' ↓'}
+      </span>
+    );
+  }
+  return null;
+}
+
+/** Renders the provenance change for a technology between two scans (Step 77). */
+function getProvenanceChangeElement(
+  beforeProvenance: string,
+  afterProvenance: string,
+  detection: TechnologyComparison,
+): React.ReactNode {
+  if (
+    detection.before &&
+    detection.after &&
+    detection.provenanceChanged &&
+    beforeProvenance !== afterProvenance
+  ) {
+    return (
+      <span className={styles.provenanceChange}>
+        Provenance: {beforeProvenance} → {afterProvenance}
+      </span>
+    );
+  }
+  return null;
+}
+
+/** Renders the signal-quality change between before/after detections (Step 77). */
+function getSignalQualityChangeElement(
+  beforeSqLabel: string | null,
+  afterSqLabel: string | null,
+): React.ReactNode {
+  if (beforeSqLabel && afterSqLabel && beforeSqLabel !== afterSqLabel) {
+    return (
+      <span className={styles.signalQualityChange}>
+        Signal quality: {beforeSqLabel} → {afterSqLabel}
+      </span>
+    );
+  }
+  return null;
+}
+
 function TechnologyComparisonItem({
   detection,
   fullDetection,
@@ -353,29 +453,10 @@ function TechnologyComparisonItem({
    *  Present for added/removed technologies; undefined for unchanged. */
   fullDetection?: DetectionResponse | null;
 }): React.ReactElement {
-  const badgeClass =
-    detection.status === 'added'
-      ? styles.addedBadge
-      : detection.status === 'removed'
-        ? styles.removedBadge
-        : styles.unchangedBadge;
+  const badgeClass = getBadgeClass(detection.status);
 
   // Technology name: link to catalog detail page if the tech is known.
-  const techName =
-    fullDetection && isKnownTechnology(detection.id) ? (
-      <Link
-        href={`/technologies/${encodeURIComponent(detection.id)}`}
-        className={styles.techNameLink}
-      >
-        {detection.name}
-      </Link>
-    ) : (
-      <span className={styles.techName}>{detection.name}</span>
-    );
-
-  // Derive a structured explanation (summary + deduplicated evidence)
-  // from the full detection — reused from the existing explainability pipeline.
-  const explainability = fullDetection ? getDetectionExplainability(fullDetection) : null;
+  const techName = getTechNameElement(detection, fullDetection);
 
   // Step 77 — provenance & signal-quality deltas are READ from the precomputed
   // before/after (Step 77 §7: reuse `explanation.signalQuality`, never recompute).
@@ -388,54 +469,21 @@ function TechnologyComparisonItem({
   const beforeSqLabel = before && beforeSq ? signalQualityLabel(before, beforeSq) : null;
   const afterSqLabel = after && afterSq ? signalQualityLabel(after, afterSq) : null;
 
+  // Derive a structured explanation (summary + deduplicated evidence)
+  // from the full detection — reused from the existing explainability pipeline.
+  const explainability = fullDetection ? getDetectionExplainability(fullDetection) : null;
+
   return (
     <li className={styles.changeItem}>
       <span className={`${styles.changeBadge} ${badgeClass}`}>{detection.status}</span>
       {techName}
       <span className={styles.category}>{detection.category}</span>
 
-      {/* Confidence for added/removed technologies (from the source scan) */}
-      {detection.status === 'added' && detection.rightConfidence !== null && (
-        <span className={styles.score}>Confidence: {detection.rightConfidence}</span>
-      )}
-      {detection.status === 'removed' && detection.leftConfidence !== null && (
-        <span className={styles.score}>Confidence: {detection.leftConfidence}</span>
-      )}
-
-      {/* Version (subordinate): resolved version, or a conflict notice.
-          Surfaced from the Step 74 version comparison so a conflict side
-          never shows a fabricated value (Step 72 §5). */}
-      {detection.version.beforeConflict || detection.version.afterConflict ? (
-        <span className={styles.versionConflict}>Version: unavailable — conflict detected</span>
-      ) : typeof detection.version.after === 'string' ? (
-        <span className={styles.version}>Version: {detection.version.after}</span>
-      ) : typeof detection.version.before === 'string' ? (
-        <span className={styles.version}>Version: {detection.version.before}</span>
-      ) : null}
-
-      {/* Existing: score delta for unchanged technologies with changed confidence */}
-      {detection.status === 'unchanged' && detection.scoreChanged && (
-        <span className={styles.scoreChange}>
-          {detection.leftConfidence} → {detection.rightConfidence}
-          {(detection.scoreDelta ?? 0) > 0 ? ' ↑' : ' ↓'}
-        </span>
-      )}
-
-      {/* Step 77 — provenance change (render-only, precomputed before/after) */}
-      {detection.before &&
-      detection.after &&
-      detection.provenanceChanged &&
-      beforeProvenance !== afterProvenance ? (
-        <span className={styles.provenanceChange}>
-          Provenance: {beforeProvenance} → {afterProvenance}
-        </span>
-      ) : null}
-      {/* Step 77 — signal-quality change (only when BOTH sides carry a sq) */}
-      {beforeSqLabel && afterSqLabel && beforeSqLabel !== afterSqLabel ? (
-        <span className={styles.signalQualityChange}>
-          Signal quality: {beforeSqLabel} → {afterSqLabel}
-        </span>
-      ) : null}
+      {getConfidenceElement(detection)}
+      {getVersionElement(detection)}
+      {getScoreDeltaElement(detection)}
+      {getProvenanceChangeElement(beforeProvenance, afterProvenance, detection)}
+      {getSignalQualityChangeElement(beforeSqLabel, afterSqLabel)}
 
       {/* NEW: Explainability summary + supporting evidence for added/removed */}
       {fullDetection && explainability && explainability.evidenceCount > 0 && (

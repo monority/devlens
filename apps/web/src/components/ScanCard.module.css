@@ -999,6 +999,7 @@
   font-size: 0.9rem;
   background: white;
   cursor: pointer;
+  accent-color: #6b7280;
 }
 
 .statusSelect:focus {

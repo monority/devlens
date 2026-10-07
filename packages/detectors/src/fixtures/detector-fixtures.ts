@@ -281,6 +281,26 @@ export const FIXTURES: readonly Fixture[] = [
   },
 
   {
+    name: 'react-rsc',
+    description:
+      'React Server Components: createFromReadableStream + use client directive + ReactServerComponents marker',
+    category: 'realworld',
+    snapshot: makeSnapshot({
+      scripts: [
+        {
+          src: null,
+          content:
+            'import { createFromReadableStream } from "react-server-dom-webpack/client";\n' +
+            '"use client";\n' +
+            'window.ReactServerComponents = { /* RSC dev marker */ };',
+        },
+      ],
+    }),
+    expected: ['react'],
+    forbidden: ['nextjs', 'vue', 'angular', 'svelte'],
+  },
+
+  {
     name: 'vue',
     description: 'Vue 3 app: Vue.createApp inline, no Nuxt traces',
     category: 'framework',
@@ -310,6 +330,27 @@ export const FIXTURES: readonly Fixture[] = [
             'import { platformBrowserDynamic } from "@angular/platform-browser-dynamic"; platformBrowserDynamic.bootstrapModule(AppModule);',
         },
         { src: null, content: 'import { Component } from "@angular/core";' },
+      ],
+    }),
+    expected: ['angular'],
+    forbidden: ['react', 'vue', 'svelte', 'nextjs'],
+  },
+
+  {
+    name: 'angular-standalone',
+    description:
+      'Angular 14+ standalone app: bootstrapApplication + provideHttpClient (Signals API)',
+    category: 'framework',
+    snapshot: makeSnapshot({
+      scripts: [
+        {
+          src: null,
+          content:
+            'import { bootstrapApplication } from "@angular/platform-browser";\n' +
+            'import { provideHttpClient } from "@angular/common/http";\n' +
+            'import { Component, signal } from "@angular/core";\n' +
+            'const counter = signal(0); bootstrapApplication(AppComponent);',
+        },
       ],
     }),
     expected: ['angular'],
@@ -606,6 +647,23 @@ export const FIXTURES: readonly Fixture[] = [
     }),
     expected: ['tailwind'],
     forbidden: ['bootstrap', 'jekyll', 'hugo'],
+  },
+
+  {
+    name: 'tailwind-v4',
+    description: 'Tailwind CSS v4: @import "tailwindcss" directive (new v4 syntax)',
+    category: 'library',
+    snapshot: makeSnapshot({
+      resources: [
+        {
+          url: 'https://example.com/tailwind.css',
+          type: 'css',
+          content: '@import "tailwindcss";\nbody { color: black; }',
+        },
+      ],
+    }),
+    expected: ['tailwind'],
+    forbidden: ['bootstrap'],
   },
 
   {

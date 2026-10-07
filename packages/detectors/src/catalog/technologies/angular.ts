@@ -1,4 +1,4 @@
-/** Angular — framework (inline @angular/core + platformBrowserDynamic). Step 68 declarative catalog. */
+/** Angular — framework (inline @angular/core + platformBrowserDynamic + standalone signals). Step 68 declarative catalog. */
 import type { TechnologyDefinition } from '../types.js';
 
 export const angular: TechnologyDefinition = {
@@ -6,8 +6,13 @@ export const angular: TechnologyDefinition = {
   name: 'Angular',
   category: 'framework',
   contentSignatures: [
+    // Core framework fingerprint (all versions)
     { matchContent: '@angular/core', technologyId: 'angular', confidence: 95 },
     { matchContent: 'platformBrowserDynamic', technologyId: 'angular', confidence: 90 },
+    // Angular 14+ standalone components (bootstrapApplication replaces platformBrowserDynamic)
+    { matchContent: 'bootstrapApplication', technologyId: 'angular', confidence: 85 },
+    // Angular 16+ Signals API — `signal` import specifier from @angular/core
+    { matchContent: 'provideHttpClient', technologyId: 'angular', confidence: 80 },
   ],
   // Step 71 — fetched JS bundles. `@angular/core` is the stable ESM import
   // specifier (a string literal preserved by minifiers) emitted into every

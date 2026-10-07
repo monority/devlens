@@ -17,7 +17,6 @@ export const nextjs: TechnologyDefinition = {
     // App Router (Next.js 13+) fingerprints — not present in Pages Router
     { matchContent: 'next/navigation', technologyId: 'nextjs', confidence: 90 },
     { matchContent: 'next/font', technologyId: 'nextjs', confidence: 85 },
-    { matchContent: 'ReactServerComponents', technologyId: 'nextjs', confidence: 85 },
     { matchContent: 'next/image', technologyId: 'nextjs', confidence: 75 },
   ],
   // Step 69: Next.js is built on React. Observing Next.js *implies* React,

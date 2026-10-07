@@ -346,6 +346,97 @@ function classifyChange(
 // ─── Pure comparison function ────────────────────────────────────────
 
 /**
+ * Builds a lookup map of detections keyed by `technology.id`.
+ */
+function buildDetectionMap(
+  detections: readonly DetectionResponse[],
+): Map<string, DetectionResponse> {
+  const map = new Map<string, DetectionResponse>();
+  for (const d of detections) {
+    map.set(d.technology.id, d);
+  }
+  return map;
+}
+
+/**
+ * Retrieves a single detection from the map by id, returning null when
+ * absent (i.e. the technology exists only on the other side of the
+ * comparison).
+ */
+function getDetection(map: Map<string, DetectionResponse>, id: string): DetectionResponse | null {
+  return map.has(id) ? map.get(id)! : null;
+}
+
+/**
+ * Classifies a single technology as 'added', 'removed', or 'unchanged'
+ * based on which side(s) of the comparison carry it.
+ */
+function classifyDetectionStatus(
+  leftD: DetectionResponse | null,
+  rightD: DetectionResponse | null,
+): 'added' | 'removed' | 'unchanged' {
+  if (leftD !== null && rightD !== null) return 'unchanged';
+  if (leftD !== null) return 'removed';
+  return 'added';
+}
+
+/**
+ * Compares a single technology between two scans and produces the
+ * per-technology `TechnologyComparison` record.
+ */
+function compareSingleDetection(
+  leftD: DetectionResponse | null,
+  rightD: DetectionResponse | null,
+): TechnologyComparison {
+  const tech = (leftD ?? rightD)!.technology;
+  const id = tech.id;
+
+  const status = classifyDetectionStatus(leftD, rightD);
+
+  const leftConfidence = leftD !== null ? leftD.confidence : null;
+  const rightConfidence = rightD !== null ? rightD.confidence : null;
+  const scoreDelta =
+    leftConfidence !== null && rightConfidence !== null ? rightConfidence - leftConfidence : null;
+  const scoreChanged =
+    leftConfidence !== null && rightConfidence !== null && leftConfidence !== rightConfidence;
+
+  const evidenceChanges = compareEvidence(leftD, rightD);
+  const evidenceChanged = evidenceChanges.some((e) => e.status !== 'unchanged');
+
+  const version = computeVersionChange(leftD, rightD);
+  const provenanceChanged = computeProvenanceChange(leftD, rightD);
+  const integrityChanged = computeIntegrityChange(leftD, rightD);
+
+  const kind: DetectionChangeKind =
+    leftD === null
+      ? 'added'
+      : rightD === null
+        ? 'removed'
+        : classifyChange(version, provenanceChanged, scoreChanged);
+
+  return {
+    id,
+    name: tech.name,
+    category: tech.category,
+    status,
+    leftConfidence,
+    rightConfidence,
+    scoreDelta,
+    scoreChanged,
+    evidenceChanges,
+    before: leftD,
+    after: rightD,
+    version,
+    versionSource: version.changed ? (leftD ?? rightD)?.versionSource : undefined,
+    provenanceChanged,
+    evidenceChanged,
+    confidenceDelta: scoreDelta,
+    integrityChanged,
+    kind,
+  };
+}
+
+/**
  * Compares two scan results and produces a structured, deterministic diff.
  *
  * - Technologies are compared by stable `technology.id` (not name, not order).
@@ -376,75 +467,14 @@ export function compareScans(
     hasBoth && left !== null && right !== null && left.scan.target !== right.scan.target;
 
   // Build technology maps by ID.
-  const leftDetections = left !== null ? left.detections : [];
-  const rightDetections = right !== null ? right.detections : [];
-
-  const leftMap = new Map<string, DetectionResponse>();
-  const rightMap = new Map<string, DetectionResponse>();
-
-  for (const d of leftDetections) {
-    leftMap.set(d.technology.id, d);
-  }
-  for (const d of rightDetections) {
-    rightMap.set(d.technology.id, d);
-  }
+  const leftMap = buildDetectionMap(left !== null ? left.detections : []);
+  const rightMap = buildDetectionMap(right !== null ? right.detections : []);
 
   const allIds = new Set<string>([...leftMap.keys(), ...rightMap.keys()]);
   const comparisons: TechnologyComparison[] = [];
 
   for (const id of allIds) {
-    const leftD = leftMap.has(id) ? leftMap.get(id)! : null;
-    const rightD = rightMap.has(id) ? rightMap.get(id)! : null;
-
-    const tech = (leftD ?? rightD)!.technology;
-
-    const status: 'added' | 'removed' | 'unchanged' =
-      leftD !== null && rightD !== null ? 'unchanged' : leftD !== null ? 'removed' : 'added';
-
-    const leftConfidence = leftD !== null ? leftD.confidence : null;
-    const rightConfidence = rightD !== null ? rightD.confidence : null;
-    const scoreDelta =
-      leftConfidence !== null && rightConfidence !== null ? rightConfidence - leftConfidence : null;
-    const scoreChanged =
-      leftConfidence !== null && rightConfidence !== null && leftConfidence !== rightConfidence;
-
-    const evidenceChanges = compareEvidence(leftD, rightD);
-    const evidenceChanged = evidenceChanges.some((e) => e.status !== 'unchanged');
-
-    const version = computeVersionChange(leftD, rightD);
-    const provenanceChanged = computeProvenanceChange(leftD, rightD);
-    const integrityChanged = computeIntegrityChange(leftD, rightD);
-
-    // Single, deduplicated classification (Step 74 §10 priority).
-    const kind: DetectionChangeKind =
-      leftD === null
-        ? 'added'
-        : rightD === null
-          ? 'removed'
-          : classifyChange(version, provenanceChanged, scoreChanged);
-
-    comparisons.push({
-      id,
-      name: tech.name,
-      category: tech.category,
-      status,
-      leftConfidence,
-      rightConfidence,
-      scoreDelta,
-      scoreChanged,
-      evidenceChanges,
-      // Step 74 fields
-      before: leftD,
-      after: rightD,
-      version,
-      versionSource: version.changed ? (leftD ?? rightD)?.versionSource : undefined,
-      provenanceChanged,
-      evidenceChanged,
-      confidenceDelta: scoreDelta,
-      // Step 87 — integrity verdict change (valid↔invalid, or issue-set change)
-      integrityChanged,
-      kind,
-    });
+    comparisons.push(compareSingleDetection(getDetection(leftMap, id), getDetection(rightMap, id)));
   }
 
   // Determinism: order by (kind priority ASC, technology.id ASC).

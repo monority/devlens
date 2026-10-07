@@ -25,6 +25,14 @@ import { createDatabaseClient, PostgresScanResultRepository } from '@devlens/dat
 import type { HandleGetOptions } from '../handler';
 import { rateLimitedResponse } from '@/lib/rate-limiter';
 
+/** Applies API-only security headers (noindex, nosniff, no-cache). */
+function withApiHeaders(response: NextResponse): NextResponse {
+  response.headers.set('X-Robots-Tag', 'noindex');
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  return response;
+}
+
 /** Constructs the real dependencies for the GET handler. */
 function createDependencies(): HandleGetOptions {
   return {
@@ -37,11 +45,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   // Rate limit: 60 reads per minute per IP.
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? request.headers.get('x-real-ip') ?? 'unknown';
+  const ip =
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    request.headers.get('x-real-ip') ??
+    'unknown';
   const limited = rateLimitedResponse('read', ip);
   if (limited) return limited;
 
   const { id } = await params;
   const result = await handleGetScanById(id, createDependencies());
-  return NextResponse.json(result.body, { status: result.status });
+  return withApiHeaders(NextResponse.json(result.body, { status: result.status }));
 }

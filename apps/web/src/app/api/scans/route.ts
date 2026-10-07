@@ -28,6 +28,19 @@ import { createProductionDetector } from '@devlens/detectors';
 import type { HandleCreateScanOptions, HandleGetOptions } from './handler';
 import { rateLimitedResponse } from '@/lib/rate-limiter';
 
+/**
+ * Applies API-only security headers to a response:
+ * - `X-Robots-Tag: noindex` prevents search engines from indexing API endpoints.
+ * - `X-Content-Type-Options: nosniff` prevents MIME sniffing on JSON responses.
+ * - `Cache-Control: no-store` prevents caching of potentially sensitive scan data.
+ */
+function withApiHeaders(response: NextResponse): NextResponse {
+  response.headers.set('X-Robots-Tag', 'noindex');
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  return response;
+}
+
 /** Constructs the real dependencies for the POST handler. */
 function createDependencies(): HandleCreateScanOptions {
   return {
@@ -48,13 +61,16 @@ function createGetDependencies(): HandleGetOptions {
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   // Rate limit: 10 scan creations per minute per IP (crawling is expensive).
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? request.headers.get('x-real-ip') ?? 'unknown';
+  const ip =
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    request.headers.get('x-real-ip') ??
+    'unknown';
   const limited = rateLimitedResponse('scan', ip);
   if (limited) return limited;
 
   const body = await request.text();
   const result = await handleCreateScan(body, createDependencies());
-  return NextResponse.json(result.body, { status: result.status });
+  return withApiHeaders(NextResponse.json(result.body, { status: result.status }));
 }
 
 /**
@@ -70,15 +86,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
  * the full scan list is returned.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? request.headers.get('x-real-ip') ?? 'unknown';
+  const ip =
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    request.headers.get('x-real-ip') ??
+    'unknown';
   const limited = rateLimitedResponse('read', ip);
   if (limited) return limited;
 
   const technologyId = request.nextUrl.searchParams.get('technologyId');
   if (technologyId !== null) {
     const result = await handleGetScansByTechnology(technologyId, createGetDependencies());
-    return NextResponse.json(result.body, { status: result.status });
+    return withApiHeaders(NextResponse.json(result.body, { status: result.status }));
   }
   const result = await handleGetScans(createGetDependencies());
-  return NextResponse.json(result.body, { status: result.status });
+  return withApiHeaders(NextResponse.json(result.body, { status: result.status }));
 }

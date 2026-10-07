@@ -35,6 +35,18 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // Parallelize test files across CPU cores.
+    // pool: 'forks' (default) spawns worker processes for true parallelism.
+    // Each file runs in its own process — no shared state contamination.
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        // One file per fork — maximizes parallelism.
+        singleFork: false,
+        // Reuse workers to reduce process startup overhead.
+        recycle: true,
+      },
+    },
     include: ['packages/**/src/**/*.{test,spec}.{ts,tsx}', 'apps/**/src/**/*.{test,spec}.{ts,tsx}'],
     coverage: {
       provider: 'v8',

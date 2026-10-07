@@ -12,3 +12,7 @@ overrides:
   # GHSA-68fv-2mgg-jv7q: source-map-js <1.2.2 allows event-loop DoS via
   # indexed source-map section offsets. Forced to patched version.
   source-map-js: 1.2.2
+  # GHSA-w465-6g4c-36jq: esbuild <=0.24.2 has a DOM Clobbering vulnerability.
+  # Dev-only via drizzle-kit > @esbuild-kit/esm-loader > core-utils > esbuild.
+  # Forced to >=0.24.3 (patched) across the entire dependency tree.
+  esbuild: '>=0.24.3'

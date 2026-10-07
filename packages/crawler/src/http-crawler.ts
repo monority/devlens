@@ -39,7 +39,12 @@ import type { Crawler } from './crawler.js';
 import type { HttpHeader, Resource, ResourceType, ScanTarget, SiteSnapshot } from '@devlens/core';
 import { createUrl, createHostname, createTimestamp, createHttpStatus } from '@devlens/core';
 import { CrawlError } from './crawl-error.js';
-import { isBlockedHostname, isResourceUrlAllowed, isResourceFetchable, verifyHostnameDNS } from './ssrf-guard.js';
+import {
+  isBlockedHostname,
+  isResourceUrlAllowed,
+  isResourceFetchable,
+  verifyHostnameDNS,
+} from './ssrf-guard.js';
 import { extractHtml, type HtmlExtract } from './html-parser.js';
 import {
   discoverResources,

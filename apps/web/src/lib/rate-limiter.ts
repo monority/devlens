@@ -54,14 +54,19 @@ export class RateLimiter {
    * @returns `{ allowed: true }` if the request passes, or
    *          `{ allowed: false, retryAfterMs, remaining }` if rate-limited.
    */
-  check(ip: string, scope: keyof typeof RATE_LIMITS = 'scan'): {
-    allowed: true;
-    remaining: number;
-  } | {
-    allowed: false;
-    remaining: 0;
-    retryAfterMs: number;
-  } {
+  check(
+    ip: string,
+    scope: keyof typeof RATE_LIMITS = 'scan',
+  ):
+    | {
+        allowed: true;
+        remaining: number;
+      }
+    | {
+        allowed: false;
+        remaining: 0;
+        retryAfterMs: number;
+      } {
     const config = RATE_LIMITS[scope];
     const now = Date.now();
     const key = `${scope}:${ip}`;
@@ -138,9 +143,7 @@ export function rateLimitedResponse(scope: keyof typeof RATE_LIMITS, ip: string)
       headers: {
         'Retry-After': Math.ceil(result.retryAfterMs / 1000).toString(),
         'X-RateLimit-Remaining': '0',
-        'X-RateLimit-Reset': Math.ceil(
-          (Date.now() + result.retryAfterMs) / 1000,
-        ).toString(),
+        'X-RateLimit-Reset': Math.ceil((Date.now() + result.retryAfterMs) / 1000).toString(),
       },
     },
   );

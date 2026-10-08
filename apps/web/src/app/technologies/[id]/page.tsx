@@ -29,12 +29,8 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { getTechnologyById } from '@/lib/technology-catalog';
 import { fetchScansByTechnology } from '@/lib/api';
-import { technologyDetectionHistory } from '@/lib/technology-detection-history';
-import { technologyDetectionHistorySummary } from '@/lib/technology-detection-history-summary';
-import { TechnologyDetectedInScans } from '@/components/TechnologyDetectedInScans';
-import { TechnologyDetectionHistorySummary } from '@/components/TechnologyDetectionHistorySummary';
-import { TechnologyDetectionTimeline } from '@/components/TechnologyDetectionTimeline';
-import type { ScanSummary, TechnologyScanSummary } from '@/lib/types';
+import { TechnologyScansView } from '@/components/TechnologyScansView';
+import type { TechnologyScanSummary, TechnologyScansResponse } from '@/lib/types';
 import styles from './page.module.css';
 
 /**
@@ -63,16 +59,19 @@ export async function generateMetadata({
 }
 
 /**
- * Fetches the scans that detected the given technology ID.
+ * Fetches the first page of scans that detected the given technology ID.
  *
- * Calls the internal `GET /api/scans?technologyId=<id>` endpoint, which
- * performs a single bulk retrieval (one `listScansByTechnology` query → one
- * repository `list()` call) and returns only the scans whose detections
- * include the requested technology. The returned `detections` are the raw
- * domain `Detection` objects — the page's `technologyDetectionHistory`
- * projection reuses the exact scan-detail pipeline (`detectionToResponse` →
- * `getScanDetectionResults`) to derive provenance, integrity and signal
- * quality, so no per-detection API round-trip is required.
+ * Calls the internal `GET /api/scans?technologyId=<id>&limit=50` endpoint (the
+ * F-001 boundary fix — the page no longer touches PostgreSQL directly). A
+ * single bulk retrieval (one `listScansByTechnology` query → one repository
+ * `list()` call) returns the scans whose detections include this technology,
+ * plus pagination (`nextCursor` / `hasMore`) and a global `summary`
+ * (`scanCount` / `firstDetectedAt`) for the Step 89 rollup. The returned
+ * `detections` are the raw domain `Detection` objects — the client view's
+ * `technologyDetectionHistory` projection reuses the scan-detail detection
+ * pipeline (`detectionToResponse` → `getScanDetectionResults`) to derive
+ * provenance, integrity and signal quality, so no per-detection API
+ * round-trip is required.
  *
  * Only completed scans carry detections — failed, pending, and running scans
  * have empty detection arrays — so the result set is inherently restricted to
@@ -81,10 +80,9 @@ export async function generateMetadata({
  * Returns `null` on error (API/infrastructure failure), so the caller can
  * render an error state.
  */
-async function fetchDetectedScans(techId: string): Promise<TechnologyScanSummary[] | null> {
+async function fetchDetectedScansPage(techId: string): Promise<TechnologyScansResponse | null> {
   try {
-    const data = await fetchScansByTechnology(techId);
-    return data.scans;
+    return await fetchScansByTechnology(techId, { limit: 50 });
   } catch {
     return null;
   }
@@ -102,21 +100,12 @@ export default async function TechnologyDetailPage({
     notFound();
   }
 
-  const detectedScans = await fetchDetectedScans(id);
-
-  // The endpoint already returns the scans that detected this technology
-  // (filtered server-side). Derive compact scan summaries for the existing
-  // `TechnologyDetectedInScans` cards, and project the timeline history from
-  // the same response — reusing the scan-detail detection pipeline (no
-  // per-detection N+1) so provenance/integrity/signal-quality stay identical.
-  const scanSummaries: ScanSummary[] | null = detectedScans
-    ? detectedScans.map((s) => s.scan)
-    : null;
-  const detectionHistory = detectedScans ? technologyDetectionHistory(detectedScans, id) : [];
-  // Compact quality/stability summary (Step 89), derived from the same history.
-  const detectionHistorySummary = detectedScans
-    ? technologyDetectionHistorySummary(detectionHistory)
-    : null;
+  // First page of technology-detected scans (server-side, single bulk fetch).
+  // The interactive client view (history / timeline / Load-more) lives in
+  // `TechnologyScansView`, which receives this first page and the aggregate
+  // summary, then fetches + accumulates subsequent pages.
+  const data = await fetchDetectedScansPage(id);
+  const detectedScans: TechnologyScanSummary[] | null = data?.scans ?? null;
 
   return (
     <main className={styles.main}>
@@ -140,13 +129,16 @@ export default async function TechnologyDetailPage({
         </dl>
       </div>
 
-      <TechnologyDetectedInScans scans={scanSummaries} />
-
-      {/* Step 89: compact stability summary, placed immediately before the
-          detailed timeline per §6. Renders nothing when there is no history. */}
-      <TechnologyDetectionHistorySummary summary={detectionHistorySummary} />
-
-      <TechnologyDetectionTimeline entries={detectionHistory} />
+      {/* Scans / history / timeline + "Load more": interactive client view that
+          accumulates paginated pages (Step 99). Passed the first page fetched
+          server-side above plus the global aggregate summary. */}
+      <TechnologyScansView
+        techId={id}
+        initialScans={detectedScans}
+        initialNextCursor={data?.nextCursor ?? null}
+        initialHasMore={data?.hasMore ?? false}
+        aggregateSummary={data?.summary ?? null}
+      />
 
       <div className={styles.footer}>
         <Link href="/technologies" className={styles.backLink}>

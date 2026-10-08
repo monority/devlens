@@ -121,7 +121,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const technologyId = request.nextUrl.searchParams.get('technologyId');
   if (technologyId !== null) {
-    const result = await handleGetScansByTechnology(technologyId, createGetDependencies());
+    const result = await handleGetScansByTechnology(technologyId, {
+      ...createGetDependencies(),
+      limit: request.nextUrl.searchParams.get('limit'),
+      cursor: request.nextUrl.searchParams.get('cursor'),
+    });
     return withApiHeaders(NextResponse.json(result.body, { status: result.status }));
   }
   const result = await handleGetScans(createGetDependencies());

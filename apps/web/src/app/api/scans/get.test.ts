@@ -495,7 +495,12 @@ describe('GET /api/scans?technologyId — handler', () => {
 
       expect(response.status).toBe(200);
       if (response.status === 200) {
-        expect(response.body).toEqual({ scans: [] });
+        expect(response.body).toEqual({
+          scans: [],
+          nextCursor: null,
+          hasMore: false,
+          summary: { scanCount: 0, firstDetectedAt: null },
+        });
       }
     });
 
@@ -510,7 +515,12 @@ describe('GET /api/scans?technologyId — handler', () => {
 
       expect(response.status).toBe(200);
       if (response.status === 200) {
-        expect(response.body).toEqual({ scans: [] });
+        expect(response.body).toEqual({
+          scans: [],
+          nextCursor: null,
+          hasMore: false,
+          summary: { scanCount: 0, firstDetectedAt: null },
+        });
       }
     });
 
@@ -615,8 +625,13 @@ describe('GET /api/scans?technologyId — handler', () => {
 
       expect(response.status).toBe(200);
       if (response.status === 200) {
-        // Top-level: only "scans"
-        expect(Object.keys(response.body).sort()).toEqual(['scans']);
+        // Top-level: pagination envelope + global summary
+        expect(Object.keys(response.body).sort()).toEqual([
+          'hasMore',
+          'nextCursor',
+          'scans',
+          'summary',
+        ]);
         // Per item: only "scan" and "detections" — no snapshot / coverage / quality
         const item = response.body.scans[0]!;
         expect(Object.keys(item).sort()).toEqual(['detections', 'scan']);
@@ -632,6 +647,162 @@ describe('GET /api/scans?technologyId — handler', () => {
         expect(det).not.toHaveProperty('explanation');
         expect(det).not.toHaveProperty('provenance');
         expect(det).not.toHaveProperty('integrity');
+      }
+    });
+  });
+
+  describe('pagination', () => {
+    // Builds a repo with 6 scans that all detect `nginx`, at distinct
+    // timestamps so ordering (createdAt DESC, scanId ASC) is deterministic:
+    // newest first => scan_6 … scan_1; earliest (firstDetectedAt) = scan_1.
+    function makePaginatedRepo(): InMemoryScanResultRepository {
+      const repo = new InMemoryScanResultRepository();
+      const dates = [
+        '2025-06-01T01:00:00.000Z',
+        '2025-06-02T02:00:00.000Z',
+        '2025-06-03T03:00:00.000Z',
+        '2025-06-04T04:00:00.000Z',
+        '2025-06-05T05:00:00.000Z',
+        '2025-06-06T06:00:00.000Z',
+      ];
+      for (let i = 0; i < dates.length; i++) {
+        repo.save({
+          scan: makeCompletedScan(`scan_${i + 1}`, dates[i]),
+          snapshot: makeSnapshot(),
+          detections: [makeDetectionFor('nginx')],
+        });
+      }
+      return repo;
+    }
+
+    it('returns the first page with hasMore + nextCursor and a global summary', async () => {
+      const repo = makePaginatedRepo();
+      const response = await handleGetScansByTechnology('nginx', { repository: repo, limit: '3' });
+
+      expect(response.status).toBe(200);
+      if (response.status === 200) {
+        expect(response.body.scans.map((s) => s.scan.id)).toEqual(['scan_6', 'scan_5', 'scan_4']);
+        expect(response.body.hasMore).toBe(true);
+        expect(response.body.nextCursor).not.toBeNull();
+        expect(typeof response.body.nextCursor).toBe('string');
+        // Global aggregate is independent of the page slice.
+        expect(response.body.summary).toEqual({
+          scanCount: 6,
+          firstDetectedAt: '2025-06-01T01:00:00.000Z',
+        });
+      }
+    });
+
+    it('continues from nextCursor onto the second page in deterministic order', async () => {
+      const repo = makePaginatedRepo();
+      const first = await handleGetScansByTechnology('nginx', { repository: repo, limit: '3' });
+      expect(first.status).toBe(200);
+      if (first.status === 200) {
+        expect(first.body.nextCursor).not.toBeNull();
+        const second = await handleGetScansByTechnology('nginx', {
+          repository: repo,
+          limit: '3',
+          cursor: first.body.nextCursor!,
+        });
+        expect(second.status).toBe(200);
+        if (second.status === 200) {
+          expect(second.body.scans.map((s) => s.scan.id)).toEqual(['scan_3', 'scan_2', 'scan_1']);
+          expect(second.body.hasMore).toBe(false);
+          expect(second.body.nextCursor).toBeNull();
+        }
+      }
+    });
+
+    it('returns a global summary independent of the page (page 2)', async () => {
+      const repo = makePaginatedRepo();
+      const first = await handleGetScansByTechnology('nginx', { repository: repo, limit: '3' });
+      expect(first.status).toBe(200);
+      if (first.status === 200) {
+        const second = await handleGetScansByTechnology('nginx', {
+          repository: repo,
+          limit: '3',
+          cursor: first.body.nextCursor!,
+        });
+        expect(second.status).toBe(200);
+        if (second.status === 200) {
+          expect(second.body.summary.scanCount).toBe(6);
+          expect(second.body.summary.firstDetectedAt).toBe('2025-06-01T01:00:00.000Z');
+        }
+      }
+    });
+
+    it('returns the full list (no hasMore/nextCursor) when paging is absent (backward compatible)', async () => {
+      const repo = makePaginatedRepo();
+      const response = await handleGetScansByTechnology('nginx', { repository: repo });
+
+      expect(response.status).toBe(200);
+      if (response.status === 200) {
+        expect(response.body.scans.map((s) => s.scan.id)).toEqual([
+          'scan_6',
+          'scan_5',
+          'scan_4',
+          'scan_3',
+          'scan_2',
+          'scan_1',
+        ]);
+        expect(response.body.hasMore).toBe(false);
+        expect(response.body.nextCursor).toBeNull();
+        expect(response.body.summary.scanCount).toBe(6);
+      }
+    });
+
+    it('clamps an oversized limit to MAX_PAGE_SIZE (200)', async () => {
+      // 201 scans all detecting `nginx` (fixed createdAt; scanId ASC ordering).
+      const repo = new InMemoryScanResultRepository();
+      for (let i = 0; i < 201; i++) {
+        await repo.save({
+          scan: makeCompletedScan(`scan_${i + 1}`),
+          snapshot: makeSnapshot(),
+          detections: [makeDetectionFor('nginx')],
+        });
+      }
+
+      const response = await handleGetScansByTechnology('nginx', {
+        repository: repo,
+        limit: '300',
+      });
+
+      expect(response.status).toBe(200);
+      if (response.status === 200) {
+        // Without the clamp, limit 300 would fetch all 201 => hasMore false.
+        // Clamped to 200 => fetch 201 => first page of 200 with a next page.
+        expect(response.body.scans).toHaveLength(200);
+        expect(response.body.hasMore).toBe(true);
+        expect(response.body.nextCursor).not.toBeNull();
+        expect(response.body.summary.scanCount).toBe(201);
+      }
+    });
+
+    it('clamps limit=0 to a minimum of 1', async () => {
+      const repo = makePaginatedRepo();
+      const response = await handleGetScansByTechnology('nginx', { repository: repo, limit: '0' });
+
+      expect(response.status).toBe(200);
+      if (response.status === 200) {
+        expect(response.body.scans).toHaveLength(1);
+        expect(response.body.scans[0]!.scan.id).toBe('scan_6');
+        expect(response.body.hasMore).toBe(true);
+      }
+    });
+
+    it('falls back to the default page size for a non-numeric limit', async () => {
+      const repo = makePaginatedRepo();
+      const response = await handleGetScansByTechnology('nginx', {
+        repository: repo,
+        limit: 'abc',
+      });
+
+      expect(response.status).toBe(200);
+      if (response.status === 200) {
+        // 6 scans < DEFAULT_PAGE_SIZE (50) => all returned, no next page.
+        expect(response.body.scans).toHaveLength(6);
+        expect(response.body.hasMore).toBe(false);
+        expect(response.body.nextCursor).toBeNull();
       }
     });
   });

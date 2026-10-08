@@ -89,16 +89,28 @@ export async function fetchScanById(id: string): Promise<ScanDetailResponse | nu
  * technology detail page (F-001 boundary fix).
  *
  * The server returns only the scans whose detections include the requested
- * technology, each reduced to a lean `{ scan, detections }` projection.
+ * technology, each reduced to a lean `{ scan, detections }` projection, plus
+ * pagination (`nextCursor` / `hasMore`) and a global `summary`
+ * (`scanCount` / `firstDetectedAt` for the Step 89 summary).
  *
  * @returns the matching scan summaries + their detections (possibly an empty
- *          list when no scan detected the technology)
+ *          list when no scan detected the technology), with `nextCursor` /
+ *          `hasMore` and a global `summary`
  * @throws {ApiError} if the server returns a non-200 status
  */
 export async function fetchScansByTechnology(
   technologyId: string,
+  options?: { limit?: number; cursor?: string | null },
 ): Promise<TechnologyScansResponse> {
-  const res = await fetch(`/api/scans?technologyId=${encodeURIComponent(technologyId)}`, {
+  const params = new URLSearchParams();
+  params.set('technologyId', technologyId);
+  if (options?.limit) {
+    params.set('limit', String(options.limit));
+  }
+  if (options?.cursor) {
+    params.set('cursor', options.cursor);
+  }
+  const res = await fetch(`/api/scans?${params.toString()}`, {
     cache: 'no-store',
   });
 

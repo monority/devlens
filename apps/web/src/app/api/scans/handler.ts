@@ -8,7 +8,13 @@
  * with zero Next.js dependencies.
  */
 
-import { executeScan, getScan, listScans, listScansByTechnology } from '@devlens/application';
+import {
+  executeScan,
+  getScan,
+  listScans,
+  listScansByTechnology,
+  listScanAggregate,
+} from '@devlens/application';
 import {
   createScan,
   createScanId,
@@ -17,7 +23,7 @@ import {
   createTimestamp,
   getObservationCoverage,
 } from '@devlens/core';
-import type { ScanResult } from '@devlens/application';
+import type { ScanResult, ListScanOptions, ScanCursor } from '@devlens/application';
 import type { Crawler } from '@devlens/crawler';
 import type { ScanResultRepository } from '@devlens/application';
 import type { Scan, ObservationCoverage, ScanResultQualitySummary } from '@devlens/core';
@@ -26,6 +32,7 @@ import type {
   DetectionResponse,
   TechnologyScanSummary,
   TechnologyScansResponse,
+  TechnologyScanAggregate,
 } from '../../../lib/types.js';
 import { detectionToResponse } from '../../../lib/detection-to-response';
 import { scanResultToSummary } from '../../../lib/scan-data';
@@ -391,6 +398,18 @@ export interface HandleGetOptions {
 }
 
 /**
+ * Options for {@link handleGetScansByTechnology} — extends the shared GET
+ * dependencies with the technology-scoped paging parameters parsed from the
+ * request URL (`limit`/`cursor` arrive as strings, decoded by the handler).
+ */
+export interface HandleGetScansByTechnologyOptions extends HandleGetOptions {
+  /** `limit` query param — undefined when absent (no page cap ⇒ load-all). */
+  limit?: string | null;
+  /** Opaque base64 `cursor` query param — undefined when absent (first page). */
+  cursor?: string | null;
+}
+
+/**
  * Handles GET /api/scans — lists all scan results.
  *
  * Returns all persisted scans in deterministic order
@@ -429,20 +448,83 @@ function resultToTechnologyScanSummary(result: ScanResult): TechnologyScanSummar
   };
 }
 
+/** Default page size for the technology detail page's scan listing. */
+const DEFAULT_PAGE_SIZE = 50;
+/** Hard cap on the page size requested by the client. */
+const MAX_PAGE_SIZE = 200;
+
+/** Empty aggregate returned when no scan matches (blank id / empty set). */
+const emptyAggregate: TechnologyScanAggregate = { scanCount: 0, firstDetectedAt: null };
+
+/**
+ * Parses the `limit` query-param string into a clamped page size.
+ * - `undefined`/`null`  → `undefined` (no page cap ⇒ load-all path).
+ * - non-numeric/NaN    → `DEFAULT_PAGE_SIZE`.
+ * - otherwise          → clamped to `[1, MAX_PAGE_SIZE]`.
+ */
+function parsePageSize(raw: string | null | undefined): number | undefined {
+  if (raw === null || raw === undefined) return undefined;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return DEFAULT_PAGE_SIZE;
+  return Math.max(1, Math.min(MAX_PAGE_SIZE, Math.trunc(n)));
+}
+
+/**
+ * Decodes an opaque base64 cursor into a `{ createdAt, scanId }` pair.
+ * Returns `null` for malformed cursors — the caller treats `null` as "start
+ * from the beginning", so a corrupt/invalid cursor degrades to the first
+ * page rather than failing the request.
+ */
+function decodeCursor(cursor: string): ScanCursor | null {
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(cursor, 'base64').toString('utf8'),
+    ) as Partial<ScanCursor>;
+    if (typeof parsed.createdAt === 'string' && typeof parsed.scanId === 'string') {
+      return { createdAt: parsed.createdAt, scanId: parsed.scanId };
+    }
+  } catch {
+    // malformed cursor ⇒ treat as first page
+  }
+  return null;
+}
+
+/**
+ * Encodes a `(createdAt, scanId)` position into the opaque base64 cursor
+ * format expected by the API. The page reads this back from the response as
+ * `nextCursor` and hands it to the next request, never interpreting it.
+ */
+function encodeCursor(createdAt: string, scanId: string): string {
+  return Buffer.from(JSON.stringify({ createdAt, scanId }), 'utf8').toString('base64');
+}
+
 /**
  * Handles `GET /api/scans?technologyId=<technologyId>` — the bulk,
  * technology-scoped scan listing backing the technology detail page
  * (F-001: the page no longer reads PostgreSQL directly).
  *
- * A single `listScansByTechnology` call (itself one repository `list()` call)
- * retrieves every scan whose detections include the given technology, then
- * each result is reduced to the lean `{ scan, detections }` projection the
- * page renders. Because only completed scans carry detections by
+ * A single `listScansByTechnology` call (itself one repository `list()`
+ * call) retrieves the scans whose detections include the given technology,
+ * then each result is reduced to the lean `{ scan, detections }` projection
+ * the page renders. Because only completed scans carry detections by
  * domain-model design, non-completed scans are naturally excluded by the
  * technology predicate — no per-scan DB round-trip and no HTTP N+1.
  *
- * - An empty/absent `technologyId` yields `{ scans: [] }` with HTTP 200 —
- *   never a 404 (a technology with no detected scans is a valid, empty view;
+ * Pagination (Step 97 §4 → implemented): when `limit` or `cursor` is
+ * supplied, the fetch is bounded — the repository applies a `(createdAt,
+ * scanId)` cursor `WHERE` + `LIMIT`. To detect a next page without a
+ * separate `COUNT` query, the handler fetches `pageSize + 1` rows and
+ * truncates; `nextCursor` is derived from the last row of the returned page.
+ *
+ * The Step 89 summary needs *global* totals (`scanCount`, `firstDetectedAt`)
+ * that are correct regardless of the current page — these cannot come from a
+ * single page, so a cheap `COUNT` + `MIN(createdAt)` aggregate
+ * (`listScanAggregate`) is fetched alongside the page. `lastDetectedAt` /
+ * `latestConfidence` need no aggregate: the newest scan is always the first
+ * row of page 1, which the client already holds.
+ *
+ * - An empty/absent `technologyId` yields an empty page with HTTP 200 — never
+ *   a 404 (a technology with no detected scans is a valid, empty view;
  *   unknown technology *ids* are handled upstream by the page's
  *   `getTechnologyById` → `notFound()`).
  * - Repository errors are returned as 500 with a generic message — no
@@ -450,16 +532,56 @@ function resultToTechnologyScanSummary(result: ScanResult): TechnologyScanSummar
  */
 export async function handleGetScansByTechnology(
   technologyId: string,
-  options: HandleGetOptions,
+  options: HandleGetScansByTechnologyOptions,
 ): Promise<HandleGetScansByTechnologyResult> {
   if (technologyId.trim() === '') {
-    return { status: 200, body: { scans: [] } };
-  }
-  try {
-    const results = await listScansByTechnology(technologyId, options.repository);
     return {
       status: 200,
-      body: { scans: results.map((r) => resultToTechnologyScanSummary(r)) },
+      body: { scans: [], nextCursor: null, hasMore: false, summary: emptyAggregate },
+    };
+  }
+
+  try {
+    const pageSize = parsePageSize(options.limit);
+    const after = options.cursor ? decodeCursor(options.cursor) : null;
+    const usePaging = pageSize !== undefined || after !== null;
+
+    // Fetch one extra row when paging so `hasMore` is computable without a
+    // second round-trip; otherwise load the full (filtered) set.
+    const listOptions: ListScanOptions | undefined = usePaging
+      ? { limit: (pageSize ?? DEFAULT_PAGE_SIZE) + 1, after: after ?? null }
+      : undefined;
+
+    const [results, aggregate] = await Promise.all([
+      listScansByTechnology(technologyId, options.repository, listOptions),
+      listScanAggregate(technologyId, options.repository),
+    ]);
+
+    let scans: ScanResult[];
+    let nextCursor: string | null = null;
+    let hasMore = false;
+
+    if (usePaging) {
+      const page = pageSize ?? DEFAULT_PAGE_SIZE;
+      hasMore = results.length > page;
+      scans = results.slice(0, page);
+      const last = scans[scans.length - 1];
+      nextCursor = hasMore && last ? encodeCursor(last.scan.createdAt, last.scan.id) : null;
+    } else {
+      scans = results;
+    }
+
+    return {
+      status: 200,
+      body: {
+        scans: scans.map((r) => resultToTechnologyScanSummary(r)),
+        nextCursor,
+        hasMore,
+        summary: {
+          scanCount: aggregate.scanCount,
+          firstDetectedAt: aggregate.firstDetectedAt,
+        },
+      },
     };
   } catch (error) {
     console.error('Failed to list scans by technology:', toLoggableError(error));

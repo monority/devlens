@@ -64,6 +64,7 @@ describe('POST /api/scans — request validation', () => {
     save: vi.fn().mockResolvedValue(undefined),
     getById: vi.fn(),
     list: vi.fn(),
+    aggregate: vi.fn().mockResolvedValue({ scanCount: 0, firstDetectedAt: null }),
   };
 
   it('returns 400 for malformed JSON', async () => {
@@ -143,6 +144,7 @@ describe('POST /api/scans — successful execution', () => {
       save: vi.fn().mockResolvedValue(undefined),
       getById: vi.fn(),
       list: vi.fn(),
+      aggregate: vi.fn().mockResolvedValue({ scanCount: 0, firstDetectedAt: null }),
     };
 
     const result = await handleCreateScan(
@@ -214,6 +216,7 @@ describe('POST /api/scans — successful execution', () => {
       save: vi.fn().mockResolvedValue(undefined),
       getById: vi.fn(),
       list: vi.fn(),
+      aggregate: vi.fn().mockResolvedValue({ scanCount: 0, firstDetectedAt: null }),
     };
 
     const result = await handleCreateScan(
@@ -237,6 +240,7 @@ describe('POST /api/scans — successful execution', () => {
       save: vi.fn().mockResolvedValue(undefined),
       getById: vi.fn(),
       list: vi.fn(),
+      aggregate: vi.fn().mockResolvedValue({ scanCount: 0, firstDetectedAt: null }),
     };
 
     const result = await handleCreateScan(
@@ -255,6 +259,7 @@ describe('POST /api/scans — successful execution', () => {
       save: vi.fn().mockResolvedValue(undefined),
       getById: vi.fn(),
       list: vi.fn(),
+      aggregate: vi.fn().mockResolvedValue({ scanCount: 0, firstDetectedAt: null }),
     };
     const detector: Detector = {
       detect: () => [
@@ -316,6 +321,7 @@ describe('POST /api/scans — successful execution', () => {
       save: vi.fn().mockResolvedValue(undefined),
       getById: vi.fn(),
       list: vi.fn(),
+      aggregate: vi.fn().mockResolvedValue({ scanCount: 0, firstDetectedAt: null }),
     };
 
     const result = await handleCreateScan(
@@ -385,6 +391,7 @@ describe('POST /api/scans — successful execution', () => {
       save: vi.fn().mockResolvedValue(undefined),
       getById: vi.fn(),
       list: vi.fn(),
+      aggregate: vi.fn().mockResolvedValue({ scanCount: 0, firstDetectedAt: null }),
     };
     const detector: Detector = {
       detect: () => [
@@ -435,6 +442,7 @@ describe('POST /api/scans — domain failure (crawler error)', () => {
       save: vi.fn().mockResolvedValue(undefined),
       getById: vi.fn(),
       list: vi.fn(),
+      aggregate: vi.fn().mockResolvedValue({ scanCount: 0, firstDetectedAt: null }),
     };
 
     const result = await handleCreateScan(
@@ -472,6 +480,7 @@ describe('POST /api/scans — domain failure (crawler error)', () => {
       save: vi.fn().mockResolvedValue(undefined),
       getById: vi.fn(),
       list: vi.fn(),
+      aggregate: vi.fn().mockResolvedValue({ scanCount: 0, firstDetectedAt: null }),
     };
 
     const result = await handleCreateScan(
@@ -500,6 +509,7 @@ describe('POST /api/scans — infrastructure failure (persistence)', () => {
       save: vi.fn().mockRejectedValue(new Error('Connection refused')),
       getById: vi.fn(),
       list: vi.fn(),
+      aggregate: vi.fn().mockResolvedValue({ scanCount: 0, firstDetectedAt: null }),
     };
 
     const result = await handleCreateScan(
@@ -523,6 +533,7 @@ describe('POST /api/scans — infrastructure failure (persistence)', () => {
       save: vi.fn().mockResolvedValue(undefined),
       getById: vi.fn(),
       list: vi.fn(),
+      aggregate: vi.fn().mockResolvedValue({ scanCount: 0, firstDetectedAt: null }),
     };
 
     const result = await handleCreateScan(
@@ -542,6 +553,7 @@ describe('POST /api/scans — detection version serialization', () => {
       save: vi.fn().mockResolvedValue(undefined),
       getById: vi.fn(),
       list: vi.fn(),
+      aggregate: vi.fn().mockResolvedValue({ scanCount: 0, firstDetectedAt: null }),
     };
   }
 

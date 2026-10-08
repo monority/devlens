@@ -181,8 +181,13 @@ describe('fetchScansByTechnology', () => {
     global.fetch = originalFetch;
   });
 
-  it('fetches /api/scans?technologyId=<id> and returns matching scans', async () => {
-    const data: TechnologyScansResponse = { scans: [mockTechnologyScan('scan_001')] };
+  it('fetches /api/scans?technologyId=<id> and returns matching scans + summary', async () => {
+    const data: TechnologyScansResponse = {
+      scans: [mockTechnologyScan('scan_001')],
+      nextCursor: null,
+      hasMore: false,
+      summary: { scanCount: 1, firstDetectedAt: '2025-06-01T12:00:00.000Z' },
+    };
     global.fetch = mockFetch(data);
 
     const result = await fetchScansByTechnology('nginx');
@@ -190,8 +195,59 @@ describe('fetchScansByTechnology', () => {
     expect(result.scans).toHaveLength(1);
     expect(result.scans[0]!.scan.id).toBe('scan_001');
     expect(result.scans[0]!.detections[0]!.technology.id).toBe('nginx');
+    expect(result.nextCursor).toBeNull();
+    expect(result.hasMore).toBe(false);
+    expect(result.summary).toEqual({
+      scanCount: 1,
+      firstDetectedAt: '2025-06-01T12:00:00.000Z',
+    });
     expect(global.fetch).toHaveBeenCalledWith('/api/scans?technologyId=nginx', {
       cache: 'no-store',
+    });
+  });
+
+  it('appends limit and cursor query params when provided', async () => {
+    global.fetch = mockFetch({
+      scans: [],
+      nextCursor: null,
+      hasMore: false,
+      summary: { scanCount: 0, firstDetectedAt: null },
+    });
+
+    await fetchScansByTechnology('nginx', { limit: 50, cursor: 'cursor-token' });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/scans?technologyId=nginx&limit=50&cursor=cursor-token',
+      { cache: 'no-store' },
+    );
+  });
+
+  it('omits limit/cursor when not provided', async () => {
+    global.fetch = mockFetch({ scans: [] });
+
+    await fetchScansByTechnology('nginx');
+
+    expect(global.fetch).toHaveBeenCalledWith('/api/scans?technologyId=nginx', {
+      cache: 'no-store',
+    });
+  });
+
+  it('parses nextCursor, hasMore and summary from the response', async () => {
+    const data: TechnologyScansResponse = {
+      scans: [mockTechnologyScan('scan_001')],
+      nextCursor: 'next-cursor-value',
+      hasMore: true,
+      summary: { scanCount: 42, firstDetectedAt: '2025-01-01T00:00:00.000Z' },
+    };
+    global.fetch = mockFetch(data);
+
+    const result = await fetchScansByTechnology('nginx');
+
+    expect(result.nextCursor).toBe('next-cursor-value');
+    expect(result.hasMore).toBe(true);
+    expect(result.summary).toEqual({
+      scanCount: 42,
+      firstDetectedAt: '2025-01-01T00:00:00.000Z',
     });
   });
 

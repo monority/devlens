@@ -11,7 +11,7 @@
  * (never: API → database)
  */
 
-import type { ScanResultRepository } from './repository.js';
+import type { ScanResultRepository, ListScanOptions } from './repository.js';
 import type { ScanResult } from './orchestrator.js';
 import type { ScanId } from '@devlens/core';
 
@@ -53,8 +53,9 @@ export async function getScan(
 export async function listScansByTechnology(
   technologyId: string,
   repository: ScanResultRepository,
+  options?: ListScanOptions,
 ): Promise<ScanResult[]> {
-  return listScans(repository, technologyId);
+  return listScans(repository, technologyId, options);
 }
 
 /**
@@ -78,6 +79,23 @@ export async function listScansByTechnology(
 export async function listScans(
   repository: ScanResultRepository,
   technologyId?: string,
+  options?: ListScanOptions,
 ): Promise<ScanResult[]> {
-  return repository.list(technologyId);
+  return repository.list(technologyId, options);
+}
+
+/**
+ * Technology-scoped aggregate rollup backing the Step 89 summary on the
+ * technology detail page (`GET /api/scans?technologyId=<id>`).
+ *
+ * Returns only the cheap, global scalars (`scanCount` + `firstDetectedAt`)
+ * needed for totals/first-detection date — never the full detection set — so
+ * the summary stays correct across pages without a load-everything query.
+ *
+ * @param technologyId — the canonical technology id to match against
+ * @param repository   — the persistence implementation
+ * @returns the technology-scoped scan count and earliest detection timestamp
+ */
+export async function listScanAggregate(technologyId: string, repository: ScanResultRepository) {
+  return repository.aggregate(technologyId);
 }

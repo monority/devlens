@@ -133,9 +133,7 @@ export default async function ScanDetailPage({
 
             <div className={styles.scanMeta}>
               <ScanStatusBadge
-                status={
-                  result.scan.status as 'pending' | 'running' | 'completed' | 'failed'
-                }
+                status={result.scan.status as 'pending' | 'running' | 'completed' | 'failed'}
               />
               {isTerminal(result.scan.status) && (
                 <span className={styles.detectionCount}>
@@ -149,10 +147,7 @@ export default async function ScanDetailPage({
               <div className={styles.targetUrl}>
                 {result.scan.target}
                 {result.snapshot?.hostname && (
-                  <span className={styles.targetHostname}>
-                    {' '}
-                    ↗ {result.snapshot.hostname}
-                  </span>
+                  <span className={styles.targetHostname}> ↗ {result.snapshot.hostname}</span>
                 )}
               </div>
             )}

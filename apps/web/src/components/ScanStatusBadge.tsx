@@ -31,7 +31,10 @@ export interface ScanStatusBadgeProps {
   showDot?: boolean;
 }
 
-export function ScanStatusBadge({ status, showDot = true }: ScanStatusBadgeProps): React.ReactElement {
+export function ScanStatusBadge({
+  status,
+  showDot = true,
+}: ScanStatusBadgeProps): React.ReactElement {
   const meta = statusMeta[status];
   return (
     <span className={`${styles.statusBadge} ${meta.className}`}>

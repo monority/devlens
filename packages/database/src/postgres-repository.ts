@@ -18,10 +18,15 @@
  * `ScanResultRepository` interface only.
  */
 
-import { eq, desc, asc, sql } from 'drizzle-orm';
+import { eq, desc, asc, sql, and, type SQL } from 'drizzle-orm';
 import type { Database } from './client.js';
 import { scans, snapshots } from './schema.js';
-import type { ScanResult, ScanResultRepository } from '@devlens/application';
+import type {
+  ScanResult,
+  ScanResultRepository,
+  ListScanOptions,
+  ScanAggregate,
+} from '@devlens/application';
 import type {
   Scan,
   ScanId,
@@ -362,52 +367,103 @@ export class PostgresScanResultRepository implements ScanResultRepository {
   }
 
   /**
-   * Returns all scan results in deterministic order:
-   * `createdAt DESC, scanId ASC`.
+   * Returns scan results in deterministic order: `createdAt DESC, scanId ASC`.
    *
    * Uses a single `LEFT JOIN` so that scans without snapshots (failed
-   * scans) are included in one round-trip — no per-scan snapshot
-   * query (eliminates the N+1 that existed when this method issued a
-   * separate `SELECT FROM snapshots WHERE scan_id = ?` per scan).
-   * Empty repository returns `[]`.
+   * scans) are included in one round-trip — no per-scan snapshot query
+   * (eliminates the N+1 that existed when this method issued a separate
+   * `SELECT FROM snapshots WHERE scan_id = ?` per scan). Empty repository
+   * returns `[]`. The 1:1 relationship (`snapshots.scan_id` is the PK)
+   * guarantees at most one row per scan — no multiplication/duplicates.
    *
-   * The 1:1 relationship (`snapshots.scan_id` is the primary key)
-   * guarantees the join produces at most one row per scan — no row
-   * multiplication, no duplicates.
+   * When `technologyId` is provided, a `WHERE EXISTS` clause filters at
+   * the SQL level using a JSONB path scan of `detections` — only scans
+   * whose detections include a detection with a matching `technology.id`
+   * are returned. This replaces the load-all-then-filter pattern, avoiding
+   * transfer of data for scans that will be discarded by the filter.
    *
-   * When `technologyId` is provided, a `WHERE EXISTS` clause filters
-   * at the SQL level using a JSONB path scan of the `detections`
-   * column — only scans whose detections include a detection with a
-   * matching `technology.id` are returned. This replaces the
-   * load-all-then-filter pattern that previously lived in
-   * `listScansByTechnology` (now `list(technologyId)` delegates to this
-   * method), avoiding transfer of scan/snapshot data for scans that
-   * will be discarded by the filter.
+   * Pagination (`options`): when `options.limit` is set, a cursor clause
+   * continues strictly after `options.after` (`createdAt DESC, scanId ASC`):
+   *   `createdAt < after.createdAt
+   *    OR (createdAt = after.createdAt AND scanId > after.scanId)`
+   * plus a `LIMIT`, so one round-trip serves a full page — no N+1. The API
+   * layer fetches `limit + 1` to detect a next page and truncates before
+   * returning.
    */
-  async list(technologyId?: string): Promise<ScanResult[]> {
-    const query = this.db.select().from(scans).leftJoin(snapshots, eq(scans.id, snapshots.scanId));
+  async list(technologyId?: string, options?: ListScanOptions): Promise<ScanResult[]> {
+    const base = this.db.select().from(scans).leftJoin(snapshots, eq(scans.id, snapshots.scanId));
 
+    const conditions: SQL<unknown>[] = [];
     if (technologyId !== undefined) {
-      query.where(
+      conditions.push(
         sql`EXISTS (
           SELECT 1 FROM jsonb_array_elements(${snapshots.detections}) AS d
           WHERE d->'technology'->>'id' = ${technologyId}
         )`,
       );
     }
+    const after = options?.after;
+    if (after) {
+      // Cursor: strictly after (createdAt, scanId) in `createdAt DESC, scanId ASC`
+      // order => newer rows, OR (same timestamp AND greater id).
+      const cursorAt = new Date(after.createdAt);
+      conditions.push(
+        sql`(${scans.createdAt} < ${cursorAt}::timestamptz
+          OR (${scans.createdAt} = ${cursorAt}::timestamptz AND ${scans.id} > ${after.scanId}))`,
+      );
+    }
 
-    const rows = await query.orderBy(desc(scans.createdAt), asc(scans.id));
+    const withWhere = conditions.length > 0 ? base.where(and(...conditions)) : base;
+    const withLimit = options?.limit !== undefined ? withWhere.limit(options.limit) : withWhere;
+    const rows = await withLimit.orderBy(desc(scans.createdAt), asc(scans.id));
 
     return rows.map((row) =>
       rowsToResult(
         row.scans as ScanRow,
         // Drizzle returns `null` for the unmatched right-hand side of a
         // LEFT JOIN. Convert to `undefined` to match the old per-scan-query
-        // miss path (`snapshotRows[0]` → undefined). The non-null case is
+        // miss path (`snapshotRows[0]` => undefined). The non-null case is
         // cast to SnapshotRow because Drizzle infers jsonb columns as
         // `unknown` (the same cast getById already applies).
         row.snapshots === null ? undefined : (row.snapshots as SnapshotRow),
       ),
     );
+  }
+
+  /**
+   * Cheap technology-scoped aggregate rollup for the Step 89 summary: a single
+   * `COUNT(*)` + `MIN(scans.createdAt)` row, filtered by the same JSONB
+   * `EXISTS` predicate as {@link list}. Index-friendly and payload-free — it
+   * never loads scan/snapshot rows, so totals / first-detection stay cheap no
+   * matter how many pages of detections exist. `scanCount`/`firstDetectedAt`
+   * are global (independent of the current page).
+   *
+   * (Untested against a live database in this environment — `DATABASE_URL`
+   * is unset — but mirrors the `WHERE EXISTS` predicate proven by `list()`.)
+   */
+  async aggregate(technologyId: string): Promise<ScanAggregate> {
+    const rows = await this.db
+      .select({
+        scanCount: sql<number>`COUNT(*)`,
+        firstDetectedAt: sql<string | null>`MIN(${scans.createdAt})`,
+      })
+      .from(scans)
+      .leftJoin(snapshots, eq(scans.id, snapshots.scanId))
+      .where(
+        sql`EXISTS (
+          SELECT 1 FROM jsonb_array_elements(${snapshots.detections}) AS d
+          WHERE d->'technology'->>'id' = ${technologyId}
+        )`,
+      );
+
+    const row = rows[0];
+    if (!row) {
+      return { scanCount: 0, firstDetectedAt: null };
+    }
+    return {
+      scanCount: row.scanCount,
+      firstDetectedAt:
+        row.firstDetectedAt == null ? null : new Date(row.firstDetectedAt).toISOString(),
+    };
   }
 }

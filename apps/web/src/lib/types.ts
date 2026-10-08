@@ -480,6 +480,32 @@ export interface TechnologyScanSummary {
  */
 export interface TechnologyScansResponse {
   scans: TechnologyScanSummary[];
+  /** Opaque base64 cursor to the start of the next page; `null` when no more. */
+  nextCursor: string | null;
+  /** `true` iff a next page of scans exists after the current page. */
+  hasMore: boolean;
+  /**
+   * Global rollup (Step 89 summary support), decoupled from the paginated
+   * `scans` slice so totals / first-detection stay correct across pages.
+   */
+  summary: TechnologyScanAggregate;
+}
+
+/**
+ * Global aggregate rollup returned alongside the (paginated) scan list by
+ * `GET /api/scans?technologyId=<id>`.
+ *
+ * - `scanCount`: TOTAL number of scans whose detections include the
+ *   technology — independent of the current page.
+ * - `firstDetectedAt`: the earliest detection timestamp (`null` when none)
+ *   — the true "first seen", independent of the current page.
+ *
+ * `lastDetectedAt` / `latestConfidence` are not needed here: the newest scan
+ * is always the first row of page 1, which the client already holds.
+ */
+export interface TechnologyScanAggregate {
+  scanCount: number;
+  firstDetectedAt: string | null;
 }
 
 // ─── Error response ──────────────────────────────────────────────────

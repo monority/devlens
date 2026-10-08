@@ -158,10 +158,34 @@ describe('TechnologyDetailPage — wiring (Step 88)', () => {
     const html = renderToString(element);
     const cleaned = html.replace(/<!-- -->/g, '');
 
-    // fetchDetectedScans returns null → TechnologyDetectedInScans error state.
+    // fetchDetectedScansPage returns null => TechnologyDetectedInScans error state.
     expect(cleaned).toContain('Unable to load scan data for this technology.');
     // No timeline and no summary when data is unavailable.
     expect(cleaned).not.toContain('Detection history');
     expect(cleaned).not.toContain('Detection history summary');
+  });
+
+  it('renders a "Load more" button when the first page has more results', async () => {
+    mockFetchScansByTechnology.mockResolvedValue({
+      scans: [
+        makeTechnologyScanSummary(
+          'scan_001',
+          '2025-06-01T12:00:00.000Z',
+          '2025-06-01T12:00:05.000Z',
+          [makeDetection('nginx', 80, [{ type: 'http_header', name: 'Server', value: 'nginx' }])],
+        ),
+      ],
+      nextCursor: 'next-page-cursor',
+      hasMore: true,
+      summary: { scanCount: 3, firstDetectedAt: '2025-06-01T12:00:00.000Z' },
+    });
+
+    const element = await TechnologyDetailPage({
+      params: Promise.resolve({ id: 'nginx' }),
+    });
+    const html = renderToString(element);
+    const cleaned = html.replace(/<!-- -->/g, '');
+
+    expect(cleaned).toContain('Load more');
   });
 });
